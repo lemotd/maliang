@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'dart:io';
 import '../models/memory_item.dart';
 
@@ -64,7 +65,10 @@ class MemoryListItem extends StatelessWidget {
                     width: 60,
                     height: 60,
                     color: const Color(0xFFF2F2F7),
-                    child: const Icon(Icons.image, color: Color(0xFFC7C7CC)),
+                    child: const Icon(
+                      CupertinoIcons.photo,
+                      color: Color(0xFFC7C7CC),
+                    ),
                   ),
                 ),
               )
@@ -88,7 +92,7 @@ class MemoryListItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    memory.title,
+                    _getDisplayTitle(),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
@@ -131,7 +135,11 @@ class MemoryListItem extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Color(0xFFC7C7CC), size: 20),
+            const Icon(
+              CupertinoIcons.chevron_right,
+              color: Color(0xFFC7C7CC),
+              size: 20,
+            ),
           ],
         ),
       ),
@@ -141,13 +149,46 @@ class MemoryListItem extends StatelessWidget {
   IconData _getCategoryIcon() {
     switch (memory.category) {
       case MemoryCategory.pickupCode:
-        return Icons.restaurant;
+        return CupertinoIcons.cube_box;
       case MemoryCategory.packageCode:
-        return Icons.inventory_2;
+        return CupertinoIcons.cube;
       case MemoryCategory.bill:
-        return Icons.receipt_long;
+        return CupertinoIcons.doc_text;
       case MemoryCategory.note:
-        return Icons.note;
+        return CupertinoIcons.square_pencil;
     }
+  }
+
+  String _getDisplayTitle() {
+    var title = memory.title;
+    final categoryLabel = memory.category.label;
+    
+    final prefixes = [
+      '$categoryLabel：',
+      '$categoryLabel:',
+      '取餐码：',
+      '取餐码:',
+      '取件码：',
+      '取件码:',
+      '消费 ',
+      '支出 ',
+      '收入 ',
+    ];
+    
+    for (final prefix in prefixes) {
+      if (title.startsWith(prefix)) {
+        title = title.substring(prefix.length);
+        break;
+      }
+    }
+    
+    // 为账单标题添加收支符号
+    if (memory.category == MemoryCategory.bill) {
+      if (!title.startsWith('-') && !title.startsWith('+')) {
+        title = '-$title';
+      }
+    }
+    
+    return title;
   }
 }

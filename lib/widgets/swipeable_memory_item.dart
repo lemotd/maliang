@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'dart:io';
 import '../models/memory_item.dart';
 
@@ -16,6 +17,15 @@ class SwipeableMemoryItem extends StatefulWidget {
     this.onToggleComplete,
   });
 
+  static _SwipeableMemoryItemState? _openedState;
+
+  static void closeAll() {
+    if (_openedState != null && _openedState!.mounted) {
+      _openedState!._animateReset();
+    }
+    _openedState = null;
+  }
+
   @override
   State<SwipeableMemoryItem> createState() => _SwipeableMemoryItemState();
 }
@@ -25,8 +35,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
   late AnimationController _resetController;
   late Animation<double> _resetAnimation;
   double _dragExtent = 0;
-  static const double _actionThreshold = 80;
-  static const double _maxDragExtent = 140;
+  static const double _stage1Threshold = 60;
   bool _isDragging = false;
 
   @override
@@ -57,19 +66,52 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
   void _handleDragStart(DragStartDetails details) {
     _isDragging = true;
     _resetController.stop();
+    // 关闭其他打开的菜单
+    if (SwipeableMemoryItem._openedState != null &&
+        SwipeableMemoryItem._openedState != this) {
+      SwipeableMemoryItem.closeAll();
+    }
   }
 
   void _handleDragEnd(DragEndDetails details) {
     _isDragging = false;
 
-    if (_dragExtent > _actionThreshold) {
-      widget.onToggleComplete?.call();
-    }
+    final screenWidth = MediaQuery.of(context).size.width;
+    final halfScreen = screenWidth * 0.5;
+    final absDrag = _dragExtent.abs();
 
-    _animateReset();
+    if (absDrag > halfScreen) {
+      // 二阶段松手触发操作
+      if (_dragExtent > 0) {
+        widget.onToggleComplete?.call();
+      } else {
+        widget.onDelete?.call();
+      }
+      _animateReset();
+    } else if (absDrag > _stage1Threshold) {
+      // 一阶段松手后平滑过渡到保持位置
+      _animateToHoldPosition();
+      SwipeableMemoryItem._openedState = this;
+    } else {
+      _animateReset();
+    }
+  }
+
+  void _animateToHoldPosition() {
+    final targetExtent = _dragExtent > 0
+        ? _stage1Threshold + 10.0
+        : -(_stage1Threshold + 10.0);
+    _resetAnimation = Tween<double>(begin: _dragExtent, end: targetExtent)
+        .animate(
+          CurvedAnimation(parent: _resetController, curve: Curves.easeOutCubic),
+        );
+    _resetController.forward(from: 0);
   }
 
   void _animateReset() {
+    if (SwipeableMemoryItem._openedState == this) {
+      SwipeableMemoryItem._openedState = null;
+    }
     _resetAnimation = Tween<double>(begin: _dragExtent, end: 0).animate(
       CurvedAnimation(parent: _resetController, curve: Curves.easeOutCubic),
     );
@@ -78,12 +120,38 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
   void _handleDragUpdate(DragUpdateDetails details) {
     final delta = details.delta.dx;
-    final resistance = _dragExtent > _actionThreshold ? 0.4 : 1.0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final halfScreen = screenWidth * 0.5;
+    final absDrag = _dragExtent.abs();
+
+    // 根据滑动阶段计算阻尼
+    double resistance;
+    if (absDrag < _stage1Threshold) {
+      // 一阶段前：正常滑动
+      resistance = 1.0;
+    } else if (absDrag < halfScreen) {
+      // 一阶段到二阶段：轻微阻尼
+      resistance = 0.7;
+    } else {
+      // 二阶段后：更大阻尼
+      resistance = 0.3;
+    }
 
     setState(() {
       _dragExtent += delta * resistance;
-      _dragExtent = _dragExtent.clamp(0.0, _maxDragExtent);
+      // 限制范围：左滑最大-halfScreen-50，右滑最大halfScreen+50
+      _dragExtent = _dragExtent.clamp(-(halfScreen + 50), halfScreen + 50);
     });
+  }
+
+  void _onRightPillTap() {
+    widget.onToggleComplete?.call();
+    _animateReset();
+  }
+
+  void _onLeftPillTap() {
+    widget.onDelete?.call();
+    _animateReset();
   }
 
   String _formatTime(DateTime time) {
@@ -103,91 +171,106 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     }
   }
 
+  String _getDisplayTitle() {
+    var title = widget.memory.title;
+    final categoryLabel = widget.memory.category.label;
+
+    final prefixes = [
+      '$categoryLabel：',
+      '$categoryLabel:',
+      '取餐码：',
+      '取餐码:',
+      '取件码：',
+      '取件码:',
+      '消费 ',
+      '支出 ',
+      '收入 ',
+    ];
+
+    for (final prefix in prefixes) {
+      if (title.startsWith(prefix)) {
+        title = title.substring(prefix.length);
+        break;
+      }
+    }
+
+    // 为账单标题添加收支符号
+    if (widget.memory.category == MemoryCategory.bill) {
+      if (!title.startsWith('-') && !title.startsWith('+')) {
+        title = '-$title';
+      }
+    }
+
+    return title;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final showComplete = _dragExtent > 0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final halfScreen = screenWidth * 0.5;
+    final isStage2 = _dragExtent.abs() > halfScreen;
+    final isRightSwipe = _dragExtent > 0;
+    final isLeftSwipe = _dragExtent < 0;
+
+    // 右滑：完成/待办
     final isCompleted = widget.memory.isCompleted;
-    final actionColor = isCompleted
+    final rightActionColor = isCompleted
         ? const Color(0xFFFF9500)
         : const Color(0xFF34C759);
-    final actionText = isCompleted ? '待办' : '完成';
-    final progress = (_dragExtent / _actionThreshold).clamp(0.0, 1.0);
-    final showText = _dragExtent > 100;
+    final rightActionText = isCompleted ? '待办' : '完成';
+    final rightActionIcon = isCompleted
+        ? CupertinoIcons.arrow_2_circlepath
+        : CupertinoIcons.check_mark_circled;
+
+    // 左滑：删除
+    const leftActionColor = Color(0xFFFF3B30);
+    const leftActionText = '删除';
+    const leftActionIcon = CupertinoIcons.trash;
 
     return Stack(
+      clipBehavior: Clip.none,
       children: [
-        if (showComplete)
-          Positioned.fill(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
-                color: Color.lerp(
-                  actionColor.withOpacity(0.15),
-                  actionColor,
-                  progress,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: _dragExtent,
-                  child: Center(
-                    child: Icon(
-                      isCompleted ? Icons.replay : Icons.check_circle_outline,
-                      color: Color.lerp(actionColor, Colors.white, progress),
-                      size: 24 + progress * 4,
-                    ),
-                  ),
-                ),
-              ),
+        // 右滑按钮（显示在左侧）
+        if (isRightSwipe)
+          Positioned(
+            left: 16,
+            top: 6,
+            bottom: 6,
+            width: _dragExtent - 8,
+            child: _buildActionButton(
+              isStage2: isStage2,
+              actionColor: rightActionColor,
+              actionText: rightActionText,
+              actionIcon: rightActionIcon,
+              onTap: _onRightPillTap,
+              dragExtent: _dragExtent,
             ),
           ),
-        if (showComplete && showText)
-          Positioned.fill(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
-                color: actionColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: _dragExtent,
-                  child: Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isCompleted
-                              ? Icons.replay
-                              : Icons.check_circle_outline,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          actionText,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+        // 左滑按钮（显示在右侧）
+        if (isLeftSwipe)
+          Positioned(
+            right: 16,
+            top: 6,
+            bottom: 6,
+            width: _dragExtent.abs() - 8,
+            child: _buildActionButton(
+              isStage2: isStage2,
+              actionColor: leftActionColor,
+              actionText: leftActionText,
+              actionIcon: leftActionIcon,
+              onTap: _onLeftPillTap,
+              dragExtent: _dragExtent.abs(),
             ),
           ),
+        // 列表内容
         GestureDetector(
           onHorizontalDragStart: _handleDragStart,
           onHorizontalDragUpdate: _handleDragUpdate,
           onHorizontalDragEnd: _handleDragEnd,
-          onTap: widget.onTap,
-          onLongPress: widget.onDelete,
+          onTap: () {
+            SwipeableMemoryItem.closeAll();
+            widget.onTap?.call();
+          },
           child: Transform.translate(
             offset: Offset(_dragExtent, 0),
             child: _buildContent(),
@@ -195,6 +278,109 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
         ),
       ],
     );
+  }
+
+  Widget _buildActionButton({
+    required bool isStage2,
+    required Color actionColor,
+    required String actionText,
+    required IconData actionIcon,
+    required VoidCallback? onTap,
+    required double dragExtent,
+  }) {
+    return Center(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          width: _calculateButtonWidth(dragExtent: dragExtent),
+          height: 40,
+          decoration: BoxDecoration(
+            color: actionColor,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: actionColor.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    right: 30,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 150),
+                      curve: Curves.easeOut,
+                      opacity: isStage2 ? 1.0 : 0.0,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          actionText,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  AnimatedAlign(
+                    duration: const Duration(milliseconds: 150),
+                    curve: Curves.easeOut,
+                    alignment: isStage2
+                        ? Alignment.centerRight
+                        : Alignment.center,
+                    child: Opacity(
+                      opacity: _calculateIconOpacity(dragExtent: dragExtent),
+                      child: Transform.scale(
+                        scale: _calculateIconScale(dragExtent: dragExtent),
+                        child: Icon(actionIcon, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  double _calculateButtonWidth({required double dragExtent}) {
+    if (dragExtent <= _stage1Threshold) {
+      final progress = (dragExtent / _stage1Threshold).clamp(0.0, 1.0);
+      return 52 * progress;
+    } else {
+      return dragExtent.clamp(52.0, 200.0);
+    }
+  }
+
+  double _calculateIconOpacity({required double dragExtent}) {
+    if (dragExtent >= _stage1Threshold) {
+      return 1.0;
+    }
+    final progress = (dragExtent / _stage1Threshold).clamp(0.0, 1.0);
+    return progress;
+  }
+
+  double _calculateIconScale({required double dragExtent}) {
+    if (dragExtent >= _stage1Threshold) {
+      return 1.0;
+    }
+    final progress = (dragExtent / _stage1Threshold).clamp(0.0, 1.0);
+    return 0.5 + progress * 0.5;
   }
 
   Widget _buildContent() {
@@ -211,7 +397,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -225,7 +411,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
           if (widget.memory.thumbnailPath != null ||
               widget.memory.imagePath != null)
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
               child: ColorFiltered(
                 colorFilter: isCompleted
                     ? const ColorFilter.matrix(<double>[
@@ -281,7 +467,10 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
                     width: 60,
                     height: 60,
                     color: const Color(0xFFF2F2F7),
-                    child: const Icon(Icons.image, color: Color(0xFFC7C7CC)),
+                    child: const Icon(
+                      CupertinoIcons.photo,
+                      color: Color(0xFFC7C7CC),
+                    ),
                   ),
                 ),
               ),
@@ -292,7 +481,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
               height: 60,
               decoration: BoxDecoration(
                 color: const Color(0xFFF2F2F7),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 _getCategoryIcon(),
@@ -308,7 +497,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.memory.title,
+                  _getDisplayTitle(),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
@@ -352,7 +541,13 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, color: Color(0xFFC7C7CC), size: 20),
+          Icon(
+            CupertinoIcons.chevron_right,
+            color: isCompleted
+                ? const Color(0xFFE5E5EA)
+                : const Color(0xFFC7C7CC),
+            size: 20,
+          ),
         ],
       ),
     );
@@ -361,13 +556,13 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
   IconData _getCategoryIcon() {
     switch (widget.memory.category) {
       case MemoryCategory.pickupCode:
-        return Icons.restaurant;
+        return CupertinoIcons.cube_box;
       case MemoryCategory.packageCode:
-        return Icons.inventory_2;
+        return CupertinoIcons.cube;
       case MemoryCategory.bill:
-        return Icons.receipt_long;
+        return CupertinoIcons.doc_text;
       case MemoryCategory.note:
-        return Icons.note;
+        return CupertinoIcons.square_pencil;
     }
   }
 }

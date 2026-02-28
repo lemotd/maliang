@@ -38,7 +38,7 @@ class _SkeletonListItemState extends State<SkeletonListItem>
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -61,7 +61,7 @@ class _SkeletonListItemState extends State<SkeletonListItem>
                     const Color(0xFFF2F2F7),
                     _animation.value,
                   ),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                 ),
               );
             },
