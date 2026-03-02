@@ -517,7 +517,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 8),
             const Text(
-              '点击下方按钮或分享图片',
+              '点击下方按钮或分享图片到这里',
               style: TextStyle(fontSize: 14, color: Color(0xFFC7C7CC)),
             ),
           ],
