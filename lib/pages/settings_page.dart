@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:ui';
 import '../services/config_service.dart';
 
@@ -16,6 +18,7 @@ class _SettingsPageState extends State<SettingsPage> {
   final _apiKeyController = TextEditingController();
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _obscureApiKey = true;
 
   @override
   void initState() {
@@ -66,78 +69,84 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF2F2F7),
-      body: Column(
-        children: [
-          _buildAppBar(context),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView(
-                    physics: const BouncingScrollPhysics(
-                      parent: AlwaysScrollableScrollPhysics(),
-                    ),
-                    children: [
-                      const SizedBox(height: 20),
-                      _buildSection(
-                        title: 'AI 配置',
-                        children: [
-                          _buildInputField(
-                            title: 'API地址',
-                            controller: _apiAddressController,
-                            placeholder: '请输入API地址',
-                          ),
-                          _buildDivider(),
-                          _buildInputField(
-                            title: 'API密钥',
-                            controller: _apiKeyController,
-                            placeholder: '请输入API密钥',
-                            obscureText: true,
-                          ),
-                        ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildAppBar(context),
+            const SizedBox(height: 12),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView(
+                      physics: const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
                       ),
-                    ],
-                  ),
-          ),
-        ],
+                      children: [
+                        _buildInputField(
+                          title: 'API地址',
+                          controller: _apiAddressController,
+                          placeholder: '请输入API地址',
+                        ),
+                        _buildInputField(
+                          title: 'API Key',
+                          controller: _apiKeyController,
+                          placeholder: '请输入API Key',
+                          obscureText: _obscureApiKey,
+                          suffixIcon: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _obscureApiKey = !_obscureApiKey;
+                              });
+                            },
+                            child: Icon(
+                              _obscureApiKey
+                                  ? CupertinoIcons.eye
+                                  : CupertinoIcons.eye_slash,
+                              color: const Color(0xFF8E8E93),
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildApiKeyGuide(context),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildAppBar(BuildContext context) {
-    return Container(
-      color: Colors.transparent,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 52,
-          child: Stack(
-            children: [
-              Positioned(
-                left: 0,
-                top: 0,
-                child: _BackButton(onTap: () => Navigator.pop(context)),
-              ),
-              const Positioned(
-                left: 60,
-                right: 60,
-                top: 0,
-                child: SizedBox(
-                  height: 52,
-                  child: Center(
-                    child: Text(
-                      '设置',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A),
-                      ),
-                    ),
+    return SizedBox(
+      height: 52,
+      child: Stack(
+        children: [
+          Positioned(
+            left: 0,
+            top: 0,
+            child: _BackButton(onTap: () => Navigator.pop(context)),
+          ),
+          const Positioned(
+            left: 60,
+            right: 60,
+            top: 0,
+            child: SizedBox(
+              height: 52,
+              child: Center(
+                child: Text(
+                  '设置',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF1A1A1A),
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -173,33 +182,55 @@ class _SettingsPageState extends State<SettingsPage> {
     required TextEditingController controller,
     required String placeholder,
     bool obscureText = false,
+    Widget? suffixIcon,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 70,
-            child: Text(
-              title,
-              style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A1A)),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF1A1A1A),
             ),
           ),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              obscureText: obscureText,
-              style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A1A)),
-              decoration: InputDecoration(
-                hintText: placeholder,
-                hintStyle: const TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFFC7C7CC),
-                ),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-                isDense: true,
+          const SizedBox(height: 8),
+          TextField(
+            controller: controller,
+            obscureText: obscureText,
+            style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A1A)),
+            decoration: InputDecoration(
+              hintText: placeholder,
+              hintStyle: const TextStyle(
+                fontSize: 16,
+                color: Color(0xFFC7C7CC),
               ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFE5E5EA)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFE5E5EA)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Color(0xFF007AFF),
+                  width: 1.5,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              suffixIcon: suffixIcon,
             ),
           ),
         ],
@@ -212,6 +243,94 @@ class _SettingsPageState extends State<SettingsPage> {
       margin: const EdgeInsets.only(left: 102),
       height: 0.5,
       color: const Color(0xFFE5E5EA),
+    );
+  }
+
+  Widget _buildApiKeyGuide(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                CupertinoIcons.info_circle,
+                size: 18,
+                color: Color(0xFF007AFF),
+              ),
+              SizedBox(width: 8),
+              Text(
+                'API Key 配置说明',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '1. 访问智谱AI开放平台获取 API Key',
+            style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () async {
+              final uri = Uri.parse(
+                'https://bigmodel.cn/usercenter/proj-mgmt/apikeys',
+              );
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF2F2F7),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'https://bigmodel.cn/usercenter/proj-mgmt/apikeys',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF007AFF),
+                        decoration: TextDecoration.underline,
+                        decorationColor: Color(0xFF007AFF),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Icon(
+                    CupertinoIcons.arrow_up_right,
+                    size: 16,
+                    color: Color(0xFF007AFF),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '2. 登录后创建项目，在 API Key 管理页面获取密钥',
+            style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '3. 将 API Key 粘贴到上方输入框中保存',
+            style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+          ),
+        ],
+      ),
     );
   }
 }
