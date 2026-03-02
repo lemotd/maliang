@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/memory_item.dart';
 
 typedef MemoryActionCallback = void Function(int? memoryIdHash);
@@ -13,6 +14,9 @@ class NotificationService {
     'com.maliang.maliang_notes/notification',
   );
 
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
+
   bool _initialized = false;
   MemoryActionCallback? onCompleteMemory;
   MemoryActionCallback? onOpenDetail;
@@ -20,8 +24,17 @@ class NotificationService {
   Future<void> initialize() async {
     if (_initialized) return;
 
+    // 初始化本地通知
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
+    const initSettings = InitializationSettings(android: androidSettings);
+
+    await _notifications.initialize(initSettings);
+
     _channel.setMethodCallHandler(_handleMethodCall);
     _initialized = true;
+    debugPrint('通知服务初始化完成');
   }
 
   Future<dynamic> _handleMethodCall(MethodCall call) async {
@@ -49,11 +62,15 @@ class NotificationService {
     if (!_initialized) await initialize();
 
     try {
+      debugPrint(
+        '调用原生通知: id=${memory.id.hashCode}, title=${memory.title}, category=${memory.category.label}',
+      );
       await _channel.invokeMethod('showLiveUpdateNotification', {
         'id': memory.id.hashCode,
         'title': memory.title,
         'category': memory.category.label,
       });
+      debugPrint('原生通知调用成功');
     } catch (e) {
       debugPrint('显示实时通知失败: $e');
     }
@@ -78,6 +95,16 @@ class NotificationService {
   }
 
   Future<bool> requestNotificationPermission() async {
-    return true;
+    final android = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
+    if (android != null) {
+      final granted = await android.requestNotificationsPermission();
+      debugPrint('通知权限请求结果: $granted');
+      return granted ?? false;
+    }
+    return false;
   }
 }

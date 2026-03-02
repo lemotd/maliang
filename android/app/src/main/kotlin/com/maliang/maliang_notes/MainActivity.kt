@@ -57,11 +57,13 @@ class MainActivity : FlutterActivity() {
         
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel?.setMethodCallHandler { call, result ->
+            Log.d("MainActivity", "收到方法调用: ${call.method}")
             when (call.method) {
                 "showLiveUpdateNotification" -> {
                     val id = call.argument<Int>("id") ?: 0
                     val title = call.argument<String>("title") ?: ""
                     val category = call.argument<String>("category") ?: ""
+                    Log.d("MainActivity", "显示通知: id=$id, title=$title, category=$category")
                     showLiveUpdateNotification(id, title, category)
                     result.success(null)
                 }
@@ -77,6 +79,9 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        
+        // 设置 MethodChannel 引用到 CompleteActionReceiver
+        CompleteActionReceiver.setMethodChannel(methodChannel!!)
         
         // 如果有待处理的详情页请求
         initialMemoryIdHash?.let {
@@ -145,6 +150,8 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun showLiveUpdateNotification(id: Int, title: String, category: String) {
+        Log.d("MainActivity", "showLiveUpdateNotification 开始: id=$id, title=$title, category=$category")
+        
         // 点击通知打开详情页的 Intent
         val openDetailIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -170,6 +177,7 @@ class MainActivity : FlutterActivity() {
         )
 
         val largeIcon = getCategoryIcon(category)
+        Log.d("MainActivity", "图标创建完成: ${largeIcon.width}x${largeIcon.height}")
 
         val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_agenda)
@@ -202,6 +210,7 @@ class MainActivity : FlutterActivity() {
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(id, builder.build())
+        Log.d("MainActivity", "通知已发送: id=$id")
     }
 
     private fun cancelNotification(id: Int) {

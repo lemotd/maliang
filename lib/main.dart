@@ -68,7 +68,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final _memoryService = MemoryService();
   final _aiService = AiService();
   final _notificationService = NotificationService();
@@ -85,10 +85,54 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initNotificationService();
     _loadMemories();
     _initShareListener();
     _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // 应用恢复时检查待处理的完成请求
+      _checkPendingCompletesAndRefresh();
+    }
+  }
+
+  Future<void> _checkPendingCompletesAndRefresh() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pendingCompletes = prefs.getStringList('pending_completes') ?? [];
+
+    debugPrint('应用恢复，检查待处理的完成请求: $pendingCompletes');
+
+    if (pendingCompletes.isNotEmpty) {
+      for (final idHashStr in pendingCompletes) {
+        final idHash = int.tryParse(idHashStr);
+        if (idHash != null) {
+          final memory = _memories
+              .where((m) => m.id.hashCode == idHash)
+              .firstOrNull;
+          if (memory != null && !memory.isCompleted) {
+            debugPrint('标记事项为完成: ${memory.id}');
+            await _memoryService.toggleCompleted(memory.id);
+          }
+        }
+      }
+
+      // 清除待处理列表
+      await prefs.remove('pending_completes');
+
+      // 重新加载列表
+      await _loadMemories();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _initNotificationService() async {
@@ -97,11 +141,14 @@ class _HomePageState extends State<HomePage> {
 
     // 设置通知回调
     _notificationService.onCompleteMemory = (memoryIdHash) async {
+      debugPrint('收到完成回调: memoryIdHash=$memoryIdHash');
       // 根据 hashCode 找到对应的 memory
       final memory = _memories
           .where((m) => m.id.hashCode == memoryIdHash)
           .firstOrNull;
+      debugPrint('找到对应事项: ${memory != null}');
       if (memory != null) {
+        debugPrint('标记事项为完成: ${memory.id}');
         await _memoryService.toggleCompleted(memory.id);
         final memories = await _memoryService.getAllMemories();
         if (mounted) {
@@ -135,13 +182,6 @@ class _HomePageState extends State<HomePage> {
       // 如果数据还在加载中，保存请求等加载完成后再处理
       _pendingDetailMemoryIdHash = memoryIdHash;
     }
-  }
-
-  @override
-  void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
-    super.dispose();
   }
 
   void _onScroll() {
@@ -219,7 +259,9 @@ class _HomePageState extends State<HomePage> {
 
     // 为所有待办事项显示通知
     final pendingMemories = _memories.where((m) => !m.isCompleted);
+    debugPrint('待办事项数量: ${pendingMemories.length}');
     for (final memory in pendingMemories) {
+      debugPrint('显示通知: ${memory.title}, id.hashCode=${memory.id.hashCode}');
       await _notificationService.showLiveUpdateNotification(memory);
     }
   }
