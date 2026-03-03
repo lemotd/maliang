@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'dart:io';
+import 'dart:ui';
 import '../models/memory_item.dart';
 
 class SwipeableMemoryItem extends StatefulWidget {
@@ -31,7 +32,7 @@ class SwipeableMemoryItem extends StatefulWidget {
 }
 
 class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _resetController;
   late Animation<double> _resetAnimation;
   double _dragExtent = 0;
@@ -40,6 +41,10 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
   // 缓存图片
   ImageProvider? _cachedImage;
+  Size? _imageSize;
+
+  // 点击缩放状态
+  bool _isPressed = false;
 
   @override
   void initState() {
@@ -70,10 +75,23 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     }
   }
 
-  void _loadImage() {
+  void _loadImage() async {
     final path = widget.memory.thumbnailPath ?? widget.memory.imagePath;
     if (path != null) {
       _cachedImage = FileImage(File(path));
+      // 获取图片尺寸
+      try {
+        final file = File(path);
+        final bytes = await file.readAsBytes();
+        final image = await decodeImageFromList(bytes);
+        if (mounted) {
+          setState(() {
+            _imageSize = Size(image.width.toDouble(), image.height.toDouble());
+          });
+        }
+      } catch (e) {
+        // 忽略错误
+      }
     }
   }
 
@@ -168,18 +186,16 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
   String _formatTime(DateTime time) {
     final now = DateTime.now();
-    final diff = now.difference(time);
+    final isToday =
+        time.year == now.year && time.month == now.month && time.day == now.day;
 
-    if (diff.inMinutes < 1) {
-      return '刚刚';
-    } else if (diff.inHours < 1) {
-      return '${diff.inMinutes}分钟前';
-    } else if (diff.inDays < 1) {
-      return '${diff.inHours}小时前';
-    } else if (diff.inDays < 7) {
-      return '${diff.inDays}天前';
+    final timeStr =
+        '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+
+    if (isToday) {
+      return '今天 $timeStr';
     } else {
-      return '${time.month}月${time.day}日';
+      return '${time.month.toString().padLeft(2, '0')}/${time.day.toString().padLeft(2, '0')} $timeStr';
     }
   }
 
@@ -213,6 +229,14 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     }
 
     return title;
+  }
+
+  String _getSubtitle() {
+    final detailInfo = widget.memory.getDetailInfo();
+    if (detailInfo.isEmpty) {
+      return '';
+    }
+    return detailInfo.join(' · ');
   }
 
   @override
@@ -277,13 +301,31 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
           onHorizontalDragStart: _handleDragStart,
           onHorizontalDragUpdate: _handleDragUpdate,
           onHorizontalDragEnd: _handleDragEnd,
+          onTapDown: (_) {
+            setState(() => _isPressed = true);
+          },
+          onTapUp: (_) async {
+            // 确保动画至少执行100ms
+            await Future.delayed(const Duration(milliseconds: 100));
+            if (mounted) {
+              setState(() => _isPressed = false);
+            }
+          },
+          onTapCancel: () {
+            setState(() => _isPressed = false);
+          },
           onTap: () {
             SwipeableMemoryItem.closeAll();
             widget.onTap?.call();
           },
           child: Transform.translate(
             offset: Offset(_dragExtent, 0),
-            child: RepaintBoundary(child: _buildContent()),
+            child: AnimatedScale(
+              scale: _isPressed ? 0.97 : 1.0,
+              duration: const Duration(milliseconds: 100),
+              curve: Curves.easeOut,
+              child: RepaintBoundary(child: _buildContent()),
+            ),
           ),
         ),
       ],
@@ -397,100 +439,153 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     final isCompleted = widget.memory.isCompleted;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // 标题颜色
     final textColor = isCompleted
         ? const Color(0xFF8E8E93)
         : (isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1A1A1A));
+    // 副标题和时间颜色 - 已完成时更浅
     final subTextColor = isCompleted
         ? const Color(0xFFC7C7CC)
         : const Color(0xFF8E8E93);
+    final subtitle = _getSubtitle();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _buildThumbnail(isCompleted),
-          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // 标题
                 Text(
                   _getDisplayTitle(),
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 17,
                     fontWeight: FontWeight.w500,
                     color: textColor,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                // 副标题（详细内容）- 始终留出两行高度
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 40, // 两行文字高度 (14 * 1.4 * 2 ≈ 39)
+                  child: Text(
+                    subtitle.isNotEmpty ? subtitle : '',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.4,
+                      fontWeight: FontWeight.w400,
+                      color: subTextColor,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 const SizedBox(height: 6),
+                // 时间 + 分类
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isCompleted
-                            ? (isDark
-                                  ? const Color(0xFF2C2C2E)
-                                  : const Color(0xFFE5E5EA))
-                            : widget.memory.category.color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        widget.memory.category.label,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isCompleted
-                              ? const Color(0xFF8E8E93)
-                              : widget.memory.category.color,
-                          fontWeight: FontWeight.w500,
-                        ),
+                    Text(
+                      _formatTime(widget.memory.createdAt),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: subTextColor,
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      _formatTime(widget.memory.createdAt),
-                      style: TextStyle(fontSize: 12, color: subTextColor),
-                    ),
+                    _buildCategoryTag(isCompleted),
                   ],
                 ),
               ],
             ),
           ),
-          Icon(
-            CupertinoIcons.chevron_right,
-            color: isCompleted
-                ? (isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5EA))
-                : const Color(0xFFC7C7CC),
-            size: 20,
+          // 右侧缩略图容器 - 固定宽度，居中对齐
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 72,
+            child: Center(child: _buildThumbnail(isCompleted)),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildCategoryTag(bool isCompleted) {
+    final category = widget.memory.category;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          _getCategoryIcon(category),
+          size: 14,
+          color: isCompleted ? const Color(0xFFC7C7CC) : category.color,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          category.label,
+          style: TextStyle(
+            fontSize: 12,
+            color: isCompleted
+                ? const Color(0xFFC7C7CC)
+                : (isDark ? const Color(0xFF8E8E93) : const Color(0xFF666666)),
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ],
+    );
+  }
+
+  IconData _getCategoryIcon(MemoryCategory category) {
+    switch (category) {
+      case MemoryCategory.pickupCode:
+        return Icons.restaurant_menu;
+      case MemoryCategory.packageCode:
+        return Icons.inventory_2;
+      case MemoryCategory.bill:
+        return Icons.receipt_long;
+      case MemoryCategory.note:
+        return Icons.note_alt;
+    }
+  }
+
   Widget _buildThumbnail(bool isCompleted) {
-    if (_cachedImage != null) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // 缩略图最大尺寸
+    const maxWidth = 72.0;
+    const maxHeight = 72.0;
+
+    if (_cachedImage != null && _imageSize != null) {
+      // 按原比例计算缩略图尺寸
+      final aspectRatio = _imageSize!.width / _imageSize!.height;
+      double displayWidth;
+      double displayHeight;
+
+      if (aspectRatio > 1) {
+        // 横向图片
+        displayWidth = maxWidth;
+        displayHeight = maxWidth / aspectRatio;
+      } else {
+        // 纵向图片
+        displayHeight = maxHeight;
+        displayWidth = maxHeight * aspectRatio;
+      }
+
       return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         child: ColorFiltered(
           colorFilter: isCompleted
               ? const ColorFilter.matrix(<double>[
@@ -518,8 +613,8 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
               : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
           child: Image(
             image: _cachedImage!,
-            width: 60,
-            height: 60,
+            width: displayWidth,
+            height: displayHeight,
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => _buildPlaceholderIcon(isCompleted),
           ),
@@ -530,33 +625,22 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
   }
 
   Widget _buildPlaceholderIcon(bool isCompleted) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      width: 60,
-      height: 60,
+      width: 72,
+      height: 72,
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F2F7),
-        borderRadius: BorderRadius.circular(12),
+        color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(
-        _getCategoryIcon(),
+        _getCategoryIcon(widget.memory.category),
         color: isCompleted
             ? const Color(0xFFC7C7CC)
             : widget.memory.category.color,
-        size: 28,
+        size: 32,
       ),
     );
-  }
-
-  IconData _getCategoryIcon() {
-    switch (widget.memory.category) {
-      case MemoryCategory.pickupCode:
-        return CupertinoIcons.cube_box;
-      case MemoryCategory.packageCode:
-        return CupertinoIcons.cube;
-      case MemoryCategory.bill:
-        return CupertinoIcons.doc_text;
-      case MemoryCategory.note:
-        return CupertinoIcons.square_pencil;
-    }
   }
 }

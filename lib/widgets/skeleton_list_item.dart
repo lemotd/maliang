@@ -33,54 +33,38 @@ class _SkeletonListItemState extends State<SkeletonListItem>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          AnimatedBuilder(
-            animation: _animation,
-            builder: (context, child) {
-              return Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Color.lerp(
-                    const Color(0xFFE5E5EA),
-                    const Color(0xFFF2F2F7),
-                    _animation.value,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // 标题占位
                 AnimatedBuilder(
                   animation: _animation,
                   builder: (context, child) {
                     return Container(
-                      height: 18,
+                      height: 20,
                       width: double.infinity,
                       decoration: BoxDecoration(
                         color: Color.lerp(
-                          const Color(0xFFE5E5EA),
-                          const Color(0xFFF2F2F7),
+                          isDark
+                              ? const Color(0xFF3A3A3C)
+                              : const Color(0xFFE5E5EA),
+                          isDark
+                              ? const Color(0xFF2C2C2E)
+                              : const Color(0xFFF2F2F7),
                           _animation.value,
                         ),
                         borderRadius: BorderRadius.circular(4),
@@ -88,19 +72,49 @@ class _SkeletonListItemState extends State<SkeletonListItem>
                     );
                   },
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 4),
+                // 副标题占位 - 两行高度
+                SizedBox(
+                  height: 40,
+                  child: AnimatedBuilder(
+                    animation: _animation,
+                    builder: (context, child) {
+                      return Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Color.lerp(
+                            isDark
+                                ? const Color(0xFF3A3A3C)
+                                : const Color(0xFFE5E5EA),
+                            isDark
+                                ? const Color(0xFF2C2C2E)
+                                : const Color(0xFFF2F2F7),
+                            _animation.value,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 6),
+                // 时间和分类占位
                 Row(
                   children: [
                     AnimatedBuilder(
                       animation: _animation,
                       builder: (context, child) {
                         return Container(
-                          height: 20,
-                          width: 60,
+                          height: 14,
+                          width: 80,
                           decoration: BoxDecoration(
                             color: Color.lerp(
-                              const Color(0xFFE5E5EA),
-                              const Color(0xFFF2F2F7),
+                              isDark
+                                  ? const Color(0xFF3A3A3C)
+                                  : const Color(0xFFE5E5EA),
+                              isDark
+                                  ? const Color(0xFF2C2C2E)
+                                  : const Color(0xFFF2F2F7),
                               _animation.value,
                             ),
                             borderRadius: BorderRadius.circular(4),
@@ -114,11 +128,15 @@ class _SkeletonListItemState extends State<SkeletonListItem>
                       builder: (context, child) {
                         return Container(
                           height: 14,
-                          width: 80,
+                          width: 50,
                           decoration: BoxDecoration(
                             color: Color.lerp(
-                              const Color(0xFFE5E5EA),
-                              const Color(0xFFF2F2F7),
+                              isDark
+                                  ? const Color(0xFF3A3A3C)
+                                  : const Color(0xFFE5E5EA),
+                              isDark
+                                  ? const Color(0xFF2C2C2E)
+                                  : const Color(0xFFF2F2F7),
                               _animation.value,
                             ),
                             borderRadius: BorderRadius.circular(4),
@@ -129,6 +147,34 @@ class _SkeletonListItemState extends State<SkeletonListItem>
                   ],
                 ),
               ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // 缩略图占位
+          SizedBox(
+            width: 72,
+            child: Center(
+              child: AnimatedBuilder(
+                animation: _animation,
+                builder: (context, child) {
+                  return Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: Color.lerp(
+                        isDark
+                            ? const Color(0xFF3A3A3C)
+                            : const Color(0xFFE5E5EA),
+                        isDark
+                            ? const Color(0xFF2C2C2E)
+                            : const Color(0xFFF2F2F7),
+                        _animation.value,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ],

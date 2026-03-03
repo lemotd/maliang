@@ -150,29 +150,58 @@ class MemoryItem {
 
     switch (category) {
       case MemoryCategory.pickupCode:
-        if (shopName != null && shopName!.isNotEmpty) details.add(shopName!);
-        if (pickupCode != null && pickupCode!.isNotEmpty)
-          details.add(pickupCode!);
-        if (dishName != null && dishName!.isNotEmpty) details.add(dishName!);
+        if (shopName != null && shopName!.isNotEmpty) {
+          // 检查标题是否已包含店铺名
+          if (!title.contains(shopName!)) {
+            details.add(shopName!);
+          }
+        }
+        if (pickupCode != null && pickupCode!.isNotEmpty) {
+          // 检查标题是否已包含取餐码
+          if (!title.contains(pickupCode!)) {
+            details.add(pickupCode!);
+          }
+        }
+        if (dishName != null && dishName!.isNotEmpty) {
+          // 检查标题是否已包含餐品名称
+          if (!title.contains(dishName!)) {
+            details.add(dishName!);
+          }
+        }
         break;
       case MemoryCategory.packageCode:
-        if (expressCompany != null && expressCompany!.isNotEmpty)
+        if (expressCompany != null && expressCompany!.isNotEmpty) {
           details.add(expressCompany!);
-        if (pickupCode != null && pickupCode!.isNotEmpty)
-          details.add(pickupCode!);
-        if (pickupAddress != null && pickupAddress!.isNotEmpty)
+        }
+        if (pickupCode != null && pickupCode!.isNotEmpty) {
+          // 检查标题是否已包含取件码
+          if (!title.contains(pickupCode!)) {
+            details.add(pickupCode!);
+          }
+        }
+        if (pickupAddress != null && pickupAddress!.isNotEmpty) {
           details.add(pickupAddress!);
-        if (productType != null && productType!.isNotEmpty)
+        }
+        if (productType != null && productType!.isNotEmpty) {
           details.add(productType!);
-        if (trackingNumber != null && trackingNumber!.isNotEmpty)
+        }
+        if (trackingNumber != null && trackingNumber!.isNotEmpty) {
           details.add(trackingNumber!);
+        }
         break;
       case MemoryCategory.bill:
-        if (amount != null && amount!.isNotEmpty) details.add(amount!);
-        if (paymentMethod != null && paymentMethod!.isNotEmpty)
+        if (amount != null && amount!.isNotEmpty) {
+          // 检查标题是否已包含金额
+          if (!title.contains(amount!)) {
+            details.add(amount!);
+          }
+        }
+        if (paymentMethod != null && paymentMethod!.isNotEmpty) {
           details.add(paymentMethod!);
-        if (merchantName != null && merchantName!.isNotEmpty)
+        }
+        if (merchantName != null && merchantName!.isNotEmpty) {
           details.add(merchantName!);
+        }
         break;
       case MemoryCategory.note:
         break;

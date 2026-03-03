@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'dart:ui';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../pages/settings_page.dart';
@@ -26,19 +27,20 @@ class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
             clipBehavior: Clip.none,
             children: [
               Positioned(
-                left: 0,
-                right: 0,
+                left: 20,
+                right: 60,
                 top: 44,
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 150),
                   curve: Curves.easeOut,
                   opacity: isCollapsed ? 0 : 1,
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         '马良神记',
                         style: TextStyle(
-                          fontSize: 22,
+                          fontSize: 24,
                           fontWeight: FontWeight.w500,
                           color: isDark
                               ? const Color(0xFFFFFFFF)
@@ -61,7 +63,7 @@ class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
               Positioned(
-                left: 16,
+                left: 20,
                 right: 60,
                 top: 0,
                 child: AnimatedOpacity(
@@ -86,7 +88,7 @@ class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
               Positioned(
-                right: 0,
+                right: 8,
                 top: 0,
                 child: _SettingsButton(
                   onTap: onSettingsTap ?? () => _handleSettingsTap(context),
@@ -102,7 +104,7 @@ class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
   void _handleSettingsTap(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const SettingsPage()),
+      CupertinoPageRoute(builder: (context) => const SettingsPage()),
     );
   }
 
