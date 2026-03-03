@@ -157,7 +157,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   void _animateToOffset(double targetOffset) {
-    HapticFeedback.mediumImpact();
+    HapticFeedback.lightImpact();
     final start = _offset;
     final end = targetOffset;
 
@@ -175,7 +175,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   void _animateToExpanded() {
-    HapticFeedback.mediumImpact();
+    HapticFeedback.lightImpact();
     final start = _offset;
     final end = 0.0;
 
@@ -193,7 +193,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   void _animateToDefault() {
-    HapticFeedback.mediumImpact();
+    HapticFeedback.lightImpact();
     final start = _offset;
     final end = 1.0;
 
