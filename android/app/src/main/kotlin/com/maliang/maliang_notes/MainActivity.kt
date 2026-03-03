@@ -6,11 +6,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -63,8 +58,9 @@ class MainActivity : FlutterActivity() {
                     val id = call.argument<Int>("id") ?: 0
                     val title = call.argument<String>("title") ?: ""
                     val category = call.argument<String>("category") ?: ""
-                    Log.d("MainActivity", "显示通知: id=$id, title=$title, category=$category")
-                    showLiveUpdateNotification(id, title, category)
+                    val detail = call.argument<String>("detail") ?: ""
+                    Log.d("MainActivity", "显示通知: id=$id, title=$title, category=$category, detail=$detail")
+                    showLiveUpdateNotification(id, title, category, detail)
                     result.success(null)
                 }
                 "cancelNotification" -> {
@@ -109,48 +105,17 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun getCategoryIcon(category: String): Bitmap {
-        val size = 96
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        
-        val bgColor = when (category) {
-            "取餐码" -> Color.parseColor("#FF9500")
-            "取件码" -> Color.parseColor("#34C759")
-            "账单" -> Color.parseColor("#007AFF")
-            else -> Color.parseColor("#8E8E93")
+    private fun getCategoryIconRes(category: String): Int {
+        return when (category) {
+            "取餐码" -> R.drawable.ic_pickup_food
+            "取件码" -> R.drawable.ic_pickup_package
+            "账单" -> R.drawable.ic_bill
+            else -> R.drawable.ic_note
         }
-        
-        val paint = Paint().apply {
-            color = bgColor
-            style = Paint.Style.FILL
-            isAntiAlias = true
-        }
-        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
-        
-        val iconPaint = Paint().apply {
-            color = Color.WHITE
-            textSize = 40f
-            isAntiAlias = true
-            textAlign = Paint.Align.CENTER
-        }
-        
-        val text = when (category) {
-            "取餐码" -> "餐"
-            "取件码" -> "件"
-            "账单" -> "¥"
-            else -> "记"
-        }
-        
-        val textBounds = android.graphics.Rect()
-        iconPaint.getTextBounds(text, 0, text.length, textBounds)
-        canvas.drawText(text, size / 2f, size / 2f + textBounds.height() / 2f, iconPaint)
-        
-        return bitmap
     }
 
-    private fun showLiveUpdateNotification(id: Int, title: String, category: String) {
-        Log.d("MainActivity", "showLiveUpdateNotification 开始: id=$id, title=$title, category=$category")
+    private fun showLiveUpdateNotification(id: Int, title: String, category: String, detail: String) {
+        Log.d("MainActivity", "showLiveUpdateNotification 开始: id=$id, title=$title, category=$category, detail=$detail")
         
         // 点击通知打开详情页的 Intent
         val openDetailIntent = Intent(this, MainActivity::class.java).apply {
@@ -176,17 +141,19 @@ class MainActivity : FlutterActivity() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val largeIcon = getCategoryIcon(category)
-        Log.d("MainActivity", "图标创建完成: ${largeIcon.width}x${largeIcon.height}")
+        val iconRes = getCategoryIconRes(category)
+        Log.d("MainActivity", "使用图标资源: $iconRes")
 
+        // 构建通知内容
+        val contentText = if (detail.isNotEmpty()) "$category · $detail" else category
+        
         val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_menu_agenda)
-            .setLargeIcon(largeIcon)
+            .setSmallIcon(iconRes)
             .setContentTitle(title)
-            .setContentText(category)
+            .setContentText(contentText)
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText(title)
+                    .bigText(contentText)
                     .setSummaryText(category)
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)

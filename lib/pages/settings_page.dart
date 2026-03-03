@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:io';
 import 'dart:ui';
 import '../services/config_service.dart';
+import '../services/ai_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -14,6 +16,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final _configService = ConfigService();
+  final _aiService = AiService();
   final _apiAddressController = TextEditingController();
   final _apiKeyController = TextEditingController();
   bool _isLoading = true;
@@ -24,8 +27,6 @@ class _SettingsPageState extends State<SettingsPage> {
   void initState() {
     super.initState();
     _loadConfig();
-    _apiAddressController.addListener(_onApiAddressChanged);
-    _apiKeyController.addListener(_onApiKeyChanged);
   }
 
   Future<void> _loadConfig() async {
@@ -38,28 +39,60 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
-  void _onApiAddressChanged() {
-    _autoSave();
-  }
+  Future<void> _saveAndValidate() async {
+    if (_isSaving) return;
 
-  void _onApiKeyChanged() {
-    _autoSave();
-  }
+    final apiKey = _apiKeyController.text.trim();
+    if (apiKey.isEmpty) {
+      _showToast('请输入 API Key');
+      return;
+    }
 
-  void _autoSave() {
-    if (_isLoading || _isSaving) return;
-    _isSaving = true;
-    Future.delayed(const Duration(milliseconds: 500), () async {
-      await _configService.setApiAddress(_apiAddressController.text);
-      await _configService.setApiKey(_apiKeyController.text);
-      _isSaving = false;
+    setState(() {
+      _isSaving = true;
     });
+
+    try {
+      // 先保存配置
+      await _configService.setApiAddress(_apiAddressController.text.trim());
+      await _configService.setApiKey(apiKey);
+
+      // 验证 API Key 是否可用
+      final result = await _aiService.chat('你好', systemPrompt: '请回复"OK"');
+
+      if (mounted) {
+        if (result != null && result.isNotEmpty) {
+          _showToast('API Key 运行正常');
+        } else {
+          _showToast('API Key 异常，请重新输入');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showToast('API Key 异常，请重新输入');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  void _showToast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   @override
   void dispose() {
-    _apiAddressController.removeListener(_onApiAddressChanged);
-    _apiKeyController.removeListener(_onApiKeyChanged);
     _apiAddressController.dispose();
     _apiKeyController.dispose();
     super.dispose();
@@ -67,8 +100,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F7),
+      backgroundColor: isDark
+          ? const Color(0xFF000000)
+          : const Color(0xFFF2F2F7),
       body: SafeArea(
         child: Column(
           children: [
@@ -83,11 +120,13 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                       children: [
                         _buildInputField(
+                          context: context,
                           title: 'API地址',
                           controller: _apiAddressController,
                           placeholder: '请输入API地址',
                         ),
                         _buildInputField(
+                          context: context,
                           title: 'API Key',
                           controller: _apiKeyController,
                           placeholder: '请输入API Key',
@@ -107,6 +146,50 @@ class _SettingsPageState extends State<SettingsPage> {
                             ),
                           ),
                         ),
+                        // 保存按钮
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: _isSaving ? null : _saveAndValidate,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF007AFF),
+                                disabledBackgroundColor: const Color(
+                                  0xFF007AFF,
+                                ).withOpacity(0.5),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: _isSaving
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                      ),
+                                    )
+                                  : const Text(
+                                      '保存',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         _buildApiKeyGuide(context),
                       ],
@@ -119,6 +202,8 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildAppBar(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return SizedBox(
       height: 52,
       child: Stack(
@@ -128,7 +213,7 @@ class _SettingsPageState extends State<SettingsPage> {
             top: 0,
             child: _BackButton(onTap: () => Navigator.pop(context)),
           ),
-          const Positioned(
+          Positioned(
             left: 60,
             right: 60,
             top: 0,
@@ -140,7 +225,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF1A1A1A),
+                    color: isDark
+                        ? const Color(0xFFFFFFFF)
+                        : const Color(0xFF1A1A1A),
                   ),
                 ),
               ),
@@ -155,6 +242,9 @@ class _SettingsPageState extends State<SettingsPage> {
     required String title,
     required List<Widget> children,
   }) {
+    final context = this.context;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -167,7 +257,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
             borderRadius: BorderRadius.circular(16),
           ),
           margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -178,12 +268,15 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildInputField({
+    required BuildContext context,
     required String title,
     required TextEditingController controller,
     required String placeholder,
     bool obscureText = false,
     Widget? suffixIcon,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
@@ -191,30 +284,41 @@ class _SettingsPageState extends State<SettingsPage> {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF1A1A1A),
+              color: isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1A1A1A),
             ),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: controller,
             obscureText: obscureText,
-            style: const TextStyle(fontSize: 16, color: Color(0xFF1A1A1A)),
+            style: TextStyle(
+              fontSize: 16,
+              color: isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1A1A1A),
+            ),
             decoration: InputDecoration(
               hintText: placeholder,
               hintStyle: const TextStyle(
                 fontSize: 16,
-                color: Color(0xFFC7C7CC),
+                color: Color(0xFF8E8E93),
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE5E5EA)),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF38383A)
+                      : const Color(0xFFE5E5EA),
+                ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE5E5EA)),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? const Color(0xFF38383A)
+                      : const Color(0xFFE5E5EA),
+                ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -229,7 +333,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               isDense: true,
               filled: true,
-              fillColor: Colors.white,
+              fillColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
               suffixIcon: suffixIcon,
             ),
           ),
@@ -247,38 +351,45 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildApiKeyGuide(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(
+              const Icon(
                 CupertinoIcons.info_circle,
                 size: 18,
                 color: Color(0xFF007AFF),
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 'API Key 配置说明',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF1A1A1A),
+                  color: isDark
+                      ? const Color(0xFFFFFFFF)
+                      : const Color(0xFF1A1A1A),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             '1. 访问智谱AI开放平台获取 API Key',
-            style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? const Color(0xFF8E8E93) : const Color(0xFF666666),
+            ),
           ),
           const SizedBox(height: 8),
           GestureDetector(
@@ -293,7 +404,9 @@ class _SettingsPageState extends State<SettingsPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F7),
+                color: isDark
+                    ? const Color(0xFF2C2C2E)
+                    : const Color(0xFFF2F2F7),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
@@ -303,7 +416,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       'https://bigmodel.cn/usercenter/proj-mgmt/apikeys',
                       style: TextStyle(
                         fontSize: 13,
-                        color: Color(0xFF007AFF),
+                        color: const Color(0xFF007AFF),
                         decoration: TextDecoration.underline,
                         decorationColor: Color(0xFF007AFF),
                       ),
@@ -320,14 +433,20 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             '2. 登录后创建项目，在 API Key 管理页面获取密钥',
-            style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? const Color(0xFF8E8E93) : const Color(0xFF666666),
+            ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             '3. 将 API Key 粘贴到上方输入框中保存',
-            style: TextStyle(fontSize: 14, color: Color(0xFF666666)),
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? const Color(0xFF8E8E93) : const Color(0xFF666666),
+            ),
           ),
         ],
       ),

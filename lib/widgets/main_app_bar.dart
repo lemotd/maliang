@@ -12,6 +12,7 @@ class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final isCollapsed = scrollOffset > 50;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       color: Colors.transparent,
@@ -38,8 +39,10 @@ class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
                         '马良神记',
                         style: TextStyle(
                           fontSize: 22,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF1A1A1A),
+                          fontWeight: FontWeight.w500,
+                          color: isDark
+                              ? const Color(0xFFFFFFFF)
+                              : const Color(0xFF1A1A1A),
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -72,8 +75,10 @@ class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
                       '马良神记',
                       style: TextStyle(
                         fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1A1A1A),
+                        fontWeight: FontWeight.w500,
+                        color: isDark
+                            ? const Color(0xFFFFFFFF)
+                            : const Color(0xFF1A1A1A),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -279,23 +284,27 @@ class _SettingsButtonState extends State<_SettingsButton>
   }
 
   Widget _buildGlassButton() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       width: 36,
       height: 36,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
       ),
       child: ClipOval(
         child: BackdropFilter(
@@ -303,47 +312,55 @@ class _SettingsButtonState extends State<_SettingsButton>
           child: Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withOpacity(0.9),
-                  Colors.white.withOpacity(0.6),
-                ],
-              ),
+              color: isDark ? const Color(0xFF2C2C2E) : null,
+              gradient: isDark
+                  ? null
+                  : LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withOpacity(0.9),
+                        Colors.white.withOpacity(0.6),
+                      ],
+                    ),
               border: Border.all(
-                color: Colors.white.withOpacity(0.8),
+                color: isDark
+                    ? const Color(0xFF3A3A3C)
+                    : Colors.white.withOpacity(0.8),
                 width: 0.5,
               ),
             ),
             child: Stack(
               children: [
-                Positioned(
-                  top: 2,
-                  left: 6,
-                  right: 6,
-                  child: Container(
-                    height: 10,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.white.withOpacity(0.6),
-                          Colors.white.withOpacity(0),
-                        ],
+                if (!isDark)
+                  Positioned(
+                    top: 2,
+                    left: 6,
+                    right: 6,
+                    child: Container(
+                      height: 10,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.white.withOpacity(0.6),
+                            Colors.white.withOpacity(0),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                ),
                 Center(
                   child: SvgPicture.asset(
                     'assets/icons/setting.svg',
                     width: 20,
                     height: 20,
-                    colorFilter: const ColorFilter.mode(
-                      Color(0xFF1A1A1A),
+                    colorFilter: ColorFilter.mode(
+                      isDark
+                          ? const Color(0xFFFFFFFF)
+                          : const Color(0xFF1A1A1A),
                       BlendMode.srcIn,
                     ),
                   ),

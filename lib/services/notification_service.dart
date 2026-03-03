@@ -62,13 +62,17 @@ class NotificationService {
     if (!_initialized) await initialize();
 
     try {
+      final detailInfo = memory.getDetailInfo();
+      final detailText = detailInfo.isEmpty ? '' : detailInfo.join(' · ');
+
       debugPrint(
-        '调用原生通知: id=${memory.id.hashCode}, title=${memory.title}, category=${memory.category.label}',
+        '调用原生通知: id=${memory.id.hashCode}, title=${memory.title}, category=${memory.category.label}, detail=$detailText',
       );
       await _channel.invokeMethod('showLiveUpdateNotification', {
         'id': memory.id.hashCode,
         'title': memory.title,
         'category': memory.category.label,
+        'detail': detailText,
       });
       debugPrint('原生通知调用成功');
     } catch (e) {

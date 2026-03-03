@@ -21,6 +21,18 @@ class MemoryItem {
   final String? rawContent;
   final bool isCompleted;
 
+  // 详细信息字段
+  final String? shopName;
+  final String? pickupCode;
+  final String? dishName;
+  final String? expressCompany;
+  final String? pickupAddress;
+  final String? productType;
+  final String? trackingNumber;
+  final String? amount;
+  final String? paymentMethod;
+  final String? merchantName;
+
   MemoryItem({
     required this.id,
     required this.title,
@@ -30,6 +42,16 @@ class MemoryItem {
     required this.createdAt,
     this.rawContent,
     this.isCompleted = false,
+    this.shopName,
+    this.pickupCode,
+    this.dishName,
+    this.expressCompany,
+    this.pickupAddress,
+    this.productType,
+    this.trackingNumber,
+    this.amount,
+    this.paymentMethod,
+    this.merchantName,
   });
 
   MemoryItem copyWith({
@@ -41,6 +63,16 @@ class MemoryItem {
     DateTime? createdAt,
     String? rawContent,
     bool? isCompleted,
+    String? shopName,
+    String? pickupCode,
+    String? dishName,
+    String? expressCompany,
+    String? pickupAddress,
+    String? productType,
+    String? trackingNumber,
+    String? amount,
+    String? paymentMethod,
+    String? merchantName,
   }) {
     return MemoryItem(
       id: id ?? this.id,
@@ -51,6 +83,16 @@ class MemoryItem {
       createdAt: createdAt ?? this.createdAt,
       rawContent: rawContent ?? this.rawContent,
       isCompleted: isCompleted ?? this.isCompleted,
+      shopName: shopName ?? this.shopName,
+      pickupCode: pickupCode ?? this.pickupCode,
+      dishName: dishName ?? this.dishName,
+      expressCompany: expressCompany ?? this.expressCompany,
+      pickupAddress: pickupAddress ?? this.pickupAddress,
+      productType: productType ?? this.productType,
+      trackingNumber: trackingNumber ?? this.trackingNumber,
+      amount: amount ?? this.amount,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      merchantName: merchantName ?? this.merchantName,
     );
   }
 
@@ -64,6 +106,16 @@ class MemoryItem {
       'createdAt': createdAt.toIso8601String(),
       'rawContent': rawContent,
       'isCompleted': isCompleted,
+      'shopName': shopName,
+      'pickupCode': pickupCode,
+      'dishName': dishName,
+      'expressCompany': expressCompany,
+      'pickupAddress': pickupAddress,
+      'productType': productType,
+      'trackingNumber': trackingNumber,
+      'amount': amount,
+      'paymentMethod': paymentMethod,
+      'merchantName': merchantName,
     };
   }
 
@@ -80,6 +132,52 @@ class MemoryItem {
       createdAt: DateTime.parse(json['createdAt'] as String),
       rawContent: json['rawContent'] as String?,
       isCompleted: json['isCompleted'] as bool? ?? false,
+      shopName: json['shopName'] as String?,
+      pickupCode: json['pickupCode'] as String?,
+      dishName: json['dishName'] as String?,
+      expressCompany: json['expressCompany'] as String?,
+      pickupAddress: json['pickupAddress'] as String?,
+      productType: json['productType'] as String?,
+      trackingNumber: json['trackingNumber'] as String?,
+      amount: json['amount'] as String?,
+      paymentMethod: json['paymentMethod'] as String?,
+      merchantName: json['merchantName'] as String?,
     );
+  }
+
+  List<String> getDetailInfo() {
+    final details = <String>[];
+
+    switch (category) {
+      case MemoryCategory.pickupCode:
+        if (shopName != null && shopName!.isNotEmpty) details.add(shopName!);
+        if (pickupCode != null && pickupCode!.isNotEmpty)
+          details.add(pickupCode!);
+        if (dishName != null && dishName!.isNotEmpty) details.add(dishName!);
+        break;
+      case MemoryCategory.packageCode:
+        if (expressCompany != null && expressCompany!.isNotEmpty)
+          details.add(expressCompany!);
+        if (pickupCode != null && pickupCode!.isNotEmpty)
+          details.add(pickupCode!);
+        if (pickupAddress != null && pickupAddress!.isNotEmpty)
+          details.add(pickupAddress!);
+        if (productType != null && productType!.isNotEmpty)
+          details.add(productType!);
+        if (trackingNumber != null && trackingNumber!.isNotEmpty)
+          details.add(trackingNumber!);
+        break;
+      case MemoryCategory.bill:
+        if (amount != null && amount!.isNotEmpty) details.add(amount!);
+        if (paymentMethod != null && paymentMethod!.isNotEmpty)
+          details.add(paymentMethod!);
+        if (merchantName != null && merchantName!.isNotEmpty)
+          details.add(merchantName!);
+        break;
+      case MemoryCategory.note:
+        break;
+    }
+
+    return details;
   }
 }

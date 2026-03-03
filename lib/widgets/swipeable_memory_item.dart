@@ -38,6 +38,9 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
   static const double _stage1Threshold = 60;
   bool _isDragging = false;
 
+  // 缓存图片
+  ImageProvider? _cachedImage;
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +58,23 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
             });
           }
         });
+    _loadImage();
+  }
+
+  @override
+  void didUpdateWidget(SwipeableMemoryItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.memory.thumbnailPath != widget.memory.thumbnailPath ||
+        oldWidget.memory.imagePath != widget.memory.imagePath) {
+      _loadImage();
+    }
+  }
+
+  void _loadImage() {
+    final path = widget.memory.thumbnailPath ?? widget.memory.imagePath;
+    if (path != null) {
+      _cachedImage = FileImage(File(path));
+    }
   }
 
   @override
@@ -66,7 +86,6 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
   void _handleDragStart(DragStartDetails details) {
     _isDragging = true;
     _resetController.stop();
-    // 关闭其他打开的菜单
     if (SwipeableMemoryItem._openedState != null &&
         SwipeableMemoryItem._openedState != this) {
       SwipeableMemoryItem.closeAll();
@@ -81,7 +100,6 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     final absDrag = _dragExtent.abs();
 
     if (absDrag > halfScreen) {
-      // 二阶段松手触发操作
       if (_dragExtent > 0) {
         widget.onToggleComplete?.call();
       } else {
@@ -89,7 +107,6 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
       }
       _animateReset();
     } else if (absDrag > _stage1Threshold) {
-      // 一阶段松手后平滑过渡到保持位置
       _animateToHoldPosition();
       SwipeableMemoryItem._openedState = this;
     } else {
@@ -124,22 +141,17 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     final halfScreen = screenWidth * 0.5;
     final absDrag = _dragExtent.abs();
 
-    // 根据滑动阶段计算阻尼
     double resistance;
     if (absDrag < _stage1Threshold) {
-      // 一阶段前：正常滑动
       resistance = 1.0;
     } else if (absDrag < halfScreen) {
-      // 一阶段到二阶段：轻微阻尼
       resistance = 0.7;
     } else {
-      // 二阶段后：更大阻尼
       resistance = 0.3;
     }
 
     setState(() {
       _dragExtent += delta * resistance;
-      // 限制范围：左滑最大-halfScreen-50，右滑最大halfScreen+50
       _dragExtent = _dragExtent.clamp(-(halfScreen + 50), halfScreen + 50);
     });
   }
@@ -194,7 +206,6 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
       }
     }
 
-    // 为账单标题添加收支符号
     if (widget.memory.category == MemoryCategory.bill) {
       if (!title.startsWith('-') && !title.startsWith('+')) {
         title = '-$title';
@@ -212,7 +223,6 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     final isRightSwipe = _dragExtent > 0;
     final isLeftSwipe = _dragExtent < 0;
 
-    // 右滑：完成/待办
     final isCompleted = widget.memory.isCompleted;
     final rightActionColor = isCompleted
         ? const Color(0xFFFF9500)
@@ -222,7 +232,6 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
         ? CupertinoIcons.arrow_2_circlepath
         : CupertinoIcons.check_mark_circled;
 
-    // 左滑：删除
     const leftActionColor = Color(0xFFFF3B30);
     const leftActionText = '删除';
     const leftActionIcon = CupertinoIcons.trash;
@@ -230,39 +239,40 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // 右滑按钮（显示在左侧）
         if (isRightSwipe)
           Positioned(
             left: 16,
             top: 6,
             bottom: 6,
             width: _dragExtent - 8,
-            child: _buildActionButton(
-              isStage2: isStage2,
-              actionColor: rightActionColor,
-              actionText: rightActionText,
-              actionIcon: rightActionIcon,
-              onTap: _onRightPillTap,
-              dragExtent: _dragExtent,
+            child: RepaintBoundary(
+              child: _buildActionButton(
+                isStage2: isStage2,
+                actionColor: rightActionColor,
+                actionText: rightActionText,
+                actionIcon: rightActionIcon,
+                onTap: _onRightPillTap,
+                dragExtent: _dragExtent,
+              ),
             ),
           ),
-        // 左滑按钮（显示在右侧）
         if (isLeftSwipe)
           Positioned(
             right: 16,
             top: 6,
             bottom: 6,
             width: _dragExtent.abs() - 8,
-            child: _buildActionButton(
-              isStage2: isStage2,
-              actionColor: leftActionColor,
-              actionText: leftActionText,
-              actionIcon: leftActionIcon,
-              onTap: _onLeftPillTap,
-              dragExtent: _dragExtent.abs(),
+            child: RepaintBoundary(
+              child: _buildActionButton(
+                isStage2: isStage2,
+                actionColor: leftActionColor,
+                actionText: leftActionText,
+                actionIcon: leftActionIcon,
+                onTap: _onLeftPillTap,
+                dragExtent: _dragExtent.abs(),
+              ),
             ),
           ),
-        // 列表内容
         GestureDetector(
           onHorizontalDragStart: _handleDragStart,
           onHorizontalDragUpdate: _handleDragUpdate,
@@ -273,7 +283,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
           },
           child: Transform.translate(
             offset: Offset(_dragExtent, 0),
-            child: _buildContent(),
+            child: RepaintBoundary(child: _buildContent()),
           ),
         ),
       ],
@@ -288,24 +298,24 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     required VoidCallback? onTap,
     required double dragExtent,
   }) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final halfScreen = screenWidth * 0.5;
+    final buttonWidth = _calculateButtonWidth(dragExtent: dragExtent);
+    final iconOpacity = _calculateIconOpacity(dragExtent: dragExtent);
+    final iconScale = _calculateIconScale(dragExtent: dragExtent);
+
+    // 文字透明度：进入二阶段立刻开始渐显
+    final textOpacity = isStage2 ? 1.0 : 0.0;
+
     return Center(
       child: GestureDetector(
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeOut,
-          width: _calculateButtonWidth(dragExtent: dragExtent),
+        child: Container(
+          width: buttonWidth,
           height: 40,
           decoration: BoxDecoration(
             color: actionColor,
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: actionColor.withOpacity(0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
@@ -313,38 +323,38 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Stack(
                 children: [
+                  // 文字（带渐变动画）
                   Positioned(
                     left: 0,
                     top: 0,
                     bottom: 0,
                     right: 30,
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 150),
-                      curve: Curves.easeOut,
-                      opacity: isStage2 ? 1.0 : 0.0,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: AnimatedOpacity(
+                        opacity: textOpacity,
+                        duration: const Duration(milliseconds: 150),
                         child: Text(
                           actionText,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 15,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
                     ),
                   ),
+                  // 图标（带动画）
                   AnimatedAlign(
                     duration: const Duration(milliseconds: 150),
-                    curve: Curves.easeOut,
                     alignment: isStage2
                         ? Alignment.centerRight
                         : Alignment.center,
                     child: Opacity(
-                      opacity: _calculateIconOpacity(dragExtent: dragExtent),
+                      opacity: iconOpacity,
                       child: Transform.scale(
-                        scale: _calculateIconScale(dragExtent: dragExtent),
+                        scale: iconScale,
                         child: Icon(actionIcon, color: Colors.white, size: 20),
                       ),
                     ),
@@ -385,9 +395,11 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
   Widget _buildContent() {
     final isCompleted = widget.memory.isCompleted;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final textColor = isCompleted
         ? const Color(0xFF8E8E93)
-        : const Color(0xFF1A1A1A);
+        : (isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1A1A1A));
     final subTextColor = isCompleted
         ? const Color(0xFFC7C7CC)
         : const Color(0xFF8E8E93);
@@ -396,101 +408,21 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Row(
         children: [
-          if (widget.memory.thumbnailPath != null ||
-              widget.memory.imagePath != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: ColorFiltered(
-                colorFilter: isCompleted
-                    ? const ColorFilter.matrix(<double>[
-                        0.2126,
-                        0.7152,
-                        0.0722,
-                        0,
-                        0,
-                        0.2126,
-                        0.7152,
-                        0.0722,
-                        0,
-                        0,
-                        0.2126,
-                        0.7152,
-                        0.0722,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0.5,
-                        0,
-                      ])
-                    : const ColorFilter.matrix(<double>[
-                        1,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        1,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        1,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        1,
-                        0,
-                      ]),
-                child: Image.file(
-                  File(widget.memory.thumbnailPath ?? widget.memory.imagePath!),
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 60,
-                    height: 60,
-                    color: const Color(0xFFF2F2F7),
-                    child: const Icon(
-                      CupertinoIcons.photo,
-                      color: Color(0xFFC7C7CC),
-                    ),
-                  ),
-                ),
-              ),
-            )
-          else
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F7),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                _getCategoryIcon(),
-                color: isCompleted
-                    ? const Color(0xFFC7C7CC)
-                    : widget.memory.category.color,
-                size: 28,
-              ),
-            ),
+          _buildThumbnail(isCompleted),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -516,7 +448,9 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
                       ),
                       decoration: BoxDecoration(
                         color: isCompleted
-                            ? const Color(0xFFE5E5EA)
+                            ? (isDark
+                                  ? const Color(0xFF2C2C2E)
+                                  : const Color(0xFFE5E5EA))
                             : widget.memory.category.color.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -544,11 +478,71 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
           Icon(
             CupertinoIcons.chevron_right,
             color: isCompleted
-                ? const Color(0xFFE5E5EA)
+                ? (isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5EA))
                 : const Color(0xFFC7C7CC),
             size: 20,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildThumbnail(bool isCompleted) {
+    if (_cachedImage != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: ColorFiltered(
+          colorFilter: isCompleted
+              ? const ColorFilter.matrix(<double>[
+                  0.2126,
+                  0.7152,
+                  0.0722,
+                  0,
+                  0,
+                  0.2126,
+                  0.7152,
+                  0.0722,
+                  0,
+                  0,
+                  0.2126,
+                  0.7152,
+                  0.0722,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0.5,
+                  0,
+                ])
+              : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
+          child: Image(
+            image: _cachedImage!,
+            width: 60,
+            height: 60,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _buildPlaceholderIcon(isCompleted),
+          ),
+        ),
+      );
+    }
+    return _buildPlaceholderIcon(isCompleted);
+  }
+
+  Widget _buildPlaceholderIcon(bool isCompleted) {
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF2F2F7),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(
+        _getCategoryIcon(),
+        color: isCompleted
+            ? const Color(0xFFC7C7CC)
+            : widget.memory.category.color,
+        size: 28,
       ),
     );
   }

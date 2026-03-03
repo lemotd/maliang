@@ -101,8 +101,16 @@ class AiService {
      * 无法判断时默认为支出
    - 随手记：简要描述图片内容
 
+3. 根据分类提取详细信息（可选字段，如果图片中有则提取，没有则不填）：
+   - 取餐码：shopName(店铺名称)、pickupCode(取餐码)、dishName(餐品名称)
+   - 取件码：expressCompany(快递公司)、pickupCode(取件码)、pickupAddress(取件地址)、productType(商品类型)、trackingNumber(快递单号)
+   - 账单：amount(金额，带符号如"-35.00")、paymentMethod(支付方式)、merchantName(商户名称)
+   - 随手记：无额外字段
+
 请严格按照以下JSON格式返回，不要包含其他内容：
-{"category":"分类名称","title":"提取的标题"}''';
+{"category":"分类名称","title":"提取的标题","shopName":"店铺名称","pickupCode":"取餐码/取件码","dishName":"餐品名称","expressCompany":"快递公司","pickupAddress":"取件地址","productType":"商品类型","trackingNumber":"快递单号","amount":"金额","paymentMethod":"支付方式","merchantName":"商户名称"}
+
+注意：只填写图片中实际存在的信息，不存在的字段请省略或留空。''';
 
     final url = Uri.parse('$apiAddress/chat/completions');
     debugPrint('请求URL: $url');
@@ -136,10 +144,12 @@ class AiService {
         .timeout(const Duration(seconds: 60));
 
     debugPrint('响应状态码: ${response.statusCode}');
+    debugPrint('响应体长度: ${response.bodyBytes.length}');
 
     if (response.statusCode == 200) {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
       final content = data['choices'][0]['message']['content'] as String?;
+      debugPrint('AI返回内容: $content');
       return content;
     } else {
       final errorData = jsonDecode(utf8.decode(response.bodyBytes));
@@ -182,6 +192,14 @@ class AiService {
           category = MemoryCategory.note;
       }
 
+      // 辅助函数：获取非空字符串
+      String? getNonEmptyString(Map<String, dynamic> json, String key) {
+        final value = json[key];
+        if (value == null) return null;
+        if (value is String && value.trim().isNotEmpty) return value.trim();
+        return null;
+      }
+
       return MemoryItem(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         title: title,
@@ -190,6 +208,16 @@ class AiService {
         thumbnailPath: thumbnailPath,
         createdAt: DateTime.now(),
         rawContent: result,
+        shopName: getNonEmptyString(json, 'shopName'),
+        pickupCode: getNonEmptyString(json, 'pickupCode'),
+        dishName: getNonEmptyString(json, 'dishName'),
+        expressCompany: getNonEmptyString(json, 'expressCompany'),
+        pickupAddress: getNonEmptyString(json, 'pickupAddress'),
+        productType: getNonEmptyString(json, 'productType'),
+        trackingNumber: getNonEmptyString(json, 'trackingNumber'),
+        amount: getNonEmptyString(json, 'amount'),
+        paymentMethod: getNonEmptyString(json, 'paymentMethod'),
+        merchantName: getNonEmptyString(json, 'merchantName'),
       );
     } catch (e) {
       return MemoryItem(
