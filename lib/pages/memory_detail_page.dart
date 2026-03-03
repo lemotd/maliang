@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'dart:io';
 import 'dart:math' as math;
@@ -156,6 +157,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   void _animateToOffset(double targetOffset) {
+    HapticFeedback.mediumImpact();
     final start = _offset;
     final end = targetOffset;
 
@@ -173,6 +175,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   void _animateToExpanded() {
+    HapticFeedback.mediumImpact();
     final start = _offset;
     final end = 0.0;
 
@@ -190,6 +193,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   void _animateToDefault() {
+    HapticFeedback.mediumImpact();
     final start = _offset;
     final end = 1.0;
 
