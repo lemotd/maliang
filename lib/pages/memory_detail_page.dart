@@ -97,11 +97,26 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     // 最小：0.0（上滑吸附）
     // 最大：_requiredOffset（下滑吸附，如果图片被遮挡）
     final maxOffset = _requiredOffset > 1.0 ? _requiredOffset : 1.0;
-    newOffset = newOffset.clamp(0.0, maxOffset);
+
+    // 超出反馈效果：当超出范围时，使用阻尼效果
+    if (newOffset < 0) {
+      // 向上超出，使用阻尼
+      newOffset = -_applyDamping(-newOffset, imageAreaHeight);
+    } else if (newOffset > maxOffset) {
+      // 向下超出，使用阻尼
+      newOffset =
+          maxOffset + _applyDamping(newOffset - maxOffset, imageAreaHeight);
+    }
 
     setState(() {
       _offset = newOffset;
     });
+  }
+
+  // 阻尼效果：超出越多，阻力越大
+  double _applyDamping(double overflow, double imageAreaHeight) {
+    // 使用阻尼函数实现超出反馈
+    return 0.1 * overflow;
   }
 
   void _onDragEnd() {
@@ -114,6 +129,21 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     // offset = _requiredOffset: 下滑吸附（显示完整图片）
 
     final deltaOffset = _offset - _startOffset;
+    final maxOffset = _requiredOffset > 1.0 ? _requiredOffset : 1.0;
+
+    // 如果超出范围，先回弹到边界
+    if (_offset < 0) {
+      _animateToExpanded(haptic: false);
+      return;
+    }
+    if (_offset > maxOffset) {
+      if (_requiredOffset > 1.0) {
+        _animateToOffset(_requiredOffset, haptic: false);
+      } else {
+        _animateToDefault(haptic: false);
+      }
+      return;
+    }
 
     // 判断当前位置在哪个阶段
     final isInExpandedPhase = _startOffset < 0.5;
@@ -123,41 +153,41 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     if (deltaOffset < 0) {
       // 向上滑动
       if (isInShowImagePhase) {
-        // 从下滑吸附位置上滑，回到默认态
-        _animateToDefault();
+        // 从下滑吸附位置上滑，回到默认态（阶段切换）
+        _animateToDefault(haptic: true);
       } else if (isInDefaultPhase) {
-        // 从默认态上滑，吸附到展开位置
-        _animateToExpanded();
+        // 从默认态上滑，吸附到展开位置（阶段切换）
+        _animateToExpanded(haptic: true);
       } else {
-        // 已经在展开位置，保持
-        _animateToExpanded();
+        // 已经在展开位置，保持（无阶段切换）
+        _animateToExpanded(haptic: false);
       }
     } else if (deltaOffset > 0) {
       // 向下滑动
       if (isInExpandedPhase) {
-        // 从展开位置下滑，回到默认态
-        _animateToDefault();
+        // 从展开位置下滑，回到默认态（阶段切换）
+        _animateToDefault(haptic: true);
       } else if (isInDefaultPhase && _requiredOffset > 1.0) {
-        // 从默认态下滑，图片被遮挡，吸附到显示完整图片的位置
-        _animateToOffset(_requiredOffset);
+        // 从默认态下滑，图片被遮挡，吸附到显示完整图片的位置（阶段切换）
+        _animateToOffset(_requiredOffset, haptic: true);
       } else {
-        // 图片没有被遮挡或已经在下滑吸附位置，回到默认态
-        _animateToDefault();
+        // 图片没有被遮挡或已经在下滑吸附位置，回到默认态（无阶段切换）
+        _animateToDefault(haptic: false);
       }
     } else {
       // 没有滑动，根据当前位置吸附
       if (_offset < 0.5) {
-        _animateToExpanded();
+        _animateToExpanded(haptic: false);
       } else if (_offset > _requiredOffset - 0.1 && _requiredOffset > 1.0) {
-        _animateToOffset(_requiredOffset);
+        _animateToOffset(_requiredOffset, haptic: false);
       } else {
-        _animateToDefault();
+        _animateToDefault(haptic: false);
       }
     }
   }
 
-  void _animateToOffset(double targetOffset) {
-    HapticFeedback.lightImpact();
+  void _animateToOffset(double targetOffset, {bool haptic = true}) {
+    if (haptic) HapticFeedback.lightImpact();
     final start = _offset;
     final end = targetOffset;
 
@@ -174,8 +204,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     _controller.forward(from: 0);
   }
 
-  void _animateToExpanded() {
-    HapticFeedback.lightImpact();
+  void _animateToExpanded({bool haptic = true}) {
+    if (haptic) HapticFeedback.lightImpact();
     final start = _offset;
     final end = 0.0;
 
@@ -192,8 +222,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     _controller.forward(from: 0);
   }
 
-  void _animateToDefault() {
-    HapticFeedback.lightImpact();
+  void _animateToDefault({bool haptic = true}) {
+    if (haptic) HapticFeedback.lightImpact();
     final start = _offset;
     final end = 1.0;
 
@@ -222,18 +252,13 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     final appBarHeight = 44.0 + safeAreaTop;
 
     // 计算显示完整图片所需的offset
-    // 图片区域高度 + 图片底部边距 = 内容区需要向下移动的距离
-    // offset = 1.0 时，内容区在 imageAreaHeight 下方
-    // offset > 1.0 时，内容区向下移动更多
-    if (_imageDisplayHeight > 0) {
-      final totalImageSpace = _imageDisplayHeight + 16 + 16; // 图片高度 + 上下边距
-      final defaultImageSpace = imageAreaHeight;
-      if (totalImageSpace > defaultImageSpace) {
-        // 图片被遮挡，计算需要的offset
-        _requiredOffset = totalImageSpace / defaultImageSpace;
-      } else {
-        _requiredOffset = 1.0;
-      }
+    // _imageDisplayHeight 是图片实际显示高度（已包含上下边距）
+    // 如果图片实际高度小于等于图片区域高度，则图片完全显示，不需要下滑吸附
+    if (_imageDisplayHeight > 0 && _imageDisplayHeight > imageAreaHeight) {
+      // 图片被遮挡，计算需要的offset
+      _requiredOffset = _imageDisplayHeight / imageAreaHeight;
+    } else {
+      _requiredOffset = 1.0;
     }
 
     // 计算内容区位置：offset=1时在图片下方，offset=0时在顶栏下方
@@ -287,6 +312,14 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                   borderRadius: BorderRadius.vertical(
                     top: Radius.circular(borderRadius),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(isDark ? 0.4 : 0.08),
+                      blurRadius: 24,
+                      spreadRadius: 0,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
                 ),
                 child: SingleChildScrollView(
                   controller: _scrollController,
@@ -433,7 +466,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       child: Container(
         margin: EdgeInsets.symmetric(vertical: verticalMargin),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.15),
@@ -444,7 +477,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Image.file(
             File(widget.memory.imagePath!),
             width: displayWidth,

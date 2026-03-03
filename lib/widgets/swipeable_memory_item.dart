@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'dart:io';
 import 'dart:ui';
 import '../models/memory_item.dart';
@@ -38,6 +39,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
   double _dragExtent = 0;
   static const double _stage1Threshold = 60;
   bool _isDragging = false;
+  bool _hasTriggeredStage2Haptic = false;
 
   // 缓存图片
   ImageProvider? _cachedImage;
@@ -103,6 +105,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
   void _handleDragStart(DragStartDetails details) {
     _isDragging = true;
+    _hasTriggeredStage2Haptic = false;
     _resetController.stop();
     if (SwipeableMemoryItem._openedState != null &&
         SwipeableMemoryItem._openedState != this) {
@@ -172,6 +175,13 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
       _dragExtent += delta * resistance;
       _dragExtent = _dragExtent.clamp(-(halfScreen + 50), halfScreen + 50);
     });
+
+    // 检测进入二阶段时触发振动
+    final newAbsDrag = _dragExtent.abs();
+    if (newAbsDrag > halfScreen && !_hasTriggeredStage2Haptic) {
+      HapticFeedback.lightImpact();
+      _hasTriggeredStage2Haptic = true;
+    }
   }
 
   void _onRightPillTap() {
