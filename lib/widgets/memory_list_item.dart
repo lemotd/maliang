@@ -42,7 +42,7 @@ class MemoryListItem extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -55,7 +55,7 @@ class MemoryListItem extends StatelessWidget {
           children: [
             if (memory.thumbnailPath != null || memory.imagePath != null)
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 child: Image.file(
                   File(memory.thumbnailPath ?? memory.imagePath!),
                   width: 60,
