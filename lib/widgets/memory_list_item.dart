@@ -162,7 +162,7 @@ class MemoryListItem extends StatelessWidget {
   String _getDisplayTitle() {
     var title = memory.title;
     final categoryLabel = memory.category.label;
-    
+
     final prefixes = [
       '$categoryLabel：',
       '$categoryLabel:',
@@ -174,21 +174,21 @@ class MemoryListItem extends StatelessWidget {
       '支出 ',
       '收入 ',
     ];
-    
+
     for (final prefix in prefixes) {
       if (title.startsWith(prefix)) {
         title = title.substring(prefix.length);
         break;
       }
     }
-    
+
     // 为账单标题添加收支符号
     if (memory.category == MemoryCategory.bill) {
       if (!title.startsWith('-') && !title.startsWith('+')) {
         title = '-$title';
       }
     }
-    
+
     return title;
   }
 }

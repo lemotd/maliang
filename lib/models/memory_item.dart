@@ -30,8 +30,12 @@ class MemoryItem {
   final String? productType;
   final String? trackingNumber;
   final String? amount;
+  final bool? isExpense; // 账单类型：true=支出，false=收入
+  final String? billCategory; // 账单分类：支出/收入的具体分类
+  final String? note; // 备注
   final String? paymentMethod;
   final String? merchantName;
+  final DateTime? billTime; // 账单时间（AI识别的时间）
 
   MemoryItem({
     required this.id,
@@ -50,8 +54,12 @@ class MemoryItem {
     this.productType,
     this.trackingNumber,
     this.amount,
+    this.isExpense,
+    this.billCategory,
+    this.note,
     this.paymentMethod,
     this.merchantName,
+    this.billTime,
   });
 
   MemoryItem copyWith({
@@ -71,8 +79,12 @@ class MemoryItem {
     String? productType,
     String? trackingNumber,
     String? amount,
+    bool? isExpense,
+    String? billCategory,
+    String? note,
     String? paymentMethod,
     String? merchantName,
+    DateTime? billTime,
   }) {
     return MemoryItem(
       id: id ?? this.id,
@@ -91,8 +103,12 @@ class MemoryItem {
       productType: productType ?? this.productType,
       trackingNumber: trackingNumber ?? this.trackingNumber,
       amount: amount ?? this.amount,
+      isExpense: isExpense ?? this.isExpense,
+      billCategory: billCategory ?? this.billCategory,
+      note: note ?? this.note,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       merchantName: merchantName ?? this.merchantName,
+      billTime: billTime ?? this.billTime,
     );
   }
 
@@ -114,8 +130,12 @@ class MemoryItem {
       'productType': productType,
       'trackingNumber': trackingNumber,
       'amount': amount,
+      'isExpense': isExpense,
+      'billCategory': billCategory,
+      'note': note,
       'paymentMethod': paymentMethod,
       'merchantName': merchantName,
+      'billTime': billTime?.toIso8601String(),
     };
   }
 
@@ -140,8 +160,14 @@ class MemoryItem {
       productType: json['productType'] as String?,
       trackingNumber: json['trackingNumber'] as String?,
       amount: json['amount'] as String?,
+      isExpense: json['isExpense'] as bool?,
+      billCategory: json['billCategory'] as String?,
+      note: json['note'] as String?,
       paymentMethod: json['paymentMethod'] as String?,
       merchantName: json['merchantName'] as String?,
+      billTime: json['billTime'] != null
+          ? DateTime.parse(json['billTime'] as String)
+          : null,
     );
   }
 

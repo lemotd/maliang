@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'config_service.dart';
 import '../models/memory_item.dart';
+import '../models/bill_category.dart';
 
 class AiService {
   final ConfigService _configService = ConfigService();
@@ -84,7 +85,8 @@ class AiService {
     final base64Image = base64Encode(imageBytes);
     debugPrint('最终图片大小: ${imageBytes.length} bytes');
 
-    final systemPrompt = '''你是一个智能助手，专门分析用户分享的图片内容。请根据图片内容进行分析：
+    final systemPrompt = '''你是一个智能助手
+专门分析用户分享的图片内容。请根据图片内容进行分析：
 
 1. 判断图片属于哪个分类：
    - 取餐码：包含餐厅取餐码、取餐号的图片
@@ -104,13 +106,15 @@ class AiService {
 3. 根据分类提取详细信息（可选字段，如果图片中有则提取，没有则不填）：
    - 取餐码：shopName(店铺名称)、pickupCode(取餐码)、dishName(餐品名称)
    - 取件码：expressCompany(快递公司)、pickupCode(取件码)、pickupAddress(取件地址)、productType(商品类型)、trackingNumber(快递单号)
-   - 账单：amount(金额，带符号如"-35.00")、paymentMethod(支付方式)、merchantName(商户名称)
-   - 随手记：无额外字段
+   - 账单：amount(金额，带符号如"-35.00")、isExpense(布尔值，true表示支出，false表示收入)、billCategory(账单分类，必须从以下分类中选择一个最匹配的)、billTime(账单时间，格式为"YYYY-MM-DD HH:mm"，从图片中识别的交易时间)：
+     * 支出分类：餐饮(餐厅、外卖、饮品)、零食(水果、甜品、小吃)、交通(打车、公交、地铁、加油)、日用(超市、便利店)、娱乐(电影、游戏、KTV)、运动(健身、体育)、服饰(衣服、鞋子)、家居(家具、装修)、通讯(话费、宽带)、烟酒(香烟、酒水)、住房(房租、物业)、缴费(水电燃气)、人情(红包、礼金)、教育(学费、培训)、医疗(看病、买药)、保险(车险、寿险)、宠物(宠物用品、宠物医疗)、旅行(机票、酒店)、转账(微信转账、支付宝转账)、投资(股票、基金)、购物(网购、商场)、公益(捐款)、养娃(奶粉、玩具)、其他
+     * 收入分类：工资、奖金、兼职、生意、理财、转账(微信转账、支付宝转账)、生活费、其他
+   - paymentMethod(支付方式)、merchantName(商户名称)
 
 请严格按照以下JSON格式返回，不要包含其他内容：
-{"category":"分类名称","title":"提取的标题","shopName":"店铺名称","pickupCode":"取餐码/取件码","dishName":"餐品名称","expressCompany":"快递公司","pickupAddress":"取件地址","productType":"商品类型","trackingNumber":"快递单号","amount":"金额","paymentMethod":"支付方式","merchantName":"商户名称"}
+{"category":"分类名称","title":"提取的标题","shopName":"店铺名称","pickupCode":"取餐码/取件码","dishName":"餐品名称","expressCompany":"快递公司","pickupAddress":"取件地址","productType":"商品类型","trackingNumber":"快递单号","amount":"金额","isExpense":true/false,"billCategory":"账单分类","paymentMethod":"支付方式","merchantName":"商户名称","billTime":"账单时间"}
 
-注意：只填写图片中实际存在的信息，不存在的字段请省略或留空。''';
+注意：只填写图片中实际存在的信息，不存在的字段请省略或留空。billCategory必须从上面列出的分类中选择，不要自创分类名称。billTime格式为"YYYY-MM-DD HH:mm"，如"2024-01-15 14:30"。''';
 
     final url = Uri.parse('$apiAddress/chat/completions');
     debugPrint('请求URL: $url');
@@ -200,6 +204,44 @@ class AiService {
         return null;
       }
 
+      // 辅助函数：获取布尔值
+      bool? getBoolValue(Map<String, dynamic> json, String key) {
+        final value = json[key];
+        if (value == null) return null;
+        if (value is bool) return value;
+        if (value is String) {
+          return value.toLowerCase() == 'true';
+        }
+        return null;
+      }
+
+      // 辅助函数：解析账单时间
+      DateTime? parseBillTime(String? timeStr) {
+        if (timeStr == null || timeStr.isEmpty) return null;
+        try {
+          // 尝试解析 "YYYY-MM-DD HH:mm" 格式
+          final parts = timeStr.split(' ');
+          if (parts.length == 2) {
+            final dateParts = parts[0].split('-');
+            final timeParts = parts[1].split(':');
+            if (dateParts.length == 3 && timeParts.length >= 2) {
+              return DateTime(
+                int.parse(dateParts[0]),
+                int.parse(dateParts[1]),
+                int.parse(dateParts[2]),
+                int.parse(timeParts[0]),
+                int.parse(timeParts[1]),
+              );
+            }
+          }
+          // 尝试直接解析 ISO 格式
+          return DateTime.parse(timeStr);
+        } catch (e) {
+          debugPrint('解析账单时间失败: $timeStr, 错误: $e');
+          return null;
+        }
+      }
+
       return MemoryItem(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         title: title,
@@ -216,8 +258,11 @@ class AiService {
         productType: getNonEmptyString(json, 'productType'),
         trackingNumber: getNonEmptyString(json, 'trackingNumber'),
         amount: getNonEmptyString(json, 'amount'),
+        isExpense: getBoolValue(json, 'isExpense'),
+        billCategory: getNonEmptyString(json, 'billCategory'),
         paymentMethod: getNonEmptyString(json, 'paymentMethod'),
         merchantName: getNonEmptyString(json, 'merchantName'),
+        billTime: parseBillTime(getNonEmptyString(json, 'billTime')),
       );
     } catch (e) {
       return MemoryItem(

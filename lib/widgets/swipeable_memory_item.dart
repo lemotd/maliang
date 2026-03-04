@@ -75,6 +75,12 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
         oldWidget.memory.imagePath != widget.memory.imagePath) {
       _loadImage();
     }
+    if (oldWidget.memory.title != widget.memory.title ||
+        oldWidget.memory.amount != widget.memory.amount ||
+        oldWidget.memory.billCategory != widget.memory.billCategory ||
+        oldWidget.memory.note != widget.memory.note) {
+      setState(() {});
+    }
   }
 
   void _loadImage() async {
@@ -233,8 +239,14 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     }
 
     if (widget.memory.category == MemoryCategory.bill) {
-      if (!title.startsWith('-') && !title.startsWith('+')) {
-        title = '-$title';
+      if (!title.contains('¥')) {
+        if (!title.startsWith('-') && !title.startsWith('+')) {
+          title = '-¥$title';
+        } else if (title.startsWith('-')) {
+          title = '-¥${title.substring(1)}';
+        } else if (title.startsWith('+')) {
+          title = '+¥${title.substring(1)}';
+        }
       }
     }
 

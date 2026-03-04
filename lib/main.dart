@@ -602,7 +602,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       CupertinoPageRoute(
         builder: (context) => MemoryDetailPage(memory: memory),
       ),
-    );
+    ).then((updatedMemory) {
+      debugPrint('返回数据: $updatedMemory');
+      if (updatedMemory != null && updatedMemory is MemoryItem) {
+        debugPrint('更新列表项: ${updatedMemory.title}');
+        // 更新列表中的对应项
+        final index = _memories.indexWhere((m) => m.id == updatedMemory.id);
+        debugPrint('找到索引: $index');
+        if (index != -1) {
+          setState(() {
+            _memories[index] = updatedMemory;
+          });
+          // 更新通知
+          _notificationService.showLiveUpdateNotification(updatedMemory);
+        }
+      }
+    });
   }
 
   List<Widget> _buildDetailInfo(MemoryItem memory) {

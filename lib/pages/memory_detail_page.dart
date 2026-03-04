@@ -5,16 +5,566 @@ import 'dart:ui';
 import 'dart:io';
 import 'dart:math' as math;
 import '../models/memory_item.dart';
+import '../models/bill_category.dart';
+import '../services/memory_service.dart';
 
 class _MildBounceCurve extends Curve {
   const _MildBounceCurve();
 
   @override
   double transform(double t) {
-    // 类似 easeOutBack 但回弹幅度更小
-    const c1 = 0.8; // 进一步降低回弹系数
+    const c1 = 0.8;
     const c3 = c1 + 1;
     return 1 + c3 * math.pow(t - 1, 3) + c1 * math.pow(t - 1, 2);
+  }
+}
+
+class _EditBillBottomSheet extends StatefulWidget {
+  final MemoryItem memory;
+
+  const _EditBillBottomSheet({required this.memory});
+
+  @override
+  State<_EditBillBottomSheet> createState() => _EditBillBottomSheetState();
+}
+
+class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
+  late TextEditingController _amountController;
+  late TextEditingController _noteController;
+  late DateTime _selectedDate;
+  bool _isExpense = true;
+  String? _selectedCategory;
+  final FocusNode _amountFocusNode = FocusNode();
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final amountStr = widget.memory.amount ?? '0.00';
+    final cleanAmount = amountStr.replaceAll(RegExp(r'[^\d.]'), '');
+    _amountController = TextEditingController(text: cleanAmount);
+    _noteController = TextEditingController(text: widget.memory.note ?? '');
+    _selectedDate = widget.memory.billTime ?? widget.memory.createdAt;
+    _isExpense = widget.memory.isExpense ?? true;
+    _selectedCategory = widget.memory.billCategory;
+
+    // 计算选中分类所在的页面
+    _calculateInitialPage();
+
+    // 延迟聚焦
+    Future.delayed(const Duration(milliseconds: 100), () {
+      _amountFocusNode.requestFocus();
+    });
+  }
+
+  void _calculateInitialPage() {
+    final categories = _isExpense ? _expenseCategories : _incomeCategories;
+    final billCategory = widget.memory.billCategory;
+    if (billCategory != null) {
+      for (int i = 0; i < categories.length; i++) {
+        if (categories[i]['name'] == billCategory ||
+            categories[i]['label'] == billCategory) {
+          _currentPage = i ~/ 8;
+          // 延迟跳转到对应页面
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _pageController.jumpToPage(_currentPage);
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _noteController.dispose();
+    _amountFocusNode.dispose();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  String _formatDateShort(DateTime date) {
+    return '${date.month}月${date.day}日';
+  }
+
+  String _formatTimeShort(DateTime date) {
+    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.year}年${date.month}月${date.day}日 ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedDate = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          _selectedDate.hour,
+          _selectedDate.minute,
+        );
+      });
+    }
+  }
+
+  Future<void> _selectTime() async {
+    final TimeOfDay? time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_selectedDate),
+    );
+    if (time != null) {
+      setState(() {
+        _selectedDate = DateTime(
+          _selectedDate.year,
+          _selectedDate.month,
+          _selectedDate.day,
+          time.hour,
+          time.minute,
+        );
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  SizedBox(
+                    width: 60,
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        '取消',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF8E8E93),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    height: 32,
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF2F2F7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: CupertinoSlidingSegmentedControl<bool>(
+                      groupValue: _isExpense,
+                      children: const {
+                        true: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Text('支出', style: TextStyle(fontSize: 14)),
+                        ),
+                        false: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Text('收入', style: TextStyle(fontSize: 14)),
+                        ),
+                      },
+                      onValueChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            _isExpense = value;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  SizedBox(
+                    width: 60,
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () async {
+                        final amount = _amountController.text;
+                        final note = _noteController.text;
+                        final isExpense = _isExpense;
+                        final billCategory = _selectedCategory;
+                        final createdAt = _selectedDate;
+
+                        // 更新金额格式
+                        String formattedAmount = amount;
+                        if (amount.isEmpty) {
+                          formattedAmount = '0.00';
+                        } else {
+                          final prefix = isExpense ? '-' : '+';
+                          formattedAmount =
+                              '$prefix${amount.replaceAll(RegExp(r'[^\d.]'), '')}';
+                        }
+
+                        // 生成新的标题
+                        String newTitle = widget.memory.title;
+                        if (widget.memory.category == MemoryCategory.bill) {
+                          newTitle = formattedAmount;
+                        }
+
+                        // 创建更新后的 MemoryItem
+                        final updatedMemory = widget.memory.copyWith(
+                          title: newTitle,
+                          amount: formattedAmount,
+                          isExpense: isExpense,
+                          billCategory: billCategory,
+                          note: note,
+                          billTime: createdAt,
+                        );
+
+                        // 保存到数据库
+                        final memoryService = MemoryService();
+                        await memoryService.updateMemory(updatedMemory);
+
+                        // 关闭底部抽屉并返回更新后的数据
+                        if (mounted) {
+                          Navigator.pop(context, updatedMemory);
+                        }
+                      },
+                      child: const Text(
+                        '完成',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF007AFF),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF2F2F7),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    // 金额输入行
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        const Text(
+                          '¥',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF8E8E93),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: TextField(
+                            controller: _amountController,
+                            focusNode: _amountFocusNode,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d{0,2}'),
+                              ),
+                            ],
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF1A1A1A),
+                            ),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              hintText: '0.00',
+                              hintStyle: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFFC7C7CC),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Divider(height: 1, color: Color(0x1A000000)),
+                    const SizedBox(height: 4),
+                    // 日期、时间、备注行
+                    Row(
+                      children: [
+                        // 日期胶囊
+                        GestureDetector(
+                          onTap: _selectDate,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE5E5EA),
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Text(
+                              _formatDateShort(_selectedDate),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF8E8E93),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // 时间胶囊
+                        GestureDetector(
+                          onTap: _selectTime,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE5E5EA),
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: Text(
+                              _formatTimeShort(_selectedDate),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF8E8E93),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // 备注输入
+                        Expanded(
+                          child: TextField(
+                            controller: _noteController,
+                            maxLength: 20,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF1A1A1A),
+                            ),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              hintText: '添加备注',
+                              hintStyle: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFFC7C7CC),
+                              ),
+                              contentPadding: EdgeInsets.zero,
+                              counterText: '',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // 分类选择器
+            SizedBox(
+              height: 180,
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: _isExpense
+                    ? (_expenseCategories.length / 8).ceil()
+                    : (_incomeCategories.length / 8).ceil(),
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPage = index;
+                  });
+                },
+                itemBuilder: (context, pageIndex) {
+                  final categories = _isExpense
+                      ? _expenseCategories
+                      : _incomeCategories;
+                  final startIndex = pageIndex * 8;
+                  final endIndex = (startIndex + 8).clamp(0, categories.length);
+                  final pageCategories = categories.sublist(
+                    startIndex,
+                    endIndex,
+                  );
+
+                  return GridView.count(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: 1.0,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    children: pageCategories.map((category) {
+                      final isSelected =
+                          _selectedCategory == category['name'] ||
+                          _selectedCategory == category['label'];
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedCategory = category['name'];
+                          });
+                        },
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFF007AFF)
+                                    : Colors.transparent,
+                                shape: BoxShape.circle,
+                                border: isSelected
+                                    ? null
+                                    : Border.all(
+                                        color: const Color(0xFFC7C7CC),
+                                        width: 1,
+                                      ),
+                              ),
+                              child: Icon(
+                                category['icon'],
+                                size: 22,
+                                color: isSelected
+                                    ? Colors.white
+                                    : const Color(0xFF1A1A1A),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              category['label'],
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isSelected
+                                    ? const Color(0xFF007AFF)
+                                    : const Color(0xFF8E8E93),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ),
+            // 页面指示器 - 始终保持空间
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: SizedBox(
+                height: 6,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: _buildPageIndicators(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static const List<Map<String, dynamic>> _expenseCategories = [
+    {'name': 'dining', 'label': '餐饮', 'icon': Icons.restaurant_outlined},
+    {'name': 'snacks', 'label': '零食', 'icon': Icons.cookie_outlined},
+    {'name': 'transport', 'label': '交通', 'icon': Icons.directions_bus_outlined},
+    {'name': 'daily', 'label': '日用', 'icon': Icons.shopping_basket_outlined},
+    {
+      'name': 'entertainment',
+      'label': '娱乐',
+      'icon': Icons.sports_esports_outlined,
+    },
+    {'name': 'sports', 'label': '运动', 'icon': Icons.fitness_center_outlined},
+    {'name': 'clothing', 'label': '服饰', 'icon': Icons.checkroom_outlined},
+    {'name': 'home', 'label': '家居', 'icon': Icons.chair_outlined},
+    {'name': 'communication', 'label': '通讯', 'icon': Icons.phone_outlined},
+    {'name': 'tobacco', 'label': '烟酒', 'icon': Icons.smoking_rooms_outlined},
+    {'name': 'medical', 'label': '医疗', 'icon': Icons.local_hospital_outlined},
+    {'name': 'education', 'label': '教育', 'icon': Icons.school_outlined},
+    {'name': 'gift', 'label': '礼物', 'icon': Icons.card_giftcard_outlined},
+    {'name': 'pet', 'label': '宠物', 'icon': Icons.pets_outlined},
+    {'name': 'beauty', 'label': '美容', 'icon': Icons.face_retouching_natural},
+    {'name': 'repair', 'label': '维修', 'icon': Icons.build_outlined},
+    {'name': 'travel', 'label': '旅行', 'icon': Icons.flight_outlined},
+    {'name': 'car', 'label': '汽车', 'icon': Icons.directions_car_outlined},
+    {'name': 'insurance', 'label': '保险', 'icon': Icons.security_outlined},
+    {'name': 'tax', 'label': '税费', 'icon': Icons.receipt_long_outlined},
+    {'name': 'investment', 'label': '投资', 'icon': Icons.trending_up_outlined},
+    {'name': 'transfer', 'label': '转账', 'icon': Icons.swap_horiz_outlined},
+    {'name': 'other_expense', 'label': '其他', 'icon': Icons.more_horiz_outlined},
+  ];
+
+  static const List<Map<String, dynamic>> _incomeCategories = [
+    {'name': 'salary', 'label': '工资', 'icon': Icons.work_outline},
+    {'name': 'bonus', 'label': '奖金', 'icon': Icons.card_giftcard_outlined},
+    {
+      'name': 'investment_income',
+      'label': '投资',
+      'icon': Icons.trending_up_outlined,
+    },
+    {'name': 'part_time', 'label': '兼职', 'icon': Icons.access_time_outlined},
+    {'name': 'gift_income', 'label': '红包', 'icon': Icons.redeem_outlined},
+    {'name': 'refund', 'label': '退款', 'icon': Icons.assignment_return_outlined},
+    {
+      'name': 'transfer_income',
+      'label': '转账',
+      'icon': Icons.swap_horiz_outlined,
+    },
+    {'name': 'other_income', 'label': '其他', 'icon': Icons.more_horiz_outlined},
+  ];
+
+  List<Widget> _buildPageIndicators() {
+    final pageCount = _isExpense
+        ? (_expenseCategories.length / 8).ceil()
+        : (_incomeCategories.length / 8).ceil();
+
+    if (pageCount <= 1) {
+      return [];
+    }
+
+    return List.generate(
+      pageCount,
+      (index) => AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        width: 6,
+        height: 6,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: _currentPage == index
+              ? const Color(0xFF1A1A1A)
+              : const Color(0xFFC7C7CC),
+        ),
+      ),
+    );
   }
 }
 
@@ -29,20 +579,22 @@ class MemoryDetailPage extends StatefulWidget {
 
 class _MemoryDetailPageState extends State<MemoryDetailPage>
     with SingleTickerProviderStateMixin {
+  late MemoryItem _memory;
   Size? _imageSize;
   bool _isLoading = true;
   late AnimationController _controller;
-  double _offset = 1.0; // 1.0 = 默认位置, 0.0 = 上滑吸附(展开), >1.0 = 下滑吸附(显示完整图片)
+  double _offset = 1.0;
   final ScrollController _scrollController = ScrollController();
   double _startDragY = 0;
   double _startOffset = 0;
   bool _isDragging = false;
   double _imageDisplayHeight = 0;
-  double _requiredOffset = 1.0; // 显示完整图片所需的offset
+  double _requiredOffset = 1.0;
 
   @override
   void initState() {
     super.initState();
+    _memory = widget.memory;
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 350),
@@ -51,8 +603,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   Future<void> _loadImageSize() async {
-    if (widget.memory.imagePath != null) {
-      final file = File(widget.memory.imagePath!);
+    if (_memory.imagePath != null) {
+      final file = File(_memory.imagePath!);
       final bytes = await file.readAsBytes();
       final image = await decodeImageFromList(bytes);
       if (mounted) {
@@ -274,123 +826,146 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     // offset 从 1.0 到 0.5 时，图片向上移动
     final imageSlideUp = _offset < 1.0 ? (1.0 - _offset) * 30 : 0.0;
 
-    return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF000000)
-          : const Color(0xFFF2F2F7),
-      body: Stack(
-        children: [
-          // 图片区域
-          if (imageOpacity > 0)
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          debugPrint('PopScope 返回数据: ${_memory.title}');
+          Navigator.pop(context, _memory);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: isDark
+            ? const Color(0xFF000000)
+            : const Color(0xFFF2F2F7),
+        body: Stack(
+          children: [
+            // 图片区域
+            if (imageOpacity > 0)
+              Positioned(
+                top: appBarHeight - imageSlideUp,
+                left: 0,
+                right: 0,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Opacity(
+                    opacity: imageOpacity,
+                    child: _buildImageArea(
+                      screenWidth,
+                      imageAreaHeight,
+                      isDark,
+                    ),
+                  ),
+                ),
+              ),
+            // 内容区域
             Positioned(
-              top: appBarHeight - imageSlideUp,
+              top: contentTop,
               left: 0,
               right: 0,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Opacity(
-                  opacity: imageOpacity,
-                  child: _buildImageArea(screenWidth, imageAreaHeight, isDark),
+              bottom: 0,
+              child: Listener(
+                onPointerDown: (e) => _onDragStart(e.position.dy),
+                onPointerMove: (e) =>
+                    _onDragUpdate(e.position.dy, imageAreaHeight),
+                onPointerUp: (_) => _onDragEnd(),
+                onPointerCancel: (_) => _onDragEnd(),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(borderRadius),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.4 : 0.08),
+                        blurRadius: 24,
+                        spreadRadius: 0,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    physics: _offset < 0.5 && !_isDragging
+                        ? const BouncingScrollPhysics(
+                            parent: AlwaysScrollableScrollPhysics(),
+                          )
+                        : const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.only(bottom: safeAreaBottom + 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_memory.category != MemoryCategory.bill)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              top: 20,
+                              left: 20,
+                              right: 20,
+                            ),
+                            child: Text(
+                              _memory.title,
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? const Color(0xFFFFFFFF)
+                                    : const Color(0xFF1A1A1A),
+                              ),
+                            ),
+                          ),
+                        if (_memory.category != MemoryCategory.bill)
+                          const SizedBox(height: 20),
+                        if (_memory.category == MemoryCategory.bill)
+                          const SizedBox(height: 20),
+                        if (_memory.category == MemoryCategory.bill)
+                          _buildBillDetailInfo(isDark)
+                        else
+                          _buildDetailInfo(isDark),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
-          // 内容区域
-          Positioned(
-            top: contentTop,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Listener(
-              onPointerDown: (e) => _onDragStart(e.position.dy),
-              onPointerMove: (e) =>
-                  _onDragUpdate(e.position.dy, imageAreaHeight),
-              onPointerUp: (_) => _onDragEnd(),
-              onPointerCancel: (_) => _onDragEnd(),
+            // 顶栏
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
               child: Container(
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(borderRadius),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(isDark ? 0.4 : 0.08),
-                      blurRadius: 24,
-                      spreadRadius: 0,
-                      offset: const Offset(0, -4),
+                height: appBarHeight,
+                padding: EdgeInsets.only(top: safeAreaTop),
+                color: _offset < 0.5
+                    ? (isDark ? const Color(0xFF1C1C1E) : Colors.white)
+                    : Colors.transparent,
+                child: Stack(
+                  children: [
+                    Positioned(
+                      left: 8,
+                      top: 0,
+                      bottom: 0,
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          debugPrint('返回按钮点击，返回数据: ${_memory.title}');
+                          Navigator.pop(context, _memory);
+                        },
+                        child: Icon(
+                          CupertinoIcons.back,
+                          color: isDark
+                              ? const Color(0xFFFFFFFF)
+                              : const Color(0xFF1A1A1A),
+                          size: 28,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                child: SingleChildScrollView(
-                  controller: _scrollController,
-                  physics: _offset < 0.5 && !_isDragging
-                      ? const BouncingScrollPhysics(
-                          parent: AlwaysScrollableScrollPhysics(),
-                        )
-                      : const NeverScrollableScrollPhysics(),
-                  padding: EdgeInsets.only(bottom: safeAreaBottom + 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          top: 20,
-                          left: 20,
-                          right: 20,
-                        ),
-                        child: Text(
-                          widget.memory.title,
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w600,
-                            color: isDark
-                                ? const Color(0xFFFFFFFF)
-                                : const Color(0xFF1A1A1A),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      _buildDetailInfo(isDark),
-                    ],
-                  ),
-                ),
               ),
             ),
-          ),
-          // 顶栏
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: appBarHeight,
-              padding: EdgeInsets.only(top: safeAreaTop),
-              color: _offset < 0.5
-                  ? (isDark ? const Color(0xFF1C1C1E) : Colors.white)
-                  : Colors.transparent,
-              child: Stack(
-                children: [
-                  Positioned(
-                    left: 8,
-                    top: 0,
-                    bottom: 0,
-                    child: CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () => Navigator.pop(context),
-                      child: Icon(
-                        CupertinoIcons.back,
-                        color: isDark
-                            ? const Color(0xFFFFFFFF)
-                            : const Color(0xFF1A1A1A),
-                        size: 28,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -408,15 +983,15 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       );
     }
 
-    if (widget.memory.imagePath == null) {
+    if (_memory.imagePath == null) {
       _imageDisplayHeight = 60; // 图标大小
       return Container(
         color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
         child: Center(
           child: Icon(
-            _getCategoryIcon(widget.memory.category),
+            _getCategoryIcon(_memory.category),
             size: 60,
-            color: widget.memory.category.color.withOpacity(0.5),
+            color: _memory.category.color.withOpacity(0.5),
           ),
         ),
       );
@@ -479,7 +1054,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Image.file(
-            File(widget.memory.imagePath!),
+            File(_memory.imagePath!),
             width: displayWidth,
             height: displayHeight,
             fit: BoxFit.cover,
@@ -495,73 +1070,57 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     details.add(
       _buildInfoRow(
         '分类',
-        widget.memory.category.label,
+        _memory.category.label,
         isDark,
-        icon: _getCategoryIcon(widget.memory.category),
-        iconColor: widget.memory.category.color,
+        icon: _getCategoryIcon(_memory.category),
+        iconColor: _memory.category.color,
       ),
     );
 
-    details.add(
-      _buildInfoRow('时间', _formatTime(widget.memory.createdAt), isDark),
-    );
+    details.add(_buildInfoRow('时间', _formatTime(_memory.createdAt), isDark));
 
-    switch (widget.memory.category) {
+    switch (_memory.category) {
       case MemoryCategory.pickupCode:
-        if (widget.memory.shopName != null &&
-            widget.memory.shopName!.isNotEmpty) {
-          details.add(_buildInfoRow('店铺', widget.memory.shopName!, isDark));
+        if (_memory.shopName != null && _memory.shopName!.isNotEmpty) {
+          details.add(_buildInfoRow('店铺', _memory.shopName!, isDark));
         }
-        if (widget.memory.pickupCode != null &&
-            widget.memory.pickupCode!.isNotEmpty) {
-          details.add(_buildInfoRow('取餐码', widget.memory.pickupCode!, isDark));
+        if (_memory.pickupCode != null && _memory.pickupCode!.isNotEmpty) {
+          details.add(_buildInfoRow('取餐码', _memory.pickupCode!, isDark));
         }
-        if (widget.memory.dishName != null &&
-            widget.memory.dishName!.isNotEmpty) {
-          details.add(_buildInfoRow('餐品', widget.memory.dishName!, isDark));
+        if (_memory.dishName != null && _memory.dishName!.isNotEmpty) {
+          details.add(_buildInfoRow('餐品', _memory.dishName!, isDark));
         }
         break;
       case MemoryCategory.packageCode:
-        if (widget.memory.expressCompany != null &&
-            widget.memory.expressCompany!.isNotEmpty) {
-          details.add(
-            _buildInfoRow('快递', widget.memory.expressCompany!, isDark),
-          );
+        if (_memory.expressCompany != null &&
+            _memory.expressCompany!.isNotEmpty) {
+          details.add(_buildInfoRow('快递', _memory.expressCompany!, isDark));
         }
-        if (widget.memory.pickupCode != null &&
-            widget.memory.pickupCode!.isNotEmpty) {
-          details.add(_buildInfoRow('取件码', widget.memory.pickupCode!, isDark));
+        if (_memory.pickupCode != null && _memory.pickupCode!.isNotEmpty) {
+          details.add(_buildInfoRow('取件码', _memory.pickupCode!, isDark));
         }
-        if (widget.memory.pickupAddress != null &&
-            widget.memory.pickupAddress!.isNotEmpty) {
-          details.add(
-            _buildInfoRow('地址', widget.memory.pickupAddress!, isDark),
-          );
+        if (_memory.pickupAddress != null &&
+            _memory.pickupAddress!.isNotEmpty) {
+          details.add(_buildInfoRow('地址', _memory.pickupAddress!, isDark));
         }
-        if (widget.memory.productType != null &&
-            widget.memory.productType!.isNotEmpty) {
-          details.add(_buildInfoRow('物品', widget.memory.productType!, isDark));
+        if (_memory.productType != null && _memory.productType!.isNotEmpty) {
+          details.add(_buildInfoRow('物品', _memory.productType!, isDark));
         }
-        if (widget.memory.trackingNumber != null &&
-            widget.memory.trackingNumber!.isNotEmpty) {
-          details.add(
-            _buildInfoRow('单号', widget.memory.trackingNumber!, isDark),
-          );
+        if (_memory.trackingNumber != null &&
+            _memory.trackingNumber!.isNotEmpty) {
+          details.add(_buildInfoRow('单号', _memory.trackingNumber!, isDark));
         }
         break;
       case MemoryCategory.bill:
-        if (widget.memory.amount != null && widget.memory.amount!.isNotEmpty) {
-          details.add(_buildInfoRow('金额', widget.memory.amount!, isDark));
+        if (_memory.amount != null && _memory.amount!.isNotEmpty) {
+          details.add(_buildInfoRow('金额', _memory.amount!, isDark));
         }
-        if (widget.memory.paymentMethod != null &&
-            widget.memory.paymentMethod!.isNotEmpty) {
-          details.add(
-            _buildInfoRow('支付方式', widget.memory.paymentMethod!, isDark),
-          );
+        if (_memory.paymentMethod != null &&
+            _memory.paymentMethod!.isNotEmpty) {
+          details.add(_buildInfoRow('支付方式', _memory.paymentMethod!, isDark));
         }
-        if (widget.memory.merchantName != null &&
-            widget.memory.merchantName!.isNotEmpty) {
-          details.add(_buildInfoRow('商户', widget.memory.merchantName!, isDark));
+        if (_memory.merchantName != null && _memory.merchantName!.isNotEmpty) {
+          details.add(_buildInfoRow('商户', _memory.merchantName!, isDark));
         }
         break;
       case MemoryCategory.note:
@@ -597,6 +1156,218 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     return result;
   }
 
+  Widget _buildBillDetailInfo(bool isDark) {
+    // 解析金额
+    final amountStr = _memory.amount ?? '0.00';
+    final amount =
+        double.tryParse(amountStr.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+    final isExpense = _memory.isExpense ?? true;
+
+    // 格式化金额显示
+    final formattedAmount =
+        '${isExpense ? '-' : '+'}¥${amount.toStringAsFixed(2)}';
+    final amountColor = isDark
+        ? const Color(0xFFFFFFFF)
+        : const Color(0xFF1A1A1A);
+
+    // 获取账单分类
+    final billCategoryName = _memory.billCategory ?? '其他';
+    IconData categoryIcon;
+    String categoryLabel;
+
+    if (isExpense) {
+      final category = BillExpenseCategory.values.firstWhere(
+        (c) => c.name == billCategoryName || c.label == billCategoryName,
+        orElse: () => BillExpenseCategory.other,
+      );
+      categoryIcon = category.icon;
+      categoryLabel = category.label;
+    } else {
+      final category = BillIncomeCategory.values.firstWhere(
+        (c) => c.name == billCategoryName || c.label == billCategoryName,
+        orElse: () => BillIncomeCategory.other,
+      );
+      categoryIcon = category.icon;
+      categoryLabel = category.label;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF007AFF).withOpacity(0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF007AFF).withOpacity(0.1),
+          width: 0.6,
+        ),
+      ),
+      child: Column(
+        children: [
+          // 顶部：标题和编辑按钮
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '记账',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: isDark
+                      ? const Color(0xFFFFFFFF)
+                      : const Color(0xFF1A1A1A),
+                ),
+              ),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                minSize: 28,
+                onPressed: () {
+                  _showEditBillBottomSheet();
+                },
+                child: Icon(
+                  CupertinoIcons.pencil,
+                  size: 18,
+                  color: const Color(0xFF007AFF),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // 金额显示
+          Text(
+            formattedAmount,
+            style: TextStyle(
+              fontSize: 36,
+              fontWeight: FontWeight.w500,
+              color: amountColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          // 分类显示
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                categoryIcon,
+                size: 18,
+                color: isDark
+                    ? const Color(0xFFFFFFFF)
+                    : const Color(0xFF1A1A1A),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                categoryLabel,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark
+                      ? const Color(0xFFFFFFFF)
+                      : const Color(0xFF1A1A1A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // 分割线
+          Divider(
+            height: 0.5,
+            thickness: 0.5,
+            color: isDark ? const Color(0xFF48484A) : const Color(0xFFC7C7CC),
+          ),
+          const SizedBox(height: 16),
+          // 详细信息
+          Column(
+            children: [
+              _buildBillInfoRow('类型', isExpense ? '支出' : '收入', isDark),
+              const SizedBox(height: 12),
+              _buildBillInfoRow(
+                '时间',
+                _formatTime(_memory.billTime ?? _memory.createdAt),
+                isDark,
+              ),
+              if (_memory.note != null && _memory.note!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _buildBillInfoRow('备注', _memory.note!, isDark, maxLines: 2),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBillInfoRow(
+    String label,
+    String value,
+    bool isDark, {
+    IconData? icon,
+    int maxLines = 1,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 60,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 15,
+              color: isDark ? const Color(0xFF8E8E93) : const Color(0xFF8E8E93),
+            ),
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: const Color(0xFF007AFF)),
+                const SizedBox(width: 6),
+              ],
+              Expanded(
+                child: Text(
+                  value.isEmpty ? '-' : value,
+                  maxLines: maxLines,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: isDark
+                        ? const Color(0xFFFFFFFF)
+                        : const Color(0xFF1A1A1A),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showEditBillBottomSheet() async {
+    final result = await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: _EditBillBottomSheet(memory: _memory),
+      ),
+    );
+
+    debugPrint('底部抽屉返回数据: $result');
+    if (result != null && result is MemoryItem) {
+      debugPrint('更新 _memory: ${result.title}');
+      setState(() {
+        _memory = result;
+      });
+    }
+  }
+
   Widget _buildInfoRow(
     String label,
     String value,
@@ -605,7 +1376,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     Color? iconColor,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [

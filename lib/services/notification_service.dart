@@ -65,12 +65,26 @@ class NotificationService {
       final detailInfo = memory.getDetailInfo();
       final detailText = detailInfo.isEmpty ? '' : detailInfo.join(' · ');
 
+      // 格式化标题，为账单添加 ¥ 符号
+      String displayTitle = memory.title;
+      if (memory.category == MemoryCategory.bill) {
+        if (!displayTitle.contains('¥')) {
+          if (!displayTitle.startsWith('-') && !displayTitle.startsWith('+')) {
+            displayTitle = '-¥$displayTitle';
+          } else if (displayTitle.startsWith('-')) {
+            displayTitle = '-¥${displayTitle.substring(1)}';
+          } else if (displayTitle.startsWith('+')) {
+            displayTitle = '+¥${displayTitle.substring(1)}';
+          }
+        }
+      }
+
       debugPrint(
-        '调用原生通知: id=${memory.id.hashCode}, title=${memory.title}, category=${memory.category.label}, detail=$detailText',
+        '调用原生通知: id=${memory.id.hashCode}, title=$displayTitle, category=${memory.category.label}, detail=$detailText',
       );
       await _channel.invokeMethod('showLiveUpdateNotification', {
         'id': memory.id.hashCode,
-        'title': memory.title,
+        'title': displayTitle,
         'category': memory.category.label,
         'detail': detailText,
       });
