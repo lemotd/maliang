@@ -397,6 +397,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       );
       debugPrint('解析后的memory: ${memory?.title}');
       return memory;
+    } on ApiKeyInvalidException catch (e) {
+      debugPrint('API密钥无效: $e');
+      // 跳转到设置页面
+      if (mounted) {
+        Navigator.push(
+          context,
+          CupertinoPageRoute(builder: (context) => const SettingsPage()),
+        );
+      }
+      return null;
     } catch (e, stackTrace) {
       debugPrint('AI分析错误: $e');
       debugPrint('堆栈: $stackTrace');

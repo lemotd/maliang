@@ -7,12 +7,21 @@ import 'config_service.dart';
 import '../models/memory_item.dart';
 import '../models/bill_category.dart';
 
+class ApiKeyInvalidException implements Exception {
+  final String message;
+  ApiKeyInvalidException(this.message);
+
+  @override
+  String toString() => message;
+}
+
 class AiService {
   final ConfigService _configService = ConfigService();
 
   Future<String?> chat(String message, {String? systemPrompt}) async {
     final apiAddress = await _configService.getApiAddress();
     final apiKey = await _configService.getApiKey();
+    final isUsingDefault = await _configService.isUsingDefaultApiKey();
 
     if (apiKey.isEmpty) {
       throw Exception('API密钥未配置，请在设置中填写API密钥');
@@ -47,15 +56,22 @@ class AiService {
       return content;
     } else {
       final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(
-        errorData['error']?['message'] ?? '请求失败: ${response.statusCode}',
-      );
+      final errorMessage =
+          errorData['error']?['message'] ?? '请求失败: ${response.statusCode}';
+
+      // 如果使用默认 API Key 且调用失败，提示用户更换
+      if (isUsingDefault) {
+        throw ApiKeyInvalidException('默认API密钥无效，请在设置中配置您自己的API密钥');
+      }
+
+      throw Exception(errorMessage);
     }
   }
 
   Future<String?> analyzeImage(String imagePath) async {
     final apiAddress = await _configService.getApiAddress();
     final apiKey = await _configService.getApiKey();
+    final isUsingDefault = await _configService.isUsingDefaultApiKey();
 
     debugPrint('API地址: $apiAddress');
     debugPrint('API密钥长度: ${apiKey.length}');
@@ -158,9 +174,15 @@ class AiService {
     } else {
       final errorData = jsonDecode(utf8.decode(response.bodyBytes));
       debugPrint('错误响应: $errorData');
-      throw Exception(
-        errorData['error']?['message'] ?? '图片分析失败: ${response.statusCode}',
-      );
+      final errorMessage =
+          errorData['error']?['message'] ?? '图片分析失败: ${response.statusCode}';
+
+      // 如果使用默认 API Key 且调用失败，提示用户更换
+      if (isUsingDefault) {
+        throw ApiKeyInvalidException('默认API密钥无效，请在设置中配置您自己的API密钥');
+      }
+
+      throw Exception(errorMessage);
     }
   }
 
