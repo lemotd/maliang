@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'dart:ui';
 import '../models/memory_item.dart';
+import '../theme/app_colors.dart';
 
 class SwipeableMemoryItem extends StatefulWidget {
   final MemoryItem memory;
@@ -263,6 +264,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
     final halfScreen = screenWidth * 0.5;
     final isStage2 = _dragExtent.abs() > halfScreen;
@@ -271,14 +273,14 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
     final isCompleted = widget.memory.isCompleted;
     final rightActionColor = isCompleted
-        ? const Color(0xFFFF9500)
-        : const Color(0xFF34C759);
+        ? AppColors.yellow(isDark)
+        : AppColors.success(isDark);
     final rightActionText = isCompleted ? '待办' : '完成';
     final rightActionIcon = isCompleted
         ? CupertinoIcons.arrow_2_circlepath
         : CupertinoIcons.check_mark_circled;
 
-    const leftActionColor = Color(0xFFFF3B30);
+    final leftActionColor = AppColors.warning(isDark);
     const leftActionText = '删除';
     const leftActionIcon = CupertinoIcons.trash;
 
@@ -463,19 +465,19 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
     // 标题颜色
     final textColor = isCompleted
-        ? const Color(0xFF8E8E93)
-        : (isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1A1A1A));
+        ? AppColors.onSurfaceQuaternary(isDark)
+        : AppColors.onSurface(isDark);
     // 副标题和时间颜色 - 已完成时更浅
     final subTextColor = isCompleted
-        ? const Color(0xFFC7C7CC)
-        : const Color(0xFF8E8E93);
+        ? AppColors.onSurfaceOctonary(isDark)
+        : AppColors.onSurfaceQuaternary(isDark);
     final subtitle = _getSubtitle();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        color: AppColors.surfaceHigh(isDark),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -553,7 +555,9 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
         Icon(
           _getCategoryIcon(category),
           size: 14,
-          color: isCompleted ? const Color(0xFFC7C7CC) : category.color,
+          color: isCompleted
+              ? AppColors.onSurfaceOctonary(isDark)
+              : category.color,
         ),
         const SizedBox(width: 4),
         Text(
@@ -561,8 +565,8 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
           style: TextStyle(
             fontSize: 12,
             color: isCompleted
-                ? const Color(0xFFC7C7CC)
-                : (isDark ? const Color(0xFF8E8E93) : const Color(0xFF666666)),
+                ? AppColors.onSurfaceOctonary(isDark)
+                : AppColors.onSurfaceQuaternary(isDark),
             fontWeight: FontWeight.w400,
           ),
         ),
@@ -653,13 +657,13 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
       width: 72,
       height: 72,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+        color: AppColors.surfaceContainer(isDark),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(
         _getCategoryIcon(widget.memory.category),
         color: isCompleted
-            ? const Color(0xFFC7C7CC)
+            ? AppColors.onSurfaceOctonary(isDark)
             : widget.memory.category.color,
         size: 32,
       ),

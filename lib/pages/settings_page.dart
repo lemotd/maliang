@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:ui';
 import '../services/config_service.dart';
 import '../services/ai_service.dart';
+import '../theme/app_colors.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -103,9 +104,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF000000)
-          : const Color(0xFFF2F2F7),
+      backgroundColor: AppColors.surfaceLow(isDark),
       body: SafeArea(
         child: Column(
           children: [
@@ -141,7 +140,7 @@ class _SettingsPageState extends State<SettingsPage> {
                               _obscureApiKey
                                   ? CupertinoIcons.eye
                                   : CupertinoIcons.eye_slash,
-                              color: const Color(0xFF8E8E93),
+                              color: AppColors.onSurfaceQuaternary(isDark),
                               size: 20,
                             ),
                           ),
@@ -158,9 +157,9 @@ class _SettingsPageState extends State<SettingsPage> {
                             child: ElevatedButton(
                               onPressed: _isSaving ? null : _saveAndValidate,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF007AFF),
-                                disabledBackgroundColor: const Color(
-                                  0xFF007AFF,
+                                backgroundColor: AppColors.primary(isDark),
+                                disabledBackgroundColor: AppColors.primary(
+                                  isDark,
                                 ).withOpacity(0.5),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -225,9 +224,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w500,
-                    color: isDark
-                        ? const Color(0xFFFFFFFF)
-                        : const Color(0xFF1A1A1A),
+                    color: AppColors.onSurface(isDark),
                   ),
                 ),
               ),
@@ -252,12 +249,15 @@ class _SettingsPageState extends State<SettingsPage> {
           padding: const EdgeInsets.only(left: 16, bottom: 8),
           child: Text(
             title,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF8E8E93)),
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.onSurfaceQuaternary(isDark),
+            ),
           ),
         ),
         Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+            color: AppColors.surfaceHigh(isDark),
             borderRadius: BorderRadius.circular(16),
           ),
           margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -287,43 +287,32 @@ class _SettingsPageState extends State<SettingsPage> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1A1A1A),
+              color: AppColors.onSurface(isDark),
             ),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: controller,
             obscureText: obscureText,
-            style: TextStyle(
-              fontSize: 16,
-              color: isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1A1A1A),
-            ),
+            style: TextStyle(fontSize: 16, color: AppColors.onSurface(isDark)),
             decoration: InputDecoration(
               hintText: placeholder,
-              hintStyle: const TextStyle(
+              hintStyle: TextStyle(
                 fontSize: 16,
-                color: Color(0xFF8E8E93),
+                color: AppColors.onSurfaceOctonary(isDark),
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: isDark
-                      ? const Color(0xFF38383A)
-                      : const Color(0xFFE5E5EA),
-                ),
+                borderSide: BorderSide(color: AppColors.outline(isDark)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: isDark
-                      ? const Color(0xFF38383A)
-                      : const Color(0xFFE5E5EA),
-                ),
+                borderSide: BorderSide(color: AppColors.outline(isDark)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: Color(0xFF007AFF),
+                borderSide: BorderSide(
+                  color: AppColors.primary(isDark),
                   width: 1.5,
                 ),
               ),

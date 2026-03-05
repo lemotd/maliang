@@ -7,6 +7,7 @@ import 'dart:math' as math;
 import '../models/memory_item.dart';
 import '../models/bill_category.dart';
 import '../services/memory_service.dart';
+import '../theme/app_colors.dart';
 
 const List<Map<String, dynamic>> kExpenseCategories = [
   {'name': 'dining', 'label': '餐饮', 'icon': Icons.restaurant_outlined},
@@ -184,10 +185,11 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceHigh(isDark),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         child: Column(
@@ -204,12 +206,12 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                     child: CupertinoButton(
                       padding: EdgeInsets.zero,
                       onPressed: () => Navigator.pop(context),
-                      child: const Text(
+                      child: Text(
                         '取消',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w400,
-                          color: Color(0xFF8E8E93),
+                          color: AppColors.onSurfaceQuaternary(isDark),
                         ),
                       ),
                     ),
@@ -218,6 +220,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                     height: 32,
                     child: CupertinoSlidingSegmentedControl<bool>(
                       groupValue: _isExpense,
+                      thumbColor: AppColors.containerList(isDark),
                       children: const {
                         true: Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12),
@@ -304,12 +307,12 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                           Navigator.pop(context, updatedMemory);
                         }
                       },
-                      child: const Text(
+                      child: Text(
                         '完成',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w400,
-                          color: Color(0xFF007AFF),
+                          color: AppColors.primary(isDark),
                         ),
                       ),
                     ),
@@ -326,7 +329,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF2F2F7),
+                  color: AppColors.surfaceContainer(isDark),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
@@ -336,12 +339,12 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
                       children: [
-                        const Text(
+                        Text(
                           '¥',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF8E8E93),
+                            color: AppColors.onSurfaceQuaternary(isDark),
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -357,18 +360,18 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                                 RegExp(r'^\d*\.?\d{0,2}'),
                               ),
                             ],
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 32,
                               fontWeight: FontWeight.w500,
-                              color: Color(0xFF1A1A1A),
+                              color: AppColors.onSurface(isDark),
                             ),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               border: InputBorder.none,
                               hintText: '0.00',
                               hintStyle: TextStyle(
                                 fontSize: 32,
                                 fontWeight: FontWeight.w500,
-                                color: Color(0xFFC7C7CC),
+                                color: AppColors.onSurfaceOctonary(isDark),
                               ),
                             ),
                           ),
@@ -376,7 +379,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    const Divider(height: 1, color: Color(0x1A000000)),
+                    Divider(height: 1, color: AppColors.outline(isDark)),
                     const SizedBox(height: 4),
                     // 日期、时间、备注行
                     Row(
@@ -390,14 +393,14 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE5E5EA),
+                              color: AppColors.surfaceContainer(isDark),
                               borderRadius: BorderRadius.circular(100),
                             ),
                             child: Text(
                               _formatDateShort(_selectedDate),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF8E8E93),
+                                color: AppColors.onSurfaceQuaternary(isDark),
                               ),
                             ),
                           ),
@@ -412,14 +415,14 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE5E5EA),
+                              color: AppColors.surfaceContainer(isDark),
                               borderRadius: BorderRadius.circular(100),
                             ),
                             child: Text(
                               _formatTimeShort(_selectedDate),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF8E8E93),
+                                color: AppColors.onSurfaceQuaternary(isDark),
                               ),
                             ),
                           ),
@@ -431,16 +434,16 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                             controller: _noteController,
                             focusNode: _noteFocusNode,
                             maxLength: 20,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
-                              color: Color(0xFF1A1A1A),
+                              color: AppColors.onSurface(isDark),
                             ),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               border: InputBorder.none,
                               hintText: '添加备注',
                               hintStyle: TextStyle(
                                 fontSize: 14,
-                                color: Color(0xFFC7C7CC),
+                                color: AppColors.onSurfaceOctonary(isDark),
                               ),
                               contentPadding: EdgeInsets.zero,
                               counterText: '',
@@ -503,13 +506,13 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                               height: 44,
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? const Color(0xFF007AFF)
+                                    ? AppColors.primary(isDark)
                                     : Colors.transparent,
                                 shape: BoxShape.circle,
                                 border: isSelected
                                     ? null
                                     : Border.all(
-                                        color: const Color(0xFFC7C7CC),
+                                        color: AppColors.outline(isDark),
                                         width: 1,
                                       ),
                               ),
@@ -518,7 +521,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                                 size: 22,
                                 color: isSelected
                                     ? Colors.white
-                                    : const Color(0xFF1A1A1A),
+                                    : AppColors.onSurface(isDark),
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -527,8 +530,8 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isSelected
-                                    ? const Color(0xFF007AFF)
-                                    : const Color(0xFF8E8E93),
+                                    ? AppColors.primary(isDark)
+                                    : AppColors.onSurfaceQuaternary(isDark),
                               ),
                             ),
                           ],
@@ -546,7 +549,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                 height: 6,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: _buildPageIndicators(),
+                  children: _buildPageIndicators(isDark),
                 ),
               ),
             ),
@@ -557,7 +560,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
     );
   }
 
-  List<Widget> _buildPageIndicators() {
+  List<Widget> _buildPageIndicators(bool isDark) {
     final pageCount = _isExpense
         ? (kExpenseCategories.length / 8).ceil()
         : (kIncomeCategories.length / 8).ceil();
@@ -576,8 +579,8 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: _currentPage == index
-              ? const Color(0xFF1A1A1A)
-              : const Color(0xFFC7C7CC),
+              ? AppColors.onSurface(isDark)
+              : AppColors.onSurfaceOctonary(isDark),
         ),
       ),
     );
@@ -851,9 +854,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         }
       },
       child: Scaffold(
-        backgroundColor: isDark
-            ? const Color(0xFF000000)
-            : const Color(0xFFF2F2F7),
+        backgroundColor: AppColors.surfaceLow(isDark),
         body: Stack(
           children: [
             // 图片区域
@@ -888,7 +889,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                 onPointerCancel: (_) => _onDragEnd(),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                    color: AppColors.surfaceHigh(isDark),
                     borderRadius: BorderRadius.vertical(
                       top: Radius.circular(borderRadius),
                     ),
@@ -924,9 +925,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w600,
-                                color: isDark
-                                    ? const Color(0xFFFFFFFF)
-                                    : const Color(0xFF1A1A1A),
+                                color: AppColors.onSurface(isDark),
                               ),
                             ),
                           ),
@@ -934,9 +933,12 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                           const SizedBox(height: 20),
                         if (_memory.category == MemoryCategory.bill)
                           const SizedBox(height: 20),
-                        if (_memory.category == MemoryCategory.bill)
-                          _buildBillDetailInfo(isDark)
-                        else
+                        if (_memory.category == MemoryCategory.bill) ...[
+                          // 账单标题和创建时间
+                          _buildBillSummaryCard(isDark),
+                          const SizedBox(height: 20),
+                          _buildBillDetailInfo(isDark),
+                        ] else
                           _buildDetailInfo(isDark),
                       ],
                     ),
@@ -953,7 +955,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                 height: appBarHeight,
                 padding: EdgeInsets.only(top: safeAreaTop),
                 color: _offset < 0.5
-                    ? (isDark ? const Color(0xFF1C1C1E) : Colors.white)
+                    ? AppColors.surfaceHigh(isDark)
                     : Colors.transparent,
                 child: Stack(
                   children: [
@@ -969,9 +971,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                         },
                         child: Icon(
                           CupertinoIcons.back,
-                          color: isDark
-                              ? const Color(0xFFFFFFFF)
-                              : const Color(0xFF1A1A1A),
+                          color: AppColors.onSurface(isDark),
                           size: 28,
                         ),
                       ),
@@ -993,16 +993,14 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   ) {
     if (_isLoading) {
       return Center(
-        child: CupertinoActivityIndicator(
-          color: isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1A1A1A),
-        ),
+        child: CupertinoActivityIndicator(color: AppColors.onSurface(isDark)),
       );
     }
 
     if (_memory.imagePath == null) {
       _imageDisplayHeight = 60; // 图标大小
       return Container(
-        color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+        color: AppColors.surfaceContainer(isDark),
         child: Center(
           child: Icon(
             _getCategoryIcon(_memory.category),
@@ -1146,7 +1144,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+        color: AppColors.surfaceContainer(isDark),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(children: _addDividers(details, isDark)),
@@ -1164,12 +1162,44 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             thickness: 0.5,
             indent: 16,
             endIndent: 16,
-            color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5EA),
+            color: AppColors.outline(isDark),
           ),
         );
       }
     }
     return result;
+  }
+
+  Widget _buildBillSummaryCard(bool isDark) {
+    final summary = _memory.summary ?? _memory.title;
+    final createdAt = _formatTime(_memory.createdAt);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            summary,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+              color: AppColors.onSurface(isDark),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '创建于 $createdAt',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.onSurfaceQuaternary(isDark),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildBillDetailInfo(bool isDark) {
@@ -1182,9 +1212,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     // 格式化金额显示
     final formattedAmount =
         '${isExpense ? '-' : '+'}¥${amount.toStringAsFixed(2)}';
-    final amountColor = isDark
-        ? const Color(0xFFFFFFFF)
-        : const Color(0xFF1A1A1A);
+    final amountColor = AppColors.onSurface(isDark);
 
     // 获取账单分类
     final billCategoryName = _memory.billCategory ?? '其他';
@@ -1205,10 +1233,10 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF007AFF).withOpacity(0.06),
+        color: AppColors.primary(isDark).withOpacity(0.06),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF007AFF).withOpacity(0.1),
+          color: AppColors.primary(isDark).withOpacity(0.1),
           width: 0.6,
         ),
       ),
@@ -1223,9 +1251,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
-                  color: isDark
-                      ? const Color(0xFFFFFFFF)
-                      : const Color(0xFF1A1A1A),
+                  color: AppColors.onSurface(isDark),
                 ),
               ),
               CupertinoButton(
@@ -1237,7 +1263,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                 child: Icon(
                   CupertinoIcons.pencil,
                   size: 18,
-                  color: const Color(0xFF007AFF),
+                  color: AppColors.primary(isDark),
                 ),
               ),
             ],
@@ -1257,21 +1283,13 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                categoryIcon,
-                size: 18,
-                color: isDark
-                    ? const Color(0xFFFFFFFF)
-                    : const Color(0xFF1A1A1A),
-              ),
+              Icon(categoryIcon, size: 18, color: AppColors.onSurface(isDark)),
               const SizedBox(width: 6),
               Text(
                 categoryLabel,
                 style: TextStyle(
                   fontSize: 14,
-                  color: isDark
-                      ? const Color(0xFFFFFFFF)
-                      : const Color(0xFF1A1A1A),
+                  color: AppColors.onSurface(isDark),
                 ),
               ),
             ],
@@ -1281,7 +1299,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           Divider(
             height: 0.5,
             thickness: 0.5,
-            color: isDark ? const Color(0xFF48484A) : const Color(0xFFC7C7CC),
+            color: AppColors.outline(isDark),
           ),
           const SizedBox(height: 16),
           // 详细信息
@@ -1321,7 +1339,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             label,
             style: TextStyle(
               fontSize: 15,
-              color: isDark ? const Color(0xFF8E8E93) : const Color(0xFF8E8E93),
+              color: AppColors.onSurfaceQuaternary(isDark),
             ),
           ),
         ),
@@ -1332,7 +1350,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 16, color: const Color(0xFF007AFF)),
+                Icon(icon, size: 16, color: AppColors.primary(isDark)),
                 const SizedBox(width: 6),
               ],
               Expanded(
@@ -1343,9 +1361,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                   textAlign: TextAlign.right,
                   style: TextStyle(
                     fontSize: 15,
-                    color: isDark
-                        ? const Color(0xFFFFFFFF)
-                        : const Color(0xFF1A1A1A),
+                    color: AppColors.onSurface(isDark),
                   ),
                 ),
               ),
@@ -1394,7 +1410,10 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             width: 72,
             child: Text(
               label,
-              style: const TextStyle(fontSize: 15, color: Color(0xFF8E8E93)),
+              style: TextStyle(
+                fontSize: 15,
+                color: AppColors.onSurfaceQuaternary(isDark),
+              ),
             ),
           ),
           const SizedBox(width: 20),
@@ -1405,7 +1424,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                   Icon(
                     icon,
                     size: 16,
-                    color: iconColor ?? const Color(0xFF8E8E93),
+                    color: iconColor ?? AppColors.onSurfaceQuaternary(isDark),
                   ),
                   const SizedBox(width: 6),
                 ],
@@ -1414,9 +1433,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                     value,
                     style: TextStyle(
                       fontSize: 15,
-                      color: isDark
-                          ? const Color(0xFFFFFFFF)
-                          : const Color(0xFF1A1A1A),
+                      color: AppColors.onSurface(isDark),
                     ),
                   ),
                 ),

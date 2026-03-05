@@ -36,6 +36,7 @@ class MemoryItem {
   final String? paymentMethod;
   final String? merchantName;
   final DateTime? billTime; // 账单时间（AI识别的时间）
+  final String? summary; // AI生成的账单摘要
 
   MemoryItem({
     required this.id,
@@ -60,6 +61,7 @@ class MemoryItem {
     this.paymentMethod,
     this.merchantName,
     this.billTime,
+    this.summary,
   });
 
   MemoryItem copyWith({
@@ -85,6 +87,7 @@ class MemoryItem {
     String? paymentMethod,
     String? merchantName,
     DateTime? billTime,
+    String? summary,
   }) {
     return MemoryItem(
       id: id ?? this.id,
@@ -109,6 +112,7 @@ class MemoryItem {
       paymentMethod: paymentMethod ?? this.paymentMethod,
       merchantName: merchantName ?? this.merchantName,
       billTime: billTime ?? this.billTime,
+      summary: summary ?? this.summary,
     );
   }
 
@@ -136,6 +140,7 @@ class MemoryItem {
       'paymentMethod': paymentMethod,
       'merchantName': merchantName,
       'billTime': billTime?.toIso8601String(),
+      'summary': summary,
     };
   }
 
@@ -168,6 +173,7 @@ class MemoryItem {
       billTime: json['billTime'] != null
           ? DateTime.parse(json['billTime'] as String)
           : null,
+      summary: json['summary'] as String?,
     );
   }
 

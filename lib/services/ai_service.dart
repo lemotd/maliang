@@ -158,10 +158,12 @@ class AiService {
        - 其他：无法归类的收入
    - paymentMethod(支付方式)、merchantName(商户名称)
 
-请严格按照以下JSON格式返回，不要包含其他内容：
-{"category":"分类名称","title":"提取的标题","shopName":"店铺名称","pickupCode":"取餐码/取件码","dishName":"餐品名称","expressCompany":"快递公司","pickupAddress":"取件地址","productType":"商品类型","trackingNumber":"快递单号","amount":"金额","isExpense":true/false,"billCategory":"账单分类","paymentMethod":"支付方式","merchantName":"商户名称","billTime":"账单时间"}
+4. 对于账单分类，请生成一个简短的摘要(summary)，用一句话描述这笔交易，例如"在瑞幸咖啡消费38.94元"或"收到微信转账15.60元"。
 
-注意：只填写图片中实际存在的信息，不存在的字段请省略或留空。billCategory必须从上面列出的分类中选择，不要自创分类名称。billTime格式为"YYYY-MM-DD HH:mm"，如"2024-01-15 14:30"。''';
+请严格按照以下JSON格式返回，不要包含其他内容：
+{"category":"分类名称","title":"提取的标题","shopName":"店铺名称","pickupCode":"取餐码/取件码","dishName":"餐品名称","expressCompany":"快递公司","pickupAddress":"取件地址","productType":"商品类型","trackingNumber":"快递单号","amount":"金额","isExpense":true/false,"billCategory":"账单分类","paymentMethod":"支付方式","merchantName":"商户名称","billTime":"账单时间","summary":"账单摘要"}
+
+注意：只填写图片中实际存在的信息，不存在的字段请省略或留空。billCategory必须从上面列出的分类中选择，不要自创分类名称。billTime格式为"YYYY-MM-DD HH:mm"，如"2024-01-15 14:30"。summary只对账单分类有效，用一句话简洁描述交易内容。''';
 
     final url = Uri.parse('$apiAddress/chat/completions');
     debugPrint('请求URL: $url');
@@ -316,6 +318,7 @@ class AiService {
         paymentMethod: getNonEmptyString(json, 'paymentMethod'),
         merchantName: getNonEmptyString(json, 'merchantName'),
         billTime: parseBillTime(getNonEmptyString(json, 'billTime')),
+        summary: getNonEmptyString(json, 'summary'),
       );
     } catch (e) {
       return MemoryItem(

@@ -16,6 +16,7 @@ import 'models/memory_item.dart';
 import 'services/memory_service.dart';
 import 'services/ai_service.dart';
 import 'services/notification_service.dart';
+import 'theme/app_colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,11 +43,11 @@ class MaliangNotesApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF007AFF),
+          seedColor: AppColors.primaryLight,
           brightness: Brightness.light,
         ),
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF2F2F7),
+        scaffoldBackgroundColor: AppColors.surfaceLowLight,
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -59,11 +60,11 @@ class MaliangNotesApp extends StatelessWidget {
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF007AFF),
+          seedColor: AppColors.primaryDark,
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFF000000),
+        scaffoldBackgroundColor: AppColors.surfaceLowDark,
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -303,10 +304,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final hasKey = await _aiService.hasApiKey();
     if (!hasKey) {
       if (mounted) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请先在设置中填写API密钥'),
-            backgroundColor: Color(0xFFFF3B30),
+          SnackBar(
+            content: const Text('请先在设置中填写API密钥'),
+            backgroundColor: AppColors.warning(isDark),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -334,10 +336,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final hasKey = await _aiService.hasApiKey();
     if (!hasKey) {
       if (mounted) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请先在设置中填写API密钥'),
-            backgroundColor: Color(0xFFFF3B30),
+          SnackBar(
+            content: const Text('请先在设置中填写API密钥'),
+            backgroundColor: AppColors.warning(isDark),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -437,13 +440,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   void _handleProcessingError(Object error) {
     if (mounted) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
       setState(() {
         _loadingCount--;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('处理失败: $error'),
-          backgroundColor: const Color(0xFFFF3B30),
+          backgroundColor: AppColors.warning(isDark),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -511,9 +515,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF000000)
-          : const Color(0xFFF2F2F7),
+      backgroundColor: AppColors.surfaceLow(isDark),
       body: Column(
         children: [
           MainAppBar(
@@ -551,16 +553,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             Icon(
               CupertinoIcons.square_pencil,
               size: 64,
-              color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFC7C7CC),
+              color: AppColors.onSurfaceOctonary(isDark),
             ),
             const SizedBox(height: 16),
             Text(
               '开始记录你的第一条记忆',
               style: TextStyle(
                 fontSize: 16,
-                color: isDark
-                    ? const Color(0xFF8E8E93)
-                    : const Color(0xFF8E8E93),
+                color: AppColors.onSurfaceQuaternary(isDark),
               ),
             ),
             const SizedBox(height: 8),
@@ -568,9 +568,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               '点击下方按钮或分享图片到这里',
               style: TextStyle(
                 fontSize: 14,
-                color: isDark
-                    ? const Color(0xFF48484A)
-                    : const Color(0xFFC7C7CC),
+                color: AppColors.onSurfaceOctonary(isDark),
               ),
             ),
           ],
@@ -710,7 +708,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+          color: AppColors.surfaceContainer(isDark),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(children: _addDividers(children)),
@@ -730,7 +728,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             thickness: 0.5,
             indent: 16,
             endIndent: 16,
-            color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5EA),
+            color: AppColors.outline(isDark),
           ),
         );
       }
@@ -750,7 +748,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             width: 72,
             child: Text(
               label,
-              style: const TextStyle(fontSize: 15, color: Color(0xFF8E8E93)),
+              style: TextStyle(
+                fontSize: 15,
+                color: AppColors.onSurfaceQuaternary(isDark),
+              ),
             ),
           ),
           const SizedBox(width: 20),
@@ -759,9 +760,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               value,
               style: TextStyle(
                 fontSize: 15,
-                color: isDark
-                    ? const Color(0xFFFFFFFF)
-                    : const Color(0xFF1A1A1A),
+                color: AppColors.onSurface(isDark),
               ),
             ),
           ),
@@ -771,12 +770,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               Clipboard.setData(ClipboardData(text: value));
               _showToast('已复制到剪贴板');
             },
-            child: const Padding(
-              padding: EdgeInsets.all(4),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
               child: Icon(
                 CupertinoIcons.doc_on_doc,
                 size: 18,
-                color: Color(0xFFC7C7CC),
+                color: AppColors.onSurfaceOctonary(isDark),
               ),
             ),
           ),
@@ -796,9 +795,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _confirmDelete(MemoryItem memory) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceHigh(isDark),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -809,13 +809,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   CupertinoIcons.trash,
-                  color: Color(0xFFFF3B30),
+                  color: AppColors.warning(isDark),
                 ),
-                title: const Text(
+                title: Text(
                   '删除记忆',
-                  style: TextStyle(color: Color(0xFFFF3B30)),
+                  style: TextStyle(color: AppColors.warning(isDark)),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -873,7 +873,7 @@ class _AddButtonState extends State<_AddButton> with TickerProviderStateMixin {
       ],
     ).animate(CurvedAnimation(parent: _pressController, curve: Curves.easeOut));
     _colorAnimation = ColorTween(
-      begin: const Color(0xFF007AFF),
+      begin: AppColors.primaryLight,
       end: const Color(0xFF5AC8FA),
     ).animate(CurvedAnimation(parent: _pressController, curve: Curves.easeOut));
   }
@@ -984,7 +984,7 @@ class _AddButtonState extends State<_AddButton> with TickerProviderStateMixin {
               transform: Matrix4.identity()..scale(scaleX, scaleY),
               alignment: anchorAlignment,
               child: _buildButton(
-                _colorAnimation.value ?? const Color(0xFF007AFF),
+                _colorAnimation.value ?? AppColors.primaryLight,
               ),
             ),
           );
