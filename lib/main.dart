@@ -613,8 +613,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           setState(() {
             _memories[index] = updatedMemory;
           });
-          // 更新通知
-          _notificationService.showLiveUpdateNotification(updatedMemory);
+          // 只有未完成的事项才更新通知
+          if (!updatedMemory.isCompleted) {
+            _notificationService.showLiveUpdateNotification(updatedMemory);
+          }
         }
       }
     });
