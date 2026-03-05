@@ -8,6 +8,51 @@ import '../models/memory_item.dart';
 import '../models/bill_category.dart';
 import '../services/memory_service.dart';
 
+const List<Map<String, dynamic>> kExpenseCategories = [
+  {'name': 'dining', 'label': '餐饮', 'icon': Icons.restaurant_outlined},
+  {'name': 'snacks', 'label': '零食', 'icon': Icons.cookie_outlined},
+  {'name': 'transport', 'label': '交通', 'icon': Icons.directions_bus_outlined},
+  {'name': 'daily', 'label': '日用', 'icon': Icons.shopping_basket_outlined},
+  {
+    'name': 'entertainment',
+    'label': '娱乐',
+    'icon': Icons.sports_esports_outlined,
+  },
+  {'name': 'sports', 'label': '运动', 'icon': Icons.fitness_center_outlined},
+  {'name': 'clothing', 'label': '服饰', 'icon': Icons.checkroom_outlined},
+  {'name': 'home', 'label': '家居', 'icon': Icons.chair_outlined},
+  {'name': 'communication', 'label': '通讯', 'icon': Icons.phone_outlined},
+  {'name': 'tobacco', 'label': '烟酒', 'icon': Icons.smoking_rooms_outlined},
+  {'name': 'medical', 'label': '医疗', 'icon': Icons.local_hospital_outlined},
+  {'name': 'education', 'label': '教育', 'icon': Icons.school_outlined},
+  {'name': 'gift', 'label': '礼物', 'icon': Icons.card_giftcard_outlined},
+  {'name': 'pet', 'label': '宠物', 'icon': Icons.pets_outlined},
+  {'name': 'beauty', 'label': '美容', 'icon': Icons.face_retouching_natural},
+  {'name': 'repair', 'label': '维修', 'icon': Icons.build_outlined},
+  {'name': 'travel', 'label': '旅行', 'icon': Icons.flight_outlined},
+  {'name': 'car', 'label': '汽车', 'icon': Icons.directions_car_outlined},
+  {'name': 'insurance', 'label': '保险', 'icon': Icons.security_outlined},
+  {'name': 'tax', 'label': '税费', 'icon': Icons.receipt_long_outlined},
+  {'name': 'investment', 'label': '投资', 'icon': Icons.trending_up_outlined},
+  {'name': 'transfer', 'label': '转账', 'icon': Icons.swap_horiz_outlined},
+  {'name': 'other_expense', 'label': '其他', 'icon': Icons.more_horiz_outlined},
+];
+
+const List<Map<String, dynamic>> kIncomeCategories = [
+  {'name': 'salary', 'label': '工资', 'icon': Icons.work_outline},
+  {'name': 'bonus', 'label': '奖金', 'icon': Icons.card_giftcard_outlined},
+  {
+    'name': 'investment_income',
+    'label': '投资',
+    'icon': Icons.trending_up_outlined,
+  },
+  {'name': 'part_time', 'label': '兼职', 'icon': Icons.access_time_outlined},
+  {'name': 'gift_income', 'label': '红包', 'icon': Icons.redeem_outlined},
+  {'name': 'refund', 'label': '退款', 'icon': Icons.assignment_return_outlined},
+  {'name': 'transfer_income', 'label': '转账', 'icon': Icons.swap_horiz_outlined},
+  {'name': 'other_income', 'label': '其他', 'icon': Icons.more_horiz_outlined},
+];
+
 class _MildBounceCurve extends Curve {
   const _MildBounceCurve();
 
@@ -35,6 +80,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
   bool _isExpense = true;
   String? _selectedCategory;
   final FocusNode _amountFocusNode = FocusNode();
+  final FocusNode _noteFocusNode = FocusNode();
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
@@ -59,7 +105,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
   }
 
   void _calculateInitialPage() {
-    final categories = _isExpense ? _expenseCategories : _incomeCategories;
+    final categories = _isExpense ? kExpenseCategories : kIncomeCategories;
     final billCategory = widget.memory.billCategory;
     if (billCategory != null) {
       for (int i = 0; i < categories.length; i++) {
@@ -81,6 +127,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
     _amountController.dispose();
     _noteController.dispose();
     _amountFocusNode.dispose();
+    _noteFocusNode.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -148,7 +195,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
           children: [
             Container(
               height: 56,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.only(left: 14, right: 14, top: 2),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -161,35 +208,52 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                         '取消',
                         style: TextStyle(
                           fontSize: 16,
+                          fontWeight: FontWeight.w400,
                           color: Color(0xFF8E8E93),
                         ),
                       ),
                     ),
                   ),
-                  Container(
+                  SizedBox(
                     height: 32,
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF2F2F7),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
                     child: CupertinoSlidingSegmentedControl<bool>(
                       groupValue: _isExpense,
                       children: const {
                         true: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
-                          child: Text('支出', style: TextStyle(fontSize: 14)),
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            '支出',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
                         ),
                         false: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
-                          child: Text('收入', style: TextStyle(fontSize: 14)),
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            '收入',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
                         ),
                       },
                       onValueChanged: (value) {
                         if (value != null) {
+                          // 保存当前焦点状态
+                          final hasAmountFocus = _amountFocusNode.hasFocus;
+                          final hasNoteFocus = _noteFocusNode.hasFocus;
                           setState(() {
                             _isExpense = value;
                           });
+                          // 恢复焦点
+                          if (hasAmountFocus) {
+                            _amountFocusNode.requestFocus();
+                          } else if (hasNoteFocus) {
+                            _noteFocusNode.requestFocus();
+                          }
                         }
                       },
                     ),
@@ -244,7 +308,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                         '完成',
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w400,
                           color: Color(0xFF007AFF),
                         ),
                       ),
@@ -259,7 +323,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 8,
+                  vertical: 6,
                 ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF2F2F7),
@@ -332,7 +396,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                             child: Text(
                               _formatDateShort(_selectedDate),
                               style: const TextStyle(
-                                fontSize: 14,
+                                fontSize: 12,
                                 color: Color(0xFF8E8E93),
                               ),
                             ),
@@ -354,7 +418,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                             child: Text(
                               _formatTimeShort(_selectedDate),
                               style: const TextStyle(
-                                fontSize: 14,
+                                fontSize: 12,
                                 color: Color(0xFF8E8E93),
                               ),
                             ),
@@ -365,6 +429,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                         Expanded(
                           child: TextField(
                             controller: _noteController,
+                            focusNode: _noteFocusNode,
                             maxLength: 20,
                             style: const TextStyle(
                               fontSize: 14,
@@ -395,8 +460,8 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
               child: PageView.builder(
                 controller: _pageController,
                 itemCount: _isExpense
-                    ? (_expenseCategories.length / 8).ceil()
-                    : (_incomeCategories.length / 8).ceil(),
+                    ? (kExpenseCategories.length / 8).ceil()
+                    : (kIncomeCategories.length / 8).ceil(),
                 onPageChanged: (index) {
                   setState(() {
                     _currentPage = index;
@@ -404,8 +469,8 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                 },
                 itemBuilder: (context, pageIndex) {
                   final categories = _isExpense
-                      ? _expenseCategories
-                      : _incomeCategories;
+                      ? kExpenseCategories
+                      : kIncomeCategories;
                   final startIndex = pageIndex * 8;
                   final endIndex = (startIndex + 8).clamp(0, categories.length);
                   final pageCategories = categories.sublist(
@@ -492,59 +557,10 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
     );
   }
 
-  static const List<Map<String, dynamic>> _expenseCategories = [
-    {'name': 'dining', 'label': '餐饮', 'icon': Icons.restaurant_outlined},
-    {'name': 'snacks', 'label': '零食', 'icon': Icons.cookie_outlined},
-    {'name': 'transport', 'label': '交通', 'icon': Icons.directions_bus_outlined},
-    {'name': 'daily', 'label': '日用', 'icon': Icons.shopping_basket_outlined},
-    {
-      'name': 'entertainment',
-      'label': '娱乐',
-      'icon': Icons.sports_esports_outlined,
-    },
-    {'name': 'sports', 'label': '运动', 'icon': Icons.fitness_center_outlined},
-    {'name': 'clothing', 'label': '服饰', 'icon': Icons.checkroom_outlined},
-    {'name': 'home', 'label': '家居', 'icon': Icons.chair_outlined},
-    {'name': 'communication', 'label': '通讯', 'icon': Icons.phone_outlined},
-    {'name': 'tobacco', 'label': '烟酒', 'icon': Icons.smoking_rooms_outlined},
-    {'name': 'medical', 'label': '医疗', 'icon': Icons.local_hospital_outlined},
-    {'name': 'education', 'label': '教育', 'icon': Icons.school_outlined},
-    {'name': 'gift', 'label': '礼物', 'icon': Icons.card_giftcard_outlined},
-    {'name': 'pet', 'label': '宠物', 'icon': Icons.pets_outlined},
-    {'name': 'beauty', 'label': '美容', 'icon': Icons.face_retouching_natural},
-    {'name': 'repair', 'label': '维修', 'icon': Icons.build_outlined},
-    {'name': 'travel', 'label': '旅行', 'icon': Icons.flight_outlined},
-    {'name': 'car', 'label': '汽车', 'icon': Icons.directions_car_outlined},
-    {'name': 'insurance', 'label': '保险', 'icon': Icons.security_outlined},
-    {'name': 'tax', 'label': '税费', 'icon': Icons.receipt_long_outlined},
-    {'name': 'investment', 'label': '投资', 'icon': Icons.trending_up_outlined},
-    {'name': 'transfer', 'label': '转账', 'icon': Icons.swap_horiz_outlined},
-    {'name': 'other_expense', 'label': '其他', 'icon': Icons.more_horiz_outlined},
-  ];
-
-  static const List<Map<String, dynamic>> _incomeCategories = [
-    {'name': 'salary', 'label': '工资', 'icon': Icons.work_outline},
-    {'name': 'bonus', 'label': '奖金', 'icon': Icons.card_giftcard_outlined},
-    {
-      'name': 'investment_income',
-      'label': '投资',
-      'icon': Icons.trending_up_outlined,
-    },
-    {'name': 'part_time', 'label': '兼职', 'icon': Icons.access_time_outlined},
-    {'name': 'gift_income', 'label': '红包', 'icon': Icons.redeem_outlined},
-    {'name': 'refund', 'label': '退款', 'icon': Icons.assignment_return_outlined},
-    {
-      'name': 'transfer_income',
-      'label': '转账',
-      'icon': Icons.swap_horiz_outlined,
-    },
-    {'name': 'other_income', 'label': '其他', 'icon': Icons.more_horiz_outlined},
-  ];
-
   List<Widget> _buildPageIndicators() {
     final pageCount = _isExpense
-        ? (_expenseCategories.length / 8).ceil()
-        : (_incomeCategories.length / 8).ceil();
+        ? (kExpenseCategories.length / 8).ceil()
+        : (kIncomeCategories.length / 8).ceil();
 
     if (pageCount <= 1) {
       return [];
@@ -1172,23 +1188,17 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
 
     // 获取账单分类
     final billCategoryName = _memory.billCategory ?? '其他';
-    IconData categoryIcon;
-    String categoryLabel;
+    IconData categoryIcon = Icons.more_horiz_outlined;
+    String categoryLabel = billCategoryName;
 
-    if (isExpense) {
-      final category = BillExpenseCategory.values.firstWhere(
-        (c) => c.name == billCategoryName || c.label == billCategoryName,
-        orElse: () => BillExpenseCategory.other,
-      );
-      categoryIcon = category.icon;
-      categoryLabel = category.label;
-    } else {
-      final category = BillIncomeCategory.values.firstWhere(
-        (c) => c.name == billCategoryName || c.label == billCategoryName,
-        orElse: () => BillIncomeCategory.other,
-      );
-      categoryIcon = category.icon;
-      categoryLabel = category.label;
+    // 从分类列表中查找
+    final categories = isExpense ? kExpenseCategories : kIncomeCategories;
+    for (final cat in categories) {
+      if (cat['name'] == billCategoryName || cat['label'] == billCategoryName) {
+        categoryIcon = cat['icon'] as IconData;
+        categoryLabel = cat['label'] as String;
+        break;
+      }
     }
 
     return Container(
