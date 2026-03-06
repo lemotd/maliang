@@ -11,6 +11,46 @@ enum MemoryCategory {
   const MemoryCategory(this.label, this.color);
 }
 
+class InfoSection {
+  final String title;
+  final List<InfoItem> items;
+
+  const InfoSection({required this.title, required this.items});
+
+  factory InfoSection.fromJson(Map<String, dynamic> json) {
+    return InfoSection(
+      title: json['title'] as String? ?? '',
+      items:
+          (json['items'] as List<dynamic>?)
+              ?.map((e) => InfoItem.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'title': title, 'items': items.map((e) => e.toJson()).toList()};
+  }
+}
+
+class InfoItem {
+  final String label;
+  final String value;
+
+  const InfoItem({required this.label, required this.value});
+
+  factory InfoItem.fromJson(Map<String, dynamic> json) {
+    return InfoItem(
+      label: json['label'] as String? ?? '',
+      value: json['value'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'label': label, 'value': value};
+  }
+}
+
 class MemoryItem {
   final String id;
   final String title;
@@ -37,6 +77,7 @@ class MemoryItem {
   final String? merchantName;
   final DateTime? billTime; // 账单时间（AI识别的时间）
   final String? summary; // AI生成的账单摘要
+  final List<InfoSection> infoSections; // 结构化信息区域
 
   MemoryItem({
     required this.id,
@@ -62,6 +103,7 @@ class MemoryItem {
     this.merchantName,
     this.billTime,
     this.summary,
+    this.infoSections = const [],
   });
 
   MemoryItem copyWith({
@@ -88,6 +130,7 @@ class MemoryItem {
     String? merchantName,
     DateTime? billTime,
     String? summary,
+    List<InfoSection>? infoSections,
   }) {
     return MemoryItem(
       id: id ?? this.id,
@@ -113,6 +156,7 @@ class MemoryItem {
       merchantName: merchantName ?? this.merchantName,
       billTime: billTime ?? this.billTime,
       summary: summary ?? this.summary,
+      infoSections: infoSections ?? this.infoSections,
     );
   }
 
@@ -141,6 +185,7 @@ class MemoryItem {
       'merchantName': merchantName,
       'billTime': billTime?.toIso8601String(),
       'summary': summary,
+      'infoSections': infoSections.map((e) => e.toJson()).toList(),
     };
   }
 
@@ -174,6 +219,11 @@ class MemoryItem {
           ? DateTime.parse(json['billTime'] as String)
           : null,
       summary: json['summary'] as String?,
+      infoSections:
+          (json['infoSections'] as List<dynamic>?)
+              ?.map((e) => InfoSection.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
 

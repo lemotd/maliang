@@ -98,11 +98,6 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
 
     // 计算选中分类所在的页面
     _calculateInitialPage();
-
-    // 延迟聚焦
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _amountFocusNode.requestFocus();
-    });
   }
 
   void _calculateInitialPage() {
@@ -146,6 +141,8 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
   }
 
   Future<void> _selectDate() async {
+    _amountFocusNode.unfocus();
+    _noteFocusNode.unfocus();
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
@@ -166,6 +163,8 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
   }
 
   Future<void> _selectTime() async {
+    _amountFocusNode.unfocus();
+    _noteFocusNode.unfocus();
     final TimeOfDay? time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_selectedDate),
@@ -607,6 +606,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   double _startDragY = 0;
   double _startOffset = 0;
   bool _isDragging = false;
+  bool _isTextSelecting = false;
   double _imageDisplayHeight = 0;
   double _requiredOffset = 1.0;
 
@@ -649,16 +649,25 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   void _onDragStart(double y) {
     _startDragY = y;
     _startOffset = _offset;
-    _isDragging = true;
+    _isDragging = false;
+    _isTextSelecting = false;
     if (_controller.isAnimating) {
       _controller.stop();
     }
   }
 
   void _onDragUpdate(double y, double imageAreaHeight) {
+    final deltaY = y - _startDragY;
+
+    // 如果滑动距离很小，可能是文本选择操作
+    if (!_isDragging && !_isTextSelecting) {
+      if (deltaY.abs() > 10) {
+        _isDragging = true;
+      }
+    }
+
     if (!_isDragging) return;
 
-    final deltaY = y - _startDragY;
     // 向上滑动 deltaY < 0，offset 减少
     // 向下滑动 deltaY > 0，offset 增加
     final deltaOffset = deltaY / imageAreaHeight;
@@ -882,6 +891,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
               right: 0,
               bottom: 0,
               child: Listener(
+                behavior: HitTestBehavior.translucent,
                 onPointerDown: (e) => _onDragStart(e.position.dy),
                 onPointerMove: (e) =>
                     _onDragUpdate(e.position.dy, imageAreaHeight),
@@ -895,10 +905,10 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(isDark ? 0.4 : 0.08),
-                        blurRadius: 24,
+                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                        blurRadius: 16,
                         spreadRadius: 0,
-                        offset: const Offset(0, -4),
+                        offset: const Offset(0, -2),
                       ),
                     ],
                   ),
@@ -913,26 +923,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (_memory.category != MemoryCategory.bill)
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              top: 20,
-                              left: 20,
-                              right: 20,
-                            ),
-                            child: Text(
-                              _memory.title,
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.onSurface(isDark),
-                              ),
-                            ),
-                          ),
-                        if (_memory.category != MemoryCategory.bill)
-                          const SizedBox(height: 20),
-                        if (_memory.category == MemoryCategory.bill)
-                          const SizedBox(height: 20),
+                        const SizedBox(height: 20),
                         if (_memory.category == MemoryCategory.bill) ...[
                           // 账单标题和创建时间
                           _buildBillSummaryCard(isDark),
@@ -1079,6 +1070,126 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   Widget _buildDetailInfo(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 标题和创建时间卡片
+        _buildTitleCard(isDark),
+        const SizedBox(height: 16),
+        // 信息区域
+        if (_memory.infoSections.isNotEmpty) ...[
+          ..._memory.infoSections.map(
+            (section) => _buildInfoSection(section, isDark),
+          ),
+        ] else ...[
+          // 兼容旧数据：如果没有 infoSections，使用旧的显示方式
+          _buildLegacyDetailInfo(isDark),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildTitleCard(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _memory.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+              color: AppColors.onSurface(isDark),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '创建于 ${_formatTime(_memory.createdAt)}',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.onSurfaceQuaternary(isDark),
+            ),
+          ),
+          // 显示 summary（非账单类型）
+          if (_memory.summary != null && _memory.summary!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              _memory.summary!,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: AppColors.onSurfaceQuaternary(isDark),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoSection(InfoSection section, bool isDark) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainer(isDark),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 小标题
+          Text(
+            section.title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: AppColors.onSurface(isDark),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // 信息项列表
+          ...section.items.map((item) => _buildInfoItem(item, isDark)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoItem(InfoItem item, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 72,
+            child: Text(
+              item.label,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.onSurfaceQuaternary(isDark),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SelectableText(
+              item.value,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.onSurface(isDark),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegacyDetailInfo(bool isDark) {
     final details = <Widget>[];
 
     details.add(
@@ -1318,6 +1429,25 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
               ],
             ],
           ),
+          const SizedBox(height: 20),
+          // 一段话总结
+          if (_memory.summary != null && _memory.summary!.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainer(isDark),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _memory.summary!,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: AppColors.onSurfaceQuaternary(isDark),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1367,8 +1497,57 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  // 一段话总结（账单类型显示在账单详情下方）
+  Widget _buildSummarySection(bool isDark) {
+    if (_memory.summary == null || _memory.summary!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainer(isDark),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.auto_awesome,
+                  size: 16,
+                  color: AppColors.primary(isDark),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'AI 总结',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.onSurface(isDark),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _memory.summary!,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.6,
+                color: AppColors.onSurfaceQuaternary(isDark),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 

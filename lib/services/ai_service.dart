@@ -104,11 +104,11 @@ class AiService {
     final systemPrompt = '''你是一个智能助手
 专门分析用户分享的图片内容。请根据图片内容进行分析：
 
-1. 判断图片属于哪个分类：
-   - 取餐码：包含餐厅取餐码、取餐号的图片
-   - 取件码：包含快递取件码、取件码的图片
-   - 账单：包含消费金额、支付信息的图片
-   - 随手记：其他无法分类的内容
+1. 判断图片属于哪个分类（请仔细判断，不要误分类）：
+   - 取餐码：必须包含明确的取餐码/取餐号/排队号等数字编码，如"A001"、"12号"、"B-03"等。注意：仅有餐厅菜单、食物图片、店铺信息但没有取餐码的，不属于取餐码类型
+   - 取件码：必须包含明确的快递取件码/取件号，如"12-3-4567"、"丰巢取件码"等。注意：仅有快递单号但没有取件码的，不属于取件码类型
+   - 账单：包含消费金额、支付信息的图片，如支付截图、小票、发票等
+   - 随手记：其他无法归类的图片，如截图、文档、名片、海报、通知、菜单、食物照片、风景、物品等
 
 2. 根据分类提取关键信息作为标题（标题要精简，不要重复分类名称）：
    - 取餐码：只提取店铺名称和取餐码，格式如"肯德基 A001"或"A001"（无店铺名时）
@@ -117,53 +117,59 @@ class AiService {
      * 支出：格式如"-¥35.00"
      * 收入：格式如"+¥100.00"
      * 无法判断时默认为支出
-   - 随手记：简要描述图片内容
+   - 随手记：用一句话概括图片的主要内容，如"周末公园散步"、"公司年会合影"、"新买的咖啡机"、"餐厅菜单推荐"等
 
-3. 根据分类提取详细信息（可选字段，如果图片中有则提取，没有则不填）：
-   - 取餐码：shopName(店铺名称)、pickupCode(取餐码)、dishName(餐品名称)
-   - 取件码：expressCompany(快递公司)、pickupCode(取件码)、pickupAddress(取件地址)、productType(商品类型)、trackingNumber(快递单号)
-   - 账单：amount(金额，带符号如"-35.00")、isExpense(布尔值，true表示支出，false表示收入)、billCategory(账单分类，必须从以下分类中选择一个最匹配的)、billTime(账单时间，格式为"YYYY-MM-DD HH:mm"，从图片中识别的交易时间)：
-     * 支出分类及示例：
-       - 餐饮：餐厅消费、外卖订单、奶茶咖啡、食堂用餐
-       - 零食：水果店、甜品蛋糕、零食小吃
-       - 交通：打车滴滴、公交地铁、加油充电、停车费
-       - 日用：超市购物、便利店、日用品采购
-       - 娱乐：电影票、游戏充值、KTV、游乐园
-       - 运动：健身房、体育用品、运动场馆
-       - 服饰：衣服鞋子、服装店、箱包
-       - 家居：家具家电、装修材料、家居用品
-       - 通讯：话费充值、宽带费用
-       - 烟酒：香烟、酒水饮料
-       - 医疗：医院挂号、药店买药、体检
-       - 教育：学费、培训课程、书籍
-       - 礼物：生日礼物、节日礼品
-       - 宠物：宠物食品、宠物医院、宠物用品
-       - 美容：理发店、美容院、化妆品
-       - 维修：家电维修、手机维修、汽车维修
-       - 旅行：机票火车票、酒店住宿、景点门票
-       - 汽车：汽车保养、洗车、违章罚款
-       - 保险：车险、寿险、医疗险
-       - 税费：个人所得税、房产税
-       - 投资：股票买入、基金购买、理财产品
-       - 转账：微信转账给他人、支付宝转账、银行卡转账、红包发送
-       - 其他：无法归类的支出
-     * 收入分类及示例：
-       - 工资：月薪、工资收入
-       - 奖金：年终奖、绩效奖金
-       - 投资：股票收益、基金分红、理财收益
-       - 兼职：兼职收入、稿费
-       - 红包：收到微信红包、支付宝红包
-       - 退款：购物退款、退货退款
-       - 转账：收到微信转账、收到支付宝转账、收到银行卡转账
-       - 其他：无法归类的收入
-   - paymentMethod(支付方式)、merchantName(商户名称)
+3. 对于所有非账单类型（取餐码、取件码、随手记），必须将识别出的信息组织成结构化的信息区域（infoSections）：
+   - 每个信息区域包含：
+     * title：小标题名称，根据内容类型命名，可添加合适的emoji表情，如"📋 基本信息"、"📍 地点信息"、"📅 时间信息"、"📝 内容详情"等
+     * items：信息项列表，每项包含label（标签名）和value（值）
+   
+   - 取餐码示例：
+     {"title":"🍔 取餐信息","items":[{"label":"店铺","value":"肯德基"},{"label":"取餐码","value":"A001"},{"label":"餐品","value":"香辣鸡腿堡套餐"}]}
+   
+   - 取件码示例：
+     {"title":"📦 取件信息","items":[{"label":"取件码","value":"12-3-4567"},{"label":"快递公司","value":"顺丰快递"},{"label":"取件地址","value":"菜鸟驿站XX店"}]}
+   
+   - 随手记示例（会议通知）：
+     {"title":"📅 会议信息","items":[{"label":"主题","value":"产品评审会"},{"label":"时间","value":"2024年1月15日 14:00"},{"label":"地点","value":"3楼会议室A"}]}
+   
+   - 随手记示例（活动海报）：
+     {"title":"🎉 活动详情","items":[{"label":"活动名称","value":"新年促销"},{"label":"时间","value":"1月20日-1月30日"},{"label":"优惠","value":"全场8折"}]}
+   
+   - 如果图片中包含多种类型的信息，可以创建多个信息区域
 
-4. 对于账单分类，请生成一个简短的摘要(summary)，用一句话描述这笔交易，例如"在瑞幸咖啡消费38.94元"或"收到微信转账15.60元"。
+4. 对于随手记类型，请尽可能详细地识别图片内容，可以适当联想：
+   - 食物/餐饮：描述食物名称、口味特点、餐厅风格、用餐场景、推荐理由等
+   - 风景/旅行：描述地点、季节、天气、景色特点、游玩建议等
+   - 人物/活动：描述活动类型、参与人员、氛围、时间地点等
+   - 物品/产品：描述物品名称、品牌、特点、用途、购买渠道等
+   - 文档/截图：提取文档标题、关键内容、要点总结等
+   - 可以适当联想相关内容，如推荐搭配、使用建议、注意事项等
+
+5. 对于账单类型，请提取以下信息：
+   - amount(金额，带符号如"-35.00")
+   - isExpense(布尔值，true表示支出，false表示收入)
+   - billCategory(账单分类，必须从以下分类中选择一个最匹配的)
+   - billTime(账单时间，格式为"YYYY-MM-DD HH:mm")
+   - paymentMethod(支付方式)
+   - merchantName(商户名称)
+   - summary(账单摘要，一句话描述交易)
+   
+   账单分类列表：
+   支出：餐饮、零食、交通、日用、娱乐、运动、服饰、家居、通讯、烟酒、医疗、教育、礼物、宠物、美容、维修、旅行、汽车、保险、税费、投资、转账、其他
+   收入：工资、奖金、投资、兼职、红包、退款、转账、其他
 
 请严格按照以下JSON格式返回，不要包含其他内容：
-{"category":"分类名称","title":"提取的标题","shopName":"店铺名称","pickupCode":"取餐码/取件码","dishName":"餐品名称","expressCompany":"快递公司","pickupAddress":"取件地址","productType":"商品类型","trackingNumber":"快递单号","amount":"金额","isExpense":true/false,"billCategory":"账单分类","paymentMethod":"支付方式","merchantName":"商户名称","billTime":"账单时间","summary":"账单摘要"}
+{"category":"分类名称","title":"提取的标题","summary":"一段话总结图片内容","infoSections":[{"title":"小标题","items":[{"label":"标签","value":"值"}]}],"amount":"金额","isExpense":true/false,"billCategory":"账单分类","paymentMethod":"支付方式","merchantName":"商户名称","billTime":"账单时间"}
 
-注意：只填写图片中实际存在的信息，不存在的字段请省略或留空。billCategory必须从上面列出的分类中选择，不要自创分类名称。billTime格式为"YYYY-MM-DD HH:mm"，如"2024-01-15 14:30"。summary只对账单分类有效，用一句话简洁描述交易内容。''';
+注意：
+1. 对于所有类型（取餐码、取件码、账单、随手记），必须填写summary字段，用简洁明了的一段话总结图片的相关内容
+2. 对于所有非账单类型（取餐码、取件码、随手记），必须填写infoSections，将图片中识别出的所有重要信息组织成结构化格式
+3. 对于账单类型，填写amount、isExpense、billCategory等字段，infoSections可以留空
+4. 只填写图片中实际存在的信息，不存在的字段请省略或留空
+5. billCategory必须从上面列出的分类中选择，不要自创分类名称
+6. billTime格式为"YYYY-MM-DD HH:mm"，如"2024-01-15 14:30"
+7. 随手记类型要详细分析图片内容，提取所有有价值的信息，可以适当联想丰富内容，标题应该是对图片的概括性描述''';
 
     final url = Uri.parse('$apiAddress/chat/completions');
     debugPrint('请求URL: $url');
@@ -297,6 +303,25 @@ class AiService {
         }
       }
 
+      // 辅助函数：解析信息区域
+      List<InfoSection> parseInfoSections(List<dynamic>? sectionsJson) {
+        if (sectionsJson == null) return [];
+        return sectionsJson.map((section) {
+          final items =
+              (section['items'] as List<dynamic>?)?.map((item) {
+                return InfoItem(
+                  label: item['label'] as String? ?? '',
+                  value: item['value'] as String? ?? '',
+                );
+              }).toList() ??
+              [];
+          return InfoSection(
+            title: section['title'] as String? ?? '',
+            items: items,
+          );
+        }).toList();
+      }
+
       return MemoryItem(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         title: title,
@@ -319,6 +344,7 @@ class AiService {
         merchantName: getNonEmptyString(json, 'merchantName'),
         billTime: parseBillTime(getNonEmptyString(json, 'billTime')),
         summary: getNonEmptyString(json, 'summary'),
+        infoSections: parseInfoSections(json['infoSections'] as List<dynamic>?),
       );
     } catch (e) {
       return MemoryItem(
