@@ -929,8 +929,11 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                           _buildBillSummaryCard(isDark),
                           const SizedBox(height: 20),
                           _buildBillDetailInfo(isDark),
-                        ] else
+                          // 一段话总结（账单类型显示在账单详情下方）
+                          _buildSummarySection(isDark),
+                        ] else ...[
                           _buildDetailInfo(isDark),
+                        ],
                       ],
                     ),
                   ),
@@ -1115,12 +1118,31 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           ),
           // 显示 summary（非账单类型）
           if (_memory.summary != null && _memory.summary!.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(
+                  Icons.auto_awesome,
+                  size: 16,
+                  color: AppColors.primary(isDark),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'AI 总结',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.onSurface(isDark),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             Text(
               _memory.summary!,
               style: TextStyle(
                 fontSize: 14,
-                height: 1.5,
+                height: 1.6,
                 color: AppColors.onSurfaceQuaternary(isDark),
               ),
             ),
@@ -1133,11 +1155,6 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   Widget _buildInfoSection(InfoSection section, bool isDark) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainer(isDark),
-        borderRadius: BorderRadius.circular(12),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1254,10 +1271,6 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainer(isDark),
-        borderRadius: BorderRadius.circular(12),
-      ),
       child: Column(children: _addDividers(details, isDark)),
     );
   }
@@ -1429,25 +1442,6 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
               ],
             ],
           ),
-          const SizedBox(height: 20),
-          // 一段话总结
-          if (_memory.summary != null && _memory.summary!.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainer(isDark),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                _memory.summary!,
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.5,
-                  color: AppColors.onSurfaceQuaternary(isDark),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -1497,8 +1491,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
               ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1510,43 +1504,38 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainer(isDark),
-        borderRadius: BorderRadius.circular(12),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.auto_awesome,
-                  size: 16,
-                  color: AppColors.primary(isDark),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'AI 总结',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.onSurface(isDark),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _memory.summary!,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.6,
-                color: AppColors.onSurfaceQuaternary(isDark),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Icon(
+                Icons.auto_awesome,
+                size: 16,
+                color: AppColors.primary(isDark),
               ),
+              const SizedBox(width: 8),
+              Text(
+                'AI 总结',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.onSurface(isDark),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _memory.summary!,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.6,
+              color: AppColors.onSurfaceQuaternary(isDark),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -289,8 +289,8 @@ class _SettingsButtonState extends State<_SettingsButton>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      width: 36,
-      height: 36,
+      width: 42,
+      height: 42,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         boxShadow: isDark
@@ -357,8 +357,8 @@ class _SettingsButtonState extends State<_SettingsButton>
                 Center(
                   child: SvgPicture.asset(
                     'assets/icons/setting.svg',
-                    width: 20,
-                    height: 20,
+                    width: 24,
+                    height: 24,
                     colorFilter: ColorFilter.mode(
                       isDark
                           ? const Color(0xFFFFFFFF)
