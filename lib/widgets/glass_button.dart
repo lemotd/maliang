@@ -1,127 +1,24 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'dart:ui';
-import 'package:flutter_svg/flutter_svg.dart';
-import '../pages/settings_page.dart';
 
-class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final VoidCallback? onSettingsTap;
-  final double scrollOffset;
+class GlassButton extends StatefulWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final Color? iconColor;
 
-  const MainAppBar({super.key, this.onSettingsTap, this.scrollOffset = 0});
-
-  @override
-  Widget build(BuildContext context) {
-    final isCollapsed = scrollOffset > 50;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      color: Colors.transparent,
-      child: SafeArea(
-        bottom: false,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeOut,
-          height: isCollapsed ? 52 : 100,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: 20,
-                right: 60,
-                top: 44,
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 150),
-                  curve: Curves.easeOut,
-                  opacity: isCollapsed ? 0 : 1,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '马良神记',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w500,
-                          color: isDark
-                              ? const Color(0xFFFFFFFF)
-                              : const Color(0xFF1A1A1A),
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '一键记，随时记',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          color: const Color(0xFF8E8E93),
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 20,
-                right: 60,
-                top: 0,
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 150),
-                  curve: Curves.easeOut,
-                  opacity: isCollapsed ? 1 : 0,
-                  child: Container(
-                    height: 52,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '马良神记',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w500,
-                        color: isDark
-                            ? const Color(0xFFFFFFFF)
-                            : const Color(0xFF1A1A1A),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 8,
-                top: 0,
-                child: _SettingsButton(
-                  onTap: onSettingsTap ?? () => _handleSettingsTap(context),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _handleSettingsTap(BuildContext context) {
-    Navigator.push(
-      context,
-      CupertinoPageRoute(builder: (context) => const SettingsPage()),
-    );
-  }
+  const GlassButton({
+    super.key,
+    required this.icon,
+    this.onTap,
+    this.iconColor,
+  });
 
   @override
-  Size get preferredSize => const Size.fromHeight(100);
+  State<GlassButton> createState() => _GlassButtonState();
 }
 
-class _SettingsButton extends StatefulWidget {
-  final VoidCallback onTap;
-
-  const _SettingsButton({required this.onTap});
-
-  @override
-  State<_SettingsButton> createState() => _SettingsButtonState();
-}
-
-class _SettingsButtonState extends State<_SettingsButton>
+class _GlassButtonState extends State<GlassButton>
     with TickerProviderStateMixin {
   late AnimationController _pressController;
   late AnimationController _resetController;
@@ -193,7 +90,7 @@ class _SettingsButtonState extends State<_SettingsButton>
     final startOffset = _dragOffset;
 
     if (_isDragging && wasInBounds) {
-      widget.onTap();
+      widget.onTap?.call();
     }
 
     setState(() {
@@ -213,8 +110,6 @@ class _SettingsButtonState extends State<_SettingsButton>
           ),
         );
 
-    _resetController.reset();
-
     animation.addListener(() {
       setState(() {
         _dragOffset = animation.value;
@@ -226,6 +121,11 @@ class _SettingsButtonState extends State<_SettingsButton>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final effectiveIconColor =
+        widget.iconColor ??
+        (isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1A1A1A));
+
     return SizedBox(
       height: 52,
       width: 60,
@@ -269,12 +169,13 @@ class _SettingsButtonState extends State<_SettingsButton>
 
               return Transform.scale(
                 scale: _scaleAnimation.value,
+                alignment: anchorAlignment,
                 child: Transform(
                   transform: Matrix4.identity()..scale(scaleX, scaleY),
                   alignment: anchorAlignment,
                   child: Opacity(
                     opacity: _brightnessAnimation.value,
-                    child: _buildGlassButton(),
+                    child: _buildGlassButton(isDark, effectiveIconColor),
                   ),
                 ),
               );
@@ -285,9 +186,7 @@ class _SettingsButtonState extends State<_SettingsButton>
     );
   }
 
-  Widget _buildGlassButton() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+  Widget _buildGlassButton(bool isDark, Color iconColor) {
     return Container(
       width: 40,
       height: 40,
@@ -354,19 +253,7 @@ class _SettingsButtonState extends State<_SettingsButton>
                       ),
                     ),
                   ),
-                Center(
-                  child: SvgPicture.asset(
-                    'assets/icons/setting.svg',
-                    width: 22,
-                    height: 22,
-                    colorFilter: ColorFilter.mode(
-                      isDark
-                          ? const Color(0xFFFFFFFF)
-                          : const Color(0xFF1A1A1A),
-                      BlendMode.srcIn,
-                    ),
-                  ),
-                ),
+                Center(child: Icon(widget.icon, size: 22, color: iconColor)),
               ],
             ),
           ),

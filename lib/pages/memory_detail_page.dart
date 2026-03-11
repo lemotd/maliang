@@ -1092,14 +1092,80 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     );
   }
 
+  String _getDisplayTitle() {
+    if (_memory.category == MemoryCategory.pickupCode ||
+        _memory.category == MemoryCategory.packageCode) {
+      if (_memory.pickupCode != null && _memory.pickupCode!.isNotEmpty) {
+        return _memory.pickupCode!;
+      }
+      for (final section in _memory.infoSections) {
+        for (final item in section.items) {
+          if (item.label == '取餐码' || item.label == '取件码') {
+            if (item.value.isNotEmpty) {
+              return item.value;
+            }
+          }
+        }
+      }
+      return _memory.title;
+    }
+
+    if (_memory.category == MemoryCategory.bill) {
+      if (_memory.amount != null && _memory.amount!.isNotEmpty) {
+        var amount = _memory.amount!;
+        final isExpense = _memory.isExpense ?? true;
+        if (!amount.contains('¥')) {
+          if (isExpense) {
+            amount = '-¥$amount';
+          } else {
+            amount = '+¥$amount';
+          }
+        }
+        return amount;
+      }
+      for (final section in _memory.infoSections) {
+        for (final item in section.items) {
+          if (item.label == '金额') {
+            if (item.value.isNotEmpty) {
+              var amount = item.value;
+              final isExpense = _memory.isExpense ?? true;
+              if (!amount.contains('¥')) {
+                if (isExpense) {
+                  amount = '-¥$amount';
+                } else {
+                  amount = '+¥$amount';
+                }
+              }
+              return amount;
+            }
+          }
+        }
+      }
+      var title = _memory.title;
+      if (!title.contains('¥')) {
+        if (!title.startsWith('-') && !title.startsWith('+')) {
+          title = '-¥$title';
+        } else if (title.startsWith('-')) {
+          title = '-¥${title.substring(1)}';
+        } else if (title.startsWith('+')) {
+          title = '+¥${title.substring(1)}';
+        }
+      }
+      return title;
+    }
+
+    return _memory.title;
+  }
+
   Widget _buildTitleCard(bool isDark) {
+    final displayTitle = _getDisplayTitle();
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _memory.title,
+            displayTitle,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(

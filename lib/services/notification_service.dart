@@ -62,21 +62,68 @@ class NotificationService {
     if (!_initialized) await initialize();
 
     try {
-      final detailInfo = memory.getDetailInfo();
-      final detailText = detailInfo.isEmpty ? '' : detailInfo.join(' · ');
+      String detailText;
+      if (memory.summary != null && memory.summary!.isNotEmpty) {
+        detailText = memory.summary!;
+      } else {
+        final detailInfo = memory.getDetailInfo();
+        detailText = detailInfo.isEmpty ? '' : detailInfo.join(' · ');
+      }
 
-      // 格式化标题，为账单添加 ¥ 符号
+      // 格式化标题
       String displayTitle = memory.title;
-      if (memory.category == MemoryCategory.bill) {
-        if (!displayTitle.contains('¥')) {
-          if (!displayTitle.startsWith('-') && !displayTitle.startsWith('+')) {
-            displayTitle = '-¥$displayTitle';
-          } else if (displayTitle.startsWith('-')) {
-            displayTitle = '-¥${displayTitle.substring(1)}';
-          } else if (displayTitle.startsWith('+')) {
-            displayTitle = '+¥${displayTitle.substring(1)}';
+
+      // 取餐码/取件码：直接显示取件码
+      if (memory.category == MemoryCategory.pickupCode ||
+          memory.category == MemoryCategory.packageCode) {
+        if (memory.pickupCode != null && memory.pickupCode!.isNotEmpty) {
+          displayTitle = memory.pickupCode!;
+        } else {
+          // 从 infoSections 中提取取件码
+          for (final section in memory.infoSections) {
+            for (final item in section.items) {
+              if (item.label == '取餐码' || item.label == '取件码') {
+                if (item.value.isNotEmpty) {
+                  displayTitle = item.value;
+                  break;
+                }
+              }
+            }
+            if (displayTitle.isNotEmpty) break;
+          }
+          if (displayTitle.isEmpty) {
+            displayTitle = memory.title;
           }
         }
+      }
+      // 账单：直接显示金额
+      else if (memory.category == MemoryCategory.bill) {
+        if (memory.amount != null && memory.amount!.isNotEmpty) {
+          var amount = memory.amount!;
+          final isExpense = memory.isExpense ?? true;
+          if (!amount.contains('¥')) {
+            if (isExpense) {
+              amount = '-¥$amount';
+            } else {
+              amount = '+¥$amount';
+            }
+          }
+          displayTitle = amount;
+        } else {
+          displayTitle = memory.title;
+          if (!displayTitle.contains('¥')) {
+            if (!displayTitle.startsWith('-') &&
+                !displayTitle.startsWith('+')) {
+              displayTitle = '-¥$displayTitle';
+            } else if (displayTitle.startsWith('-')) {
+              displayTitle = '-¥${displayTitle.substring(1)}';
+            } else if (displayTitle.startsWith('+')) {
+              displayTitle = '+¥${displayTitle.substring(1)}';
+            }
+          }
+        }
+      } else {
+        displayTitle = memory.title;
       }
 
       debugPrint(

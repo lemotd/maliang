@@ -217,29 +217,96 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
   }
 
   String _getDisplayTitle() {
-    var title = widget.memory.title;
-    final categoryLabel = widget.memory.category.label;
+    final category = widget.memory.category;
 
-    final prefixes = [
-      '$categoryLabel：',
-      '$categoryLabel:',
-      '取餐码：',
-      '取餐码:',
-      '取件码：',
-      '取件码:',
-      '消费 ',
-      '支出 ',
-      '收入 ',
-    ];
-
-    for (final prefix in prefixes) {
-      if (title.startsWith(prefix)) {
-        title = title.substring(prefix.length);
-        break;
+    // 取餐码/取件码：直接显示取件码
+    if (category == MemoryCategory.pickupCode ||
+        category == MemoryCategory.packageCode) {
+      // 优先使用 pickupCode 字段
+      if (widget.memory.pickupCode != null &&
+          widget.memory.pickupCode!.isNotEmpty) {
+        return widget.memory.pickupCode!;
       }
+      
+      // 从 infoSections 中提取取件码
+      for (final section in widget.memory.infoSections) {
+        for (final item in section.items) {
+            if (item.label == '取餐码' || item.label == '取件码') {
+              if (item.value.isNotEmpty) {
+                return item.value;
+              }
+            }
+          }
+      }
+      
+      // 从 title 中提取
+      var title = widget.memory.title;
+      final prefixes = [
+        '取餐码：',
+        '取餐码:',
+        '取件码：',
+        '取件码:',
+      ];
+      for (final prefix in prefixes) {
+        if (title.startsWith(prefix)) {
+          return title.substring(prefix.length);
+        }
+      }
+      
+      return title;
     }
 
-    if (widget.memory.category == MemoryCategory.bill) {
+    // 账单：直接显示金额
+    if (category == MemoryCategory.bill) {
+      if (widget.memory.amount != null && widget.memory.amount!.isNotEmpty) {
+        var amount = widget.memory.amount!;
+        final isExpense = widget.memory.isExpense ?? true;
+        if (!amount.contains('¥')) {
+          if (isExpense) {
+            amount = '-¥$amount';
+          } else {
+            amount = '+¥$amount';
+          }
+        }
+        return amount;
+      }
+      
+      // 从 infoSections 中提取金额
+      for (final section in widget.memory.infoSections) {
+        for (final item in section.items) {
+          if (item.label == '金额') {
+            if (item.value.isNotEmpty) {
+              var amount = item.value;
+              final isExpense = widget.memory.isExpense ?? true;
+              if (!amount.contains('¥')) {
+                if (isExpense) {
+                  amount = '-¥$amount';
+                } else {
+                  amount = '+¥$amount';
+                }
+              }
+              return amount;
+            }
+          }
+        }
+      }
+      
+      // 从 title 中提取
+      var title = widget.memory.title;
+      final prefixes = [
+        '账单：',
+        '账单:',
+        '消费 ',
+        '支出 ',
+        '收入 ',
+      ];
+      for (final prefix in prefixes) {
+        if (title.startsWith(prefix)) {
+          title = title.substring(prefix.length);
+          break;
+        }
+      }
+      
       if (!title.contains('¥')) {
         if (!title.startsWith('-') && !title.startsWith('+')) {
           title = '-¥$title';
@@ -249,12 +316,33 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
           title = '+¥${title.substring(1)}';
         }
       }
+      
+      return title;
+    }
+
+    // 其他情况：使用原来的逻辑
+    var title = widget.memory.title;
+    final categoryLabel = widget.memory.category.label;
+
+    final prefixes = [
+      '$categoryLabel：',
+      '$categoryLabel:',
+    ];
+
+    for (final prefix in prefixes) {
+      if (title.startsWith(prefix)) {
+        title = title.substring(prefix.length);
+        break;
+      }
     }
 
     return title;
   }
 
   String _getSubtitle() {
+    if (widget.memory.summary != null && widget.memory.summary!.isNotEmpty) {
+      return widget.memory.summary!;
+    }
     final detailInfo = widget.memory.getDetailInfo();
     if (detailInfo.isEmpty) {
       return '';
