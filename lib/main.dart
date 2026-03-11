@@ -11,6 +11,7 @@ import 'widgets/main_app_bar.dart';
 import 'pages/memory_detail_page.dart';
 import 'widgets/swipeable_memory_item.dart';
 import 'widgets/skeleton_list_item.dart';
+import 'widgets/collection_section.dart';
 import 'pages/settings_page.dart';
 import 'models/memory_item.dart';
 import 'services/memory_service.dart';
@@ -578,29 +579,54 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     final totalItems = _loadingCount + _memories.length;
 
-    return RefreshIndicator(
-      onRefresh: _loadMemories,
-      child: ListView.builder(
-        controller: _scrollController,
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
-        ),
-        padding: const EdgeInsets.only(top: 8, bottom: 80),
-        itemCount: totalItems,
-        itemBuilder: (context, index) {
-          if (index < _loadingCount) {
-            return const SkeletonListItem();
-          }
-          final memoryIndex = index - _loadingCount;
-          final memory = _memories[memoryIndex];
-          return SwipeableMemoryItem(
-            memory: memory,
-            onTap: () => _showMemoryDetail(memory),
-            onDelete: () => _deleteMemory(memory),
-            onToggleComplete: () => _toggleComplete(memory),
-          );
-        },
+    return ListView.builder(
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
       ),
+      padding: const EdgeInsets.only(top: 16, bottom: 80),
+      itemCount: totalItems + 2, // +2 for collection section and memory title
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return CollectionSection(memories: _memories);
+        }
+        if (index == 1) {
+          return _buildMemoryTitle(isDark);
+        }
+
+        final adjustedIndex = index - 2;
+        if (adjustedIndex < _loadingCount) {
+          return const SkeletonListItem();
+        }
+        final memoryIndex = adjustedIndex - _loadingCount;
+        final memory = _memories[memoryIndex];
+        return SwipeableMemoryItem(
+          memory: memory,
+          onTap: () => _showMemoryDetail(memory),
+          onDelete: () => _deleteMemory(memory),
+          onToggleComplete: () => _toggleComplete(memory),
+        );
+      },
+    );
+  }
+
+  Widget _buildMemoryTitle(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 16, right: 16, top: 24),
+          child: Text(
+            '记忆',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.onSurface(isDark),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
     );
   }
 

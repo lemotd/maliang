@@ -260,15 +260,14 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     if (category == MemoryCategory.bill) {
       if (widget.memory.amount != null && widget.memory.amount!.isNotEmpty) {
         var amount = widget.memory.amount!;
+        // 移除已有的符号和¥，只保留数字
+        amount = amount.replaceAll(RegExp(r'[^\d.]'), '');
+        final value = double.tryParse(amount) ?? 0;
         final isExpense = widget.memory.isExpense ?? true;
-        if (!amount.contains('¥')) {
-          if (isExpense) {
-            amount = '-¥$amount';
-          } else {
-            amount = '+¥$amount';
-          }
+        if (value > 0) {
+          return isExpense ? '-¥$amount' : '+¥$amount';
         }
-        return amount;
+        return '¥0.00';
       }
       
       // 从 infoSections 中提取金额

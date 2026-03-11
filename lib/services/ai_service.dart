@@ -156,8 +156,8 @@ class AiService {
    - summary(账单摘要，一句话描述交易)
    
    账单分类列表：
-   支出：餐饮、零食、交通、日用、娱乐、运动、服饰、家居、通讯、烟酒、医疗、教育、礼物、宠物、美容、维修、旅行、汽车、保险、税费、投资、转账、其他
-   收入：工资、奖金、投资、兼职、红包、退款、转账、其他
+   支出：${BillExpenseCategory.aiPromptList}
+   收入：${BillIncomeCategory.aiPromptList}
 
 请严格按照以下JSON格式返回，不要包含其他内容：
 {"category":"分类名称","title":"提取的标题","summary":"一段话总结图片内容","infoSections":[{"title":"小标题","items":[{"label":"标签","value":"值"}]}],"amount":"金额","isExpense":true/false,"billCategory":"账单分类","paymentMethod":"支付方式","merchantName":"商户名称","billTime":"账单时间"}

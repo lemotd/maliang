@@ -41,7 +41,7 @@ class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
                         '马良神记',
                         style: TextStyle(
                           fontSize: 24,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                           color: isDark
                               ? const Color(0xFFFFFFFF)
                               : const Color(0xFF1A1A1A),
@@ -77,7 +77,7 @@ class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
                       '马良神记',
                       style: TextStyle(
                         fontSize: 17,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                         color: isDark
                             ? const Color(0xFFFFFFFF)
                             : const Color(0xFF1A1A1A),

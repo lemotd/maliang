@@ -8,51 +8,7 @@ import '../models/memory_item.dart';
 import '../models/bill_category.dart';
 import '../services/memory_service.dart';
 import '../theme/app_colors.dart';
-
-const List<Map<String, dynamic>> kExpenseCategories = [
-  {'name': 'dining', 'label': '餐饮', 'icon': Icons.restaurant_outlined},
-  {'name': 'snacks', 'label': '零食', 'icon': Icons.cookie_outlined},
-  {'name': 'transport', 'label': '交通', 'icon': Icons.directions_bus_outlined},
-  {'name': 'daily', 'label': '日用', 'icon': Icons.shopping_basket_outlined},
-  {
-    'name': 'entertainment',
-    'label': '娱乐',
-    'icon': Icons.sports_esports_outlined,
-  },
-  {'name': 'sports', 'label': '运动', 'icon': Icons.fitness_center_outlined},
-  {'name': 'clothing', 'label': '服饰', 'icon': Icons.checkroom_outlined},
-  {'name': 'home', 'label': '家居', 'icon': Icons.chair_outlined},
-  {'name': 'communication', 'label': '通讯', 'icon': Icons.phone_outlined},
-  {'name': 'tobacco', 'label': '烟酒', 'icon': Icons.smoking_rooms_outlined},
-  {'name': 'medical', 'label': '医疗', 'icon': Icons.local_hospital_outlined},
-  {'name': 'education', 'label': '教育', 'icon': Icons.school_outlined},
-  {'name': 'gift', 'label': '礼物', 'icon': Icons.card_giftcard_outlined},
-  {'name': 'pet', 'label': '宠物', 'icon': Icons.pets_outlined},
-  {'name': 'beauty', 'label': '美容', 'icon': Icons.face_retouching_natural},
-  {'name': 'repair', 'label': '维修', 'icon': Icons.build_outlined},
-  {'name': 'travel', 'label': '旅行', 'icon': Icons.flight_outlined},
-  {'name': 'car', 'label': '汽车', 'icon': Icons.directions_car_outlined},
-  {'name': 'insurance', 'label': '保险', 'icon': Icons.security_outlined},
-  {'name': 'tax', 'label': '税费', 'icon': Icons.receipt_long_outlined},
-  {'name': 'investment', 'label': '投资', 'icon': Icons.trending_up_outlined},
-  {'name': 'transfer', 'label': '转账', 'icon': Icons.swap_horiz_outlined},
-  {'name': 'other_expense', 'label': '其他', 'icon': Icons.more_horiz_outlined},
-];
-
-const List<Map<String, dynamic>> kIncomeCategories = [
-  {'name': 'salary', 'label': '工资', 'icon': Icons.work_outline},
-  {'name': 'bonus', 'label': '奖金', 'icon': Icons.card_giftcard_outlined},
-  {
-    'name': 'investment_income',
-    'label': '投资',
-    'icon': Icons.trending_up_outlined,
-  },
-  {'name': 'part_time', 'label': '兼职', 'icon': Icons.access_time_outlined},
-  {'name': 'gift_income', 'label': '红包', 'icon': Icons.redeem_outlined},
-  {'name': 'refund', 'label': '退款', 'icon': Icons.assignment_return_outlined},
-  {'name': 'transfer_income', 'label': '转账', 'icon': Icons.swap_horiz_outlined},
-  {'name': 'other_income', 'label': '其他', 'icon': Icons.more_horiz_outlined},
-];
+import '../widgets/glass_button.dart';
 
 class _MildBounceCurve extends Curve {
   const _MildBounceCurve();
@@ -101,14 +57,15 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
   }
 
   void _calculateInitialPage() {
-    final categories = _isExpense ? kExpenseCategories : kIncomeCategories;
+    final categories = _isExpense
+        ? BillExpenseCategory.allMaps
+        : BillIncomeCategory.allMaps;
     final billCategory = widget.memory.billCategory;
     if (billCategory != null) {
       for (int i = 0; i < categories.length; i++) {
         if (categories[i]['name'] == billCategory ||
             categories[i]['label'] == billCategory) {
           _currentPage = i ~/ 8;
-          // 延迟跳转到对应页面
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _pageController.jumpToPage(_currentPage);
           });
@@ -462,8 +419,8 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
               child: PageView.builder(
                 controller: _pageController,
                 itemCount: _isExpense
-                    ? (kExpenseCategories.length / 8).ceil()
-                    : (kIncomeCategories.length / 8).ceil(),
+                    ? (BillExpenseCategory.allMaps.length / 8).ceil()
+                    : (BillIncomeCategory.allMaps.length / 8).ceil(),
                 onPageChanged: (index) {
                   setState(() {
                     _currentPage = index;
@@ -471,8 +428,8 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                 },
                 itemBuilder: (context, pageIndex) {
                   final categories = _isExpense
-                      ? kExpenseCategories
-                      : kIncomeCategories;
+                      ? BillExpenseCategory.allMaps
+                      : BillIncomeCategory.allMaps;
                   final startIndex = pageIndex * 8;
                   final endIndex = (startIndex + 8).clamp(0, categories.length);
                   final pageCategories = categories.sublist(
@@ -561,8 +518,8 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
 
   List<Widget> _buildPageIndicators(bool isDark) {
     final pageCount = _isExpense
-        ? (kExpenseCategories.length / 8).ceil()
-        : (kIncomeCategories.length / 8).ceil();
+        ? (BillExpenseCategory.allMaps.length / 8).ceil()
+        : (BillIncomeCategory.allMaps.length / 8).ceil();
 
     if (pageCount <= 1) {
       return [];
@@ -957,17 +914,12 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                       left: 8,
                       top: 0,
                       bottom: 0,
-                      child: CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: () {
+                      child: GlassButton(
+                        icon: CupertinoIcons.back,
+                        onTap: () {
                           debugPrint('返回按钮点击，返回数据: ${_memory.title}');
                           Navigator.pop(context, _memory);
                         },
-                        child: Icon(
-                          CupertinoIcons.back,
-                          color: AppColors.onSurface(isDark),
-                          size: 28,
-                        ),
                       ),
                     ),
                   ],
@@ -1084,88 +1036,22 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           ..._memory.infoSections.map(
             (section) => _buildInfoSection(section, isDark),
           ),
-        ] else ...[
-          // 兼容旧数据：如果没有 infoSections，使用旧的显示方式
+        ] else if (_memory.category != MemoryCategory.note) ...[
+          // 兼容旧数据：如果没有 infoSections，使用旧的显示方式（随手记类型不需要）
           _buildLegacyDetailInfo(isDark),
         ],
       ],
     );
   }
 
-  String _getDisplayTitle() {
-    if (_memory.category == MemoryCategory.pickupCode ||
-        _memory.category == MemoryCategory.packageCode) {
-      if (_memory.pickupCode != null && _memory.pickupCode!.isNotEmpty) {
-        return _memory.pickupCode!;
-      }
-      for (final section in _memory.infoSections) {
-        for (final item in section.items) {
-          if (item.label == '取餐码' || item.label == '取件码') {
-            if (item.value.isNotEmpty) {
-              return item.value;
-            }
-          }
-        }
-      }
-      return _memory.title;
-    }
-
-    if (_memory.category == MemoryCategory.bill) {
-      if (_memory.amount != null && _memory.amount!.isNotEmpty) {
-        var amount = _memory.amount!;
-        final isExpense = _memory.isExpense ?? true;
-        if (!amount.contains('¥')) {
-          if (isExpense) {
-            amount = '-¥$amount';
-          } else {
-            amount = '+¥$amount';
-          }
-        }
-        return amount;
-      }
-      for (final section in _memory.infoSections) {
-        for (final item in section.items) {
-          if (item.label == '金额') {
-            if (item.value.isNotEmpty) {
-              var amount = item.value;
-              final isExpense = _memory.isExpense ?? true;
-              if (!amount.contains('¥')) {
-                if (isExpense) {
-                  amount = '-¥$amount';
-                } else {
-                  amount = '+¥$amount';
-                }
-              }
-              return amount;
-            }
-          }
-        }
-      }
-      var title = _memory.title;
-      if (!title.contains('¥')) {
-        if (!title.startsWith('-') && !title.startsWith('+')) {
-          title = '-¥$title';
-        } else if (title.startsWith('-')) {
-          title = '-¥${title.substring(1)}';
-        } else if (title.startsWith('+')) {
-          title = '+¥${title.substring(1)}';
-        }
-      }
-      return title;
-    }
-
-    return _memory.title;
-  }
-
   Widget _buildTitleCard(bool isDark) {
-    final displayTitle = _getDisplayTitle();
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            displayTitle,
+            _memory.title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -1409,13 +1295,18 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     IconData categoryIcon = Icons.more_horiz_outlined;
     String categoryLabel = billCategoryName;
 
-    // 从分类列表中查找
-    final categories = isExpense ? kExpenseCategories : kIncomeCategories;
-    for (final cat in categories) {
-      if (cat['name'] == billCategoryName || cat['label'] == billCategoryName) {
-        categoryIcon = cat['icon'] as IconData;
-        categoryLabel = cat['label'] as String;
-        break;
+    // 使用枚举查找分类
+    if (isExpense) {
+      final category = BillExpenseCategory.fromName(billCategoryName);
+      if (category != null) {
+        categoryIcon = category.icon;
+        categoryLabel = category.label;
+      }
+    } else {
+      final category = BillIncomeCategory.fromName(billCategoryName);
+      if (category != null) {
+        categoryIcon = category.icon;
+        categoryLabel = category.label;
       }
     }
 

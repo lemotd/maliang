@@ -100,27 +100,17 @@ class NotificationService {
       else if (memory.category == MemoryCategory.bill) {
         if (memory.amount != null && memory.amount!.isNotEmpty) {
           var amount = memory.amount!;
+          // 移除已有的符号和¥，只保留数字
+          amount = amount.replaceAll(RegExp(r'[^\d.]'), '');
+          final value = double.tryParse(amount) ?? 0;
           final isExpense = memory.isExpense ?? true;
-          if (!amount.contains('¥')) {
-            if (isExpense) {
-              amount = '-¥$amount';
-            } else {
-              amount = '+¥$amount';
-            }
+          if (value > 0) {
+            displayTitle = isExpense ? '-¥$amount' : '+¥$amount';
+          } else {
+            displayTitle = '¥0.00';
           }
-          displayTitle = amount;
         } else {
           displayTitle = memory.title;
-          if (!displayTitle.contains('¥')) {
-            if (!displayTitle.startsWith('-') &&
-                !displayTitle.startsWith('+')) {
-              displayTitle = '-¥$displayTitle';
-            } else if (displayTitle.startsWith('-')) {
-              displayTitle = '-¥${displayTitle.substring(1)}';
-            } else if (displayTitle.startsWith('+')) {
-              displayTitle = '+¥${displayTitle.substring(1)}';
-            }
-          }
         }
       } else {
         displayTitle = memory.title;
