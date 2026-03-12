@@ -61,7 +61,10 @@ class _SettingsPageState extends State<SettingsPage> {
     final apiKey = await _configService.getApiKey();
     setState(() {
       _apiAddressController.text = apiAddress;
-      _apiKeyController.text = apiKey;
+      // 只有当用户之前保存过 API Key 时才填充
+      if (apiKey.isNotEmpty) {
+        _apiKeyController.text = apiKey;
+      }
       _isLoading = false;
     });
   }

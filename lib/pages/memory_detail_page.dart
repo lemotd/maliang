@@ -1112,7 +1112,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             ],
           ),
           const SizedBox(height: 6),
-          Text(
+          SelectableText(
             _memory.summary!,
             style: TextStyle(
               fontSize: 16,
