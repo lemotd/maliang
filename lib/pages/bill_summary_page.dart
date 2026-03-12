@@ -16,6 +16,76 @@ class BillSummaryPage extends StatefulWidget {
 
 class _BillSummaryPageState extends State<BillSummaryPage> {
   bool _isHidden = false;
+  final ScrollController _scrollController = ScrollController();
+  double _scrollOffset = 0;
+  bool _isAnimating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_isAnimating) return;
+    setState(() {
+      _scrollOffset = _scrollController.offset;
+    });
+  }
+
+  void _onScrollEnd() {
+    if (_isAnimating) return;
+
+    const double collapseThreshold = 50.0;
+    const double snapThreshold = 100.0;
+
+    if (_scrollOffset > collapseThreshold && _scrollOffset < snapThreshold) {
+      _isAnimating = true;
+      _scrollController
+          .animateTo(
+            snapThreshold,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          )
+          .then((_) {
+            _isAnimating = false;
+          });
+    }
+  }
+
+  int get _billDays {
+    if (widget.bills.isEmpty) return 0;
+    final billItems = widget.bills
+        .where((item) => item.category == MemoryCategory.bill)
+        .toList();
+    if (billItems.isEmpty) return 0;
+
+    final sortedBills = billItems
+      ..sort((a, b) {
+        final aDate = a.billTime ?? a.createdAt;
+        final bDate = b.billTime ?? b.createdAt;
+        return aDate.compareTo(bDate);
+      });
+
+    final firstBillDate =
+        sortedBills.first.billTime ?? sortedBills.first.createdAt;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final firstDay = DateTime(
+      firstBillDate.year,
+      firstBillDate.month,
+      firstBillDate.day,
+    );
+
+    return today.difference(firstDay).inDays + 1;
+  }
 
   List<MemoryItem> get _monthBills {
     final now = DateTime.now();
@@ -70,69 +140,188 @@ class _BillSummaryPageState extends State<BillSummaryPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isCollapsed = _scrollOffset > 50;
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceLow(isDark),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildAppBar(context),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                physics: const BouncingScrollPhysics(
-                  parent: AlwaysScrollableScrollPhysics(),
-                ),
-                children: [
-                  _buildMonthCard(isDark),
-                  const SizedBox(height: 16),
-                  ..._billsByDate.entries.map((entry) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildDayCard(entry.key, entry.value, isDark),
-                    );
-                  }),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAppBar(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return SizedBox(
-      height: 56,
-      child: Stack(
+      backgroundColor: isDark
+          ? AppColors.surfaceLow(isDark)
+          : const Color(0xFFEDEFF2),
+      body: Stack(
         children: [
           Positioned(
-            left: 8,
             top: 0,
-            child: GlassButton(
-              icon: CupertinoIcons.back,
-              onTap: () => Navigator.pop(context),
-            ),
-          ),
-          Positioned(
-            left: 60,
-            right: 60,
-            top: 0,
-            child: SizedBox(
-              height: 56,
-              child: Center(
-                child: Text(
-                  '总账单',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.onSurface(isDark),
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: Container(
+                height: 285,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      const Color(0xFF3482FF).withOpacity(0.1),
+                      const Color(0xFF3482FF).withOpacity(0.0),
+                    ],
                   ),
                 ),
               ),
             ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                _buildAppBar(isDark, isCollapsed),
+                Expanded(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      if (notification is ScrollEndNotification) {
+                        _onScrollEnd();
+                      }
+                      return false;
+                    },
+                    child: ListView(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      physics: const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
+                      ),
+                      children: [
+                        // 装饰图区域
+                        AnimatedOpacity(
+                          duration: const Duration(milliseconds: 150),
+                          curve: Curves.easeOut,
+                          opacity: isCollapsed ? 0 : 1,
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Center(
+                              child: Image.asset(
+                                'assets/bill_top_picture.png',
+                                width: 200,
+                                height: 200,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                        ),
+                        _buildMonthCard(isDark),
+                        const SizedBox(height: 16),
+                        ..._billsByDate.entries.map((entry) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _buildDayCard(
+                              entry.key,
+                              entry.value,
+                              isDark,
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppBar(bool isDark, bool isCollapsed) {
+    return Container(
+      color: Colors.transparent,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            height: isCollapsed ? 56 : 130,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  top: 64,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 150),
+                    curve: Curves.easeOut,
+                    opacity: isCollapsed ? 0 : 1,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '总账单',
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? const Color(0xFFFFFFFF)
+                                : const Color(0xFF1A1A1A),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          '已记账 $_billDays 天',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            color: Color(0xFF8E8E93),
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 150),
+                    curve: Curves.easeOut,
+                    opacity: isCollapsed ? 1 : 0,
+                    child: SizedBox(
+                      height: 56,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Text(
+                            '总账单',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? const Color(0xFFFFFFFF)
+                                  : const Color(0xFF1A1A1A),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 8,
+                  top: 0,
+                  child: GlassButton(
+                    icon: CupertinoIcons.back,
+                    onTap: () => Navigator.pop(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            height: isCollapsed ? 0.6 : 0,
+            child: Container(height: 0.6, color: const Color(0x0F000000)),
           ),
         ],
       ),
@@ -141,7 +330,6 @@ class _BillSummaryPageState extends State<BillSummaryPage> {
 
   Widget _buildMonthCard(bool isDark) {
     final now = DateTime.now();
-    final weekDays = ['一', '二', '三', '四', '五', '六', '日'];
 
     return Container(
       padding: const EdgeInsets.all(16),

@@ -560,6 +560,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   late AnimationController _controller;
   double _offset = 1.0;
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _selectionFocusNode = FocusNode();
   double _startDragY = 0;
   double _startOffset = 0;
   bool _isDragging = false;
@@ -600,6 +601,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
+    _selectionFocusNode.dispose();
     super.dispose();
   }
 
@@ -620,6 +622,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     if (!_isDragging && !_isTextSelecting) {
       if (deltaY.abs() > 10) {
         _isDragging = true;
+        // 开始滑动时清除文本选择
+        _selectionFocusNode.unfocus();
       }
     }
 
@@ -848,7 +852,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
               right: 0,
               bottom: 0,
               child: Listener(
-                behavior: HitTestBehavior.translucent,
+                behavior: HitTestBehavior.deferToChild,
                 onPointerDown: (e) => _onDragStart(e.position.dy),
                 onPointerMove: (e) =>
                     _onDragUpdate(e.position.dy, imageAreaHeight),
@@ -877,25 +881,28 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                           )
                         : const NeverScrollableScrollPhysics(),
                     padding: EdgeInsets.only(bottom: safeAreaBottom + 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 20),
-                        if (_memory.category == MemoryCategory.bill) ...[
-                          // 账单标题和创建时间
-                          _buildBillSummaryCard(isDark),
+                    child: SelectionArea(
+                      focusNode: _selectionFocusNode,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           const SizedBox(height: 20),
-                          _buildBillDetailInfo(isDark),
-                          // 一段话总结（账单类型显示在账单详情下方）
-                          if (_memory.summary != null &&
-                              _memory.summary!.isNotEmpty) ...[
+                          if (_memory.category == MemoryCategory.bill) ...[
+                            // 账单标题和创建时间
+                            _buildBillSummaryCard(isDark),
                             const SizedBox(height: 20),
-                            _buildSummarySection(isDark),
+                            _buildBillDetailInfo(isDark),
+                            // 一段话总结（账单类型显示在账单详情下方）
+                            if (_memory.summary != null &&
+                                _memory.summary!.isNotEmpty) ...[
+                              const SizedBox(height: 20),
+                              _buildSummarySection(isDark),
+                            ],
+                          ] else ...[
+                            _buildDetailInfo(isDark),
                           ],
-                        ] else ...[
-                          _buildDetailInfo(isDark),
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -1112,7 +1119,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             ],
           ),
           const SizedBox(height: 6),
-          SelectableText(
+          Text(
             _memory.summary!,
             style: TextStyle(
               fontSize: 16,

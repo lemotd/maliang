@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,14 +10,14 @@ import 'dart:io';
 
 import 'widgets/main_app_bar.dart';
 import 'pages/memory_detail_page.dart';
-import 'widgets/swipeable_memory_item.dart';
-import 'widgets/skeleton_list_item.dart';
+import 'widgets/memory_list_item.dart';
 import 'widgets/collection_section.dart';
 import 'pages/settings_page.dart';
 import 'models/memory_item.dart';
 import 'services/memory_service.dart';
 import 'services/ai_service.dart';
 import 'services/notification_service.dart';
+import 'services/image_cache_service.dart';
 import 'theme/app_colors.dart';
 
 void main() async {
@@ -26,22 +27,47 @@ void main() async {
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
-      statusBarBrightness: Brightness.light,
-      statusBarIconBrightness: Brightness.dark,
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: Colors.transparent,
     ),
   );
-
   runApp(const MaliangNotesApp());
 }
 
-class MaliangNotesApp extends StatelessWidget {
+class MaliangNotesApp extends StatefulWidget {
   const MaliangNotesApp({super.key});
+
+  @override
+  State<MaliangNotesApp> createState() => _MaliangNotesAppState();
+}
+
+class _MaliangNotesAppState extends State<MaliangNotesApp> {
+  bool _imagePrecached = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_imagePrecached) {
+      precacheImage(AssetImage('assets/bill_top_picture.png'), context);
+      _imagePrecached = true;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '马良神记',
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('zh', 'CN'),
+        Locale('zh', 'TW'),
+        Locale('en', 'US'),
+      ],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppColors.primaryLight,
@@ -481,6 +507,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _deleteMemory(MemoryItem memory) async {
     await _memoryService.deleteMemory(memory.id);
     await _notificationService.cancelNotification(memory.id);
+
+    // 删除图片缓存
+    final imageCacheService = ImageCacheService();
+    imageCacheService.removeFromCache(memory.thumbnailPath);
+    imageCacheService.removeFromCache(memory.imagePath);
+
     if (memory.imagePath != null) {
       final file = File(memory.imagePath!);
       if (await file.exists()) {
@@ -596,11 +628,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
         final adjustedIndex = index - 2;
         if (adjustedIndex < _loadingCount) {
-          return const SkeletonListItem();
+          return const MemoryListItem(isLoading: true);
         }
         final memoryIndex = adjustedIndex - _loadingCount;
         final memory = _memories[memoryIndex];
-        return SwipeableMemoryItem(
+        return MemoryListItem(
           memory: memory,
           onTap: () => _showMemoryDetail(memory),
           onDelete: () => _deleteMemory(memory),

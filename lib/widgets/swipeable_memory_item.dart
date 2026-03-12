@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
-import 'dart:ui';
 import '../models/memory_item.dart';
+import '../models/bill_category.dart';
 import '../theme/app_colors.dart';
+import '../services/image_cache_service.dart';
 
 class SwipeableMemoryItem extends StatefulWidget {
   final MemoryItem memory;
@@ -42,12 +43,10 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
   bool _isDragging = false;
   bool _hasTriggeredStage2Haptic = false;
 
-  // 缓存图片
-  ImageProvider? _cachedImage;
-  Size? _imageSize;
+  final _imageCacheService = ImageCacheService();
 
-  // 点击缩放状态
   bool _isPressed = false;
+  bool _isActionPressed = false;
 
   @override
   void initState() {
@@ -87,19 +86,14 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
   void _loadImage() async {
     final path = widget.memory.thumbnailPath ?? widget.memory.imagePath;
     if (path != null) {
-      _cachedImage = FileImage(File(path));
-      // 获取图片尺寸
-      try {
-        final file = File(path);
-        final bytes = await file.readAsBytes();
-        final image = await decodeImageFromList(bytes);
-        if (mounted) {
-          setState(() {
-            _imageSize = Size(image.width.toDouble(), image.height.toDouble());
-          });
+      final cachedSize = _imageCacheService.getCachedImageSize(path);
+      if (cachedSize != null && mounted) {
+        setState(() {});
+      } else {
+        final size = await _imageCacheService.getImageSize(path);
+        if (mounted && size != null) {
+          setState(() {});
         }
-      } catch (e) {
-        // 忽略错误
       }
     }
   }
@@ -192,11 +186,13 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
   }
 
   void _onRightPillTap() {
+    HapticFeedback.lightImpact();
     widget.onToggleComplete?.call();
     _animateReset();
   }
 
   void _onLeftPillTap() {
+    HapticFeedback.lightImpact();
     widget.onDelete?.call();
     _animateReset();
   }
@@ -448,57 +444,78 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
     return Center(
       child: GestureDetector(
+        onTapDown: (_) {
+          setState(() => _isActionPressed = true);
+        },
+        onTapUp: (_) async {
+          await Future.delayed(const Duration(milliseconds: 150));
+          if (mounted) {
+            setState(() => _isActionPressed = false);
+          }
+        },
+        onTapCancel: () {
+          setState(() => _isActionPressed = false);
+        },
         onTap: onTap,
-        child: Container(
-          width: buttonWidth,
-          height: 40,
-          decoration: BoxDecoration(
-            color: actionColor,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Stack(
-                children: [
-                  // 文字（带渐变动画）
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    right: 30,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: AnimatedOpacity(
-                        opacity: textOpacity,
-                        duration: const Duration(milliseconds: 150),
-                        child: Text(
-                          actionText,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
+        child: AnimatedScale(
+          scale: _isActionPressed ? 0.95 : 1.0,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          child: Container(
+            width: buttonWidth,
+            height: 40,
+            decoration: BoxDecoration(
+              color: actionColor,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Stack(
+                  children: [
+                    // 文字（带渐变动画）
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      right: 30,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: AnimatedOpacity(
+                          opacity: textOpacity,
+                          duration: const Duration(milliseconds: 150),
+                          child: Text(
+                            actionText,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  // 图标（带动画）
-                  AnimatedAlign(
-                    duration: const Duration(milliseconds: 150),
-                    alignment: isStage2
-                        ? Alignment.centerRight
-                        : Alignment.center,
-                    child: Opacity(
-                      opacity: iconOpacity,
-                      child: Transform.scale(
-                        scale: iconScale,
-                        child: Icon(actionIcon, color: Colors.white, size: 20),
+                    // 图标（带动画）
+                    AnimatedAlign(
+                      duration: const Duration(milliseconds: 150),
+                      alignment: isStage2
+                          ? Alignment.centerRight
+                          : Alignment.center,
+                      child: Opacity(
+                        opacity: iconOpacity,
+                        child: Transform.scale(
+                          scale: iconScale,
+                          child: Icon(
+                            actionIcon,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -536,19 +553,17 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     final isCompleted = widget.memory.isCompleted;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // 标题颜色
+    // 标题颜色：待办状态使用 Primary，已完成状态使用正常颜色
     final textColor = isCompleted
-        ? AppColors.onSurfaceQuaternary(isDark)
-        : AppColors.onSurface(isDark);
-    // 副标题和时间颜色 - 已完成时更浅
-    final subTextColor = isCompleted
-        ? AppColors.onSurfaceOctonary(isDark)
-        : AppColors.onSurfaceQuaternary(isDark);
+        ? AppColors.onSurface(isDark)
+        : AppColors.primary(isDark);
+    // 副标题和时间颜色
+    final subTextColor = AppColors.onSurfaceQuaternary(isDark);
     final subtitle = _getSubtitle();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh(isDark),
         borderRadius: BorderRadius.circular(20),
@@ -625,21 +640,13 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          _getCategoryIcon(category),
-          size: 14,
-          color: isCompleted
-              ? AppColors.onSurfaceOctonary(isDark)
-              : category.color,
-        ),
+        Icon(_getCategoryIcon(category), size: 14, color: category.color),
         const SizedBox(width: 4),
         Text(
           category.label,
           style: TextStyle(
             fontSize: 12,
-            color: isCompleted
-                ? AppColors.onSurfaceOctonary(isDark)
-                : AppColors.onSurfaceQuaternary(isDark),
+            color: AppColors.onSurfaceQuaternary(isDark),
             fontWeight: FontWeight.w400,
           ),
         ),
@@ -662,14 +669,18 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
   Widget _buildThumbnail(bool isCompleted) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final path = widget.memory.thumbnailPath ?? widget.memory.imagePath;
 
     // 缩略图最大尺寸
     const maxWidth = 72.0;
     const maxHeight = 72.0;
 
-    if (_cachedImage != null && _imageSize != null) {
+    final imageProvider = _imageCacheService.getImageProvider(path);
+    final imageSize = _imageCacheService.getCachedImageSize(path);
+
+    if (imageProvider != null && imageSize != null) {
       // 按原比例计算缩略图尺寸
-      final aspectRatio = _imageSize!.width / _imageSize!.height;
+      final aspectRatio = imageSize.width / imageSize.height;
       double displayWidth;
       double displayHeight;
 
@@ -685,45 +696,19 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: ColorFiltered(
-          colorFilter: isCompleted
-              ? const ColorFilter.matrix(<double>[
-                  0.2126,
-                  0.7152,
-                  0.0722,
-                  0,
-                  0,
-                  0.2126,
-                  0.7152,
-                  0.0722,
-                  0,
-                  0,
-                  0.2126,
-                  0.7152,
-                  0.0722,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0,
-                  0.5,
-                  0,
-                ])
-              : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
-          child: Image(
-            image: _cachedImage!,
-            width: displayWidth,
-            height: displayHeight,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _buildPlaceholderIcon(isCompleted),
-          ),
+        child: Image(
+          image: imageProvider,
+          width: displayWidth,
+          height: displayHeight,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildPlaceholderIcon(),
         ),
       );
     }
-    return _buildPlaceholderIcon(isCompleted);
+    return _buildPlaceholderIcon();
   }
 
-  Widget _buildPlaceholderIcon(bool isCompleted) {
+  Widget _buildPlaceholderIcon() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
@@ -735,9 +720,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
       ),
       child: Icon(
         _getCategoryIcon(widget.memory.category),
-        color: isCompleted
-            ? AppColors.onSurfaceOctonary(isDark)
-            : widget.memory.category.color,
+        color: widget.memory.category.color,
         size: 32,
       ),
     );
