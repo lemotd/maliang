@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../models/memory_item.dart';
+import '../pages/bill_summary_page.dart';
 
 class BillCard extends StatefulWidget {
   final List<MemoryItem> bills;
@@ -22,9 +23,8 @@ class _BillCardState extends State<BillCard> {
       if (bill.category == MemoryCategory.bill &&
           bill.createdAt.isAfter(monthStart)) {
         final amount = bill.amount ?? '0';
-        final value = double.tryParse(
-          amount.replaceAll(RegExp(r'[^\d.]'), ''),
-        ) ?? 0;
+        final value =
+            double.tryParse(amount.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
         if (bill.isExpense ?? true) {
           total += value;
         }
@@ -36,7 +36,11 @@ class _BillCardState extends State<BillCard> {
   List<double> get _weeklyData {
     final now = DateTime.now();
     // 计算本周一的日期（00:00:00）
-    final weekStart = DateTime(now.year, now.month, now.day - (now.weekday - 1));
+    final weekStart = DateTime(
+      now.year,
+      now.month,
+      now.day - (now.weekday - 1),
+    );
     final data = List<double>.filled(7, 0);
 
     for (final bill in widget.bills) {
@@ -45,9 +49,8 @@ class _BillCardState extends State<BillCard> {
         final daysDiff = billDate.difference(weekStart).inDays;
         if (daysDiff >= 0 && daysDiff < 7) {
           final amount = bill.amount ?? '0';
-          final value = double.tryParse(
-            amount.replaceAll(RegExp(r'[^\d.]'), ''),
-          ) ?? 0;
+          final value =
+              double.tryParse(amount.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
           if (bill.isExpense ?? true) {
             data[daysDiff] += value;
           }
@@ -70,7 +73,7 @@ class _BillCardState extends State<BillCard> {
       height: 160,
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh(isDark),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -102,7 +105,7 @@ class _BillCardState extends State<BillCard> {
                 ),
               ],
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 1),
             Text(
               '本月总支出',
               style: TextStyle(

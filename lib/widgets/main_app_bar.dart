@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'dart:ui';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../pages/settings_page.dart';
+import '../theme/app_colors.dart';
 
 class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onSettingsTap;
@@ -19,83 +20,94 @@ class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
       color: Colors.transparent,
       child: SafeArea(
         bottom: false,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeOut,
-          height: isCollapsed ? 52 : 100,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: 20,
-                right: 60,
-                top: 44,
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 150),
-                  curve: Curves.easeOut,
-                  opacity: isCollapsed ? 0 : 1,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '马良神记',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? const Color(0xFFFFFFFF)
-                              : const Color(0xFF1A1A1A),
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '一键记，随时记',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          color: const Color(0xFF8E8E93),
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 20,
-                right: 60,
-                top: 0,
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 150),
-                  curve: Curves.easeOut,
-                  opacity: isCollapsed ? 1 : 0,
-                  child: Container(
-                    height: 52,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '马良神记',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? const Color(0xFFFFFFFF)
-                            : const Color(0xFF1A1A1A),
-                        letterSpacing: 0.5,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              height: isCollapsed ? 56 : 130,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    left: 20,
+                    right: 60,
+                    top: 64,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 150),
+                      curve: Curves.easeOut,
+                      opacity: isCollapsed ? 0 : 1,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '马良神记',
+                            style: TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? const Color(0xFFFFFFFF)
+                                  : const Color(0xFF1A1A1A),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            '一键记，随时记',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
+                              color: const Color(0xFF8E8E93),
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
+                  Positioned(
+                    left: 20,
+                    right: 60,
+                    top: 0,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 150),
+                      curve: Curves.easeOut,
+                      opacity: isCollapsed ? 1 : 0,
+                      child: Container(
+                        height: 56,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '马良神记',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? const Color(0xFFFFFFFF)
+                                : const Color(0xFF1A1A1A),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 8,
+                    top: 0,
+                    child: _SettingsButton(
+                      onTap: onSettingsTap ?? () => _handleSettingsTap(context),
+                    ),
+                  ),
+                ],
               ),
-              Positioned(
-                right: 8,
-                top: 0,
-                child: _SettingsButton(
-                  onTap: onSettingsTap ?? () => _handleSettingsTap(context),
-                ),
-              ),
-            ],
-          ),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              height: isCollapsed ? 0.6 : 0,
+              child: Container(height: 0.6, color: const Color(0x0F000000)),
+            ),
+          ],
         ),
       ),
     );
@@ -227,7 +239,7 @@ class _SettingsButtonState extends State<_SettingsButton>
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 52,
+      height: 56,
       width: 60,
       child: Center(
         child: GestureDetector(
@@ -297,13 +309,13 @@ class _SettingsButtonState extends State<_SettingsButton>
             ? []
             : [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 4,
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 2,
                   offset: const Offset(0, 1),
                 ),
               ],

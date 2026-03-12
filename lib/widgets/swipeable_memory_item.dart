@@ -227,32 +227,27 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
           widget.memory.pickupCode!.isNotEmpty) {
         return widget.memory.pickupCode!;
       }
-      
+
       // 从 infoSections 中提取取件码
       for (final section in widget.memory.infoSections) {
         for (final item in section.items) {
-            if (item.label == '取餐码' || item.label == '取件码') {
-              if (item.value.isNotEmpty) {
-                return item.value;
-              }
+          if (item.label == '取餐码' || item.label == '取件码') {
+            if (item.value.isNotEmpty) {
+              return item.value;
             }
           }
+        }
       }
-      
+
       // 从 title 中提取
       var title = widget.memory.title;
-      final prefixes = [
-        '取餐码：',
-        '取餐码:',
-        '取件码：',
-        '取件码:',
-      ];
+      final prefixes = ['取餐码：', '取餐码:', '取件码：', '取件码:'];
       for (final prefix in prefixes) {
         if (title.startsWith(prefix)) {
           return title.substring(prefix.length);
         }
       }
-      
+
       return title;
     }
 
@@ -269,7 +264,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
         }
         return '¥0.00';
       }
-      
+
       // 从 infoSections 中提取金额
       for (final section in widget.memory.infoSections) {
         for (final item in section.items) {
@@ -289,23 +284,17 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
           }
         }
       }
-      
+
       // 从 title 中提取
       var title = widget.memory.title;
-      final prefixes = [
-        '账单：',
-        '账单:',
-        '消费 ',
-        '支出 ',
-        '收入 ',
-      ];
+      final prefixes = ['账单：', '账单:', '消费 ', '支出 ', '收入 '];
       for (final prefix in prefixes) {
         if (title.startsWith(prefix)) {
           title = title.substring(prefix.length);
           break;
         }
       }
-      
+
       if (!title.contains('¥')) {
         if (!title.startsWith('-') && !title.startsWith('+')) {
           title = '-¥$title';
@@ -315,7 +304,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
           title = '+¥${title.substring(1)}';
         }
       }
-      
+
       return title;
     }
 
@@ -323,10 +312,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     var title = widget.memory.title;
     final categoryLabel = widget.memory.category.label;
 
-    final prefixes = [
-      '$categoryLabel：',
-      '$categoryLabel:',
-    ];
+    final prefixes = ['$categoryLabel：', '$categoryLabel:'];
 
     for (final prefix in prefixes) {
       if (title.startsWith(prefix)) {
@@ -416,8 +402,8 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
             setState(() => _isPressed = true);
           },
           onTapUp: (_) async {
-            // 确保动画至少执行100ms
-            await Future.delayed(const Duration(milliseconds: 100));
+            // 确保动画至少执行150ms
+            await Future.delayed(const Duration(milliseconds: 150));
             if (mounted) {
               setState(() => _isPressed = false);
             }
@@ -432,8 +418,8 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
           child: Transform.translate(
             offset: Offset(_dragExtent, 0),
             child: AnimatedScale(
-              scale: _isPressed ? 0.97 : 1.0,
-              duration: const Duration(milliseconds: 100),
+              scale: _isPressed ? 0.95 : 1.0,
+              duration: const Duration(milliseconds: 150),
               curve: Curves.easeOut,
               child: RepaintBoundary(child: _buildContent()),
             ),
@@ -565,7 +551,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh(isDark),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -579,8 +565,8 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
                 Text(
                   _getDisplayTitle(),
                   style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                     color: textColor,
                   ),
                   maxLines: 1,

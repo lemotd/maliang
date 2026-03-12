@@ -153,7 +153,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
           children: [
             Container(
               height: 56,
-              padding: const EdgeInsets.only(left: 14, right: 14, top: 2),
+              padding: const EdgeInsets.only(left: 14, right: 14),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -887,7 +887,11 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                           const SizedBox(height: 20),
                           _buildBillDetailInfo(isDark),
                           // 一段话总结（账单类型显示在账单详情下方）
-                          _buildSummarySection(isDark),
+                          if (_memory.summary != null &&
+                              _memory.summary!.isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            _buildSummarySection(isDark),
+                          ],
                         ] else ...[
                           _buildDetailInfo(isDark),
                         ],
@@ -1025,22 +1029,32 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   Widget _buildDetailInfo(bool isDark) {
+    final children = <Widget>[];
+
+    // 标题和创建时间卡片
+    children.add(_buildTitleCard(isDark));
+
+    // AI 总结区域
+    if (_memory.summary != null && _memory.summary!.isNotEmpty) {
+      children.add(const SizedBox(height: 20));
+      children.add(_buildSummarySection(isDark));
+    }
+
+    // 信息区域
+    if (_memory.infoSections.isNotEmpty) {
+      for (var i = 0; i < _memory.infoSections.length; i++) {
+        children.add(const SizedBox(height: 24));
+        children.add(_buildInfoSection(_memory.infoSections[i], isDark));
+      }
+    } else if (_memory.category != MemoryCategory.note) {
+      // 兼容旧数据：如果没有 infoSections，使用旧的显示方式（随手记类型不需要）
+      children.add(const SizedBox(height: 24));
+      children.add(_buildLegacyDetailInfo(isDark));
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 标题和创建时间卡片
-        _buildTitleCard(isDark),
-        const SizedBox(height: 16),
-        // 信息区域
-        if (_memory.infoSections.isNotEmpty) ...[
-          ..._memory.infoSections.map(
-            (section) => _buildInfoSection(section, isDark),
-          ),
-        ] else if (_memory.category != MemoryCategory.note) ...[
-          // 兼容旧数据：如果没有 infoSections，使用旧的显示方式（随手记类型不需要）
-          _buildLegacyDetailInfo(isDark),
-        ],
-      ],
+      children: children,
     );
   }
 
@@ -1056,49 +1070,56 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 20,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
               color: AppColors.onSurface(isDark),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
-            '创建于 ${_formatTime(_memory.createdAt)}',
+            '${_formatTime(_memory.createdAt)} · ${_memory.category.label}',
             style: TextStyle(
               fontSize: 13,
               color: AppColors.onSurfaceQuaternary(isDark),
             ),
           ),
-          // 显示 summary（非账单类型）
-          if (_memory.summary != null && _memory.summary!.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Icon(
-                  Icons.auto_awesome,
-                  size: 16,
-                  color: AppColors.primary(isDark),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'AI 总结',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.onSurface(isDark),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _memory.summary!,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.6,
-                color: AppColors.onSurfaceQuaternary(isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummarySection(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.auto_awesome,
+                size: 16,
+                color: AppColors.primary(isDark),
               ),
+              const SizedBox(width: 8),
+              Text(
+                'AI 总结',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.onSurface(isDark),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _memory.summary!,
+            style: TextStyle(
+              fontSize: 16,
+              height: 1.6,
+              color: AppColors.onSurface(isDark),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -1106,7 +1127,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
 
   Widget _buildInfoSection(InfoSection section, bool isDark) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1114,12 +1135,12 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           Text(
             section.title,
             style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
               color: AppColors.onSurface(isDark),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
           // 信息项列表
           ...section.items.map((item) => _buildInfoItem(item, isDark)),
         ],
@@ -1134,11 +1155,11 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 72,
+            width: 80,
             child: Text(
               item.label,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 16,
                 color: AppColors.onSurfaceQuaternary(isDark),
               ),
             ),
@@ -1148,7 +1169,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             child: SelectableText(
               item.value,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 16,
                 color: AppColors.onSurface(isDark),
               ),
             ),
@@ -1267,7 +1288,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           ),
           const SizedBox(height: 4),
           Text(
-            '创建于 $createdAt',
+            '$createdAt · ${_memory.category.label}',
             style: TextStyle(
               fontSize: 13,
               color: AppColors.onSurfaceQuaternary(isDark),
@@ -1330,8 +1351,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
               Text(
                 '记账',
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
                   color: AppColors.onSurface(isDark),
                 ),
               ),
@@ -1450,50 +1471,6 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           ),
         ),
       ],
-    );
-  }
-
-  // 一段话总结（账单类型显示在账单详情下方）
-  Widget _buildSummarySection(bool isDark) {
-    if (_memory.summary == null || _memory.summary!.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Icon(
-                Icons.auto_awesome,
-                size: 16,
-                color: AppColors.primary(isDark),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'AI 总结',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.onSurface(isDark),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _memory.summary!,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.6,
-              color: AppColors.onSurfaceQuaternary(isDark),
-            ),
-          ),
-        ],
-      ),
     );
   }
 

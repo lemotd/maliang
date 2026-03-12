@@ -127,7 +127,7 @@ class _GlassButtonState extends State<GlassButton>
         (isDark ? const Color(0xFFFFFFFF) : const Color(0xFF1A1A1A));
 
     return SizedBox(
-      height: 52,
+      height: 56,
       width: 60,
       child: Center(
         child: GestureDetector(
@@ -196,13 +196,13 @@ class _GlassButtonState extends State<GlassButton>
             ? []
             : [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 4,
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 2,
                   offset: const Offset(0, 1),
                 ),
               ],

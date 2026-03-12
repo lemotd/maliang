@@ -110,7 +110,6 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           children: [
             _buildAppBar(context),
-            const SizedBox(height: 12),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -205,7 +204,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SizedBox(
-      height: 52,
+      height: 56,
       child: Stack(
         children: [
           Positioned(
@@ -221,13 +220,13 @@ class _SettingsPageState extends State<SettingsPage> {
             right: 60,
             top: 0,
             child: SizedBox(
-              height: 52,
+              height: 56,
               child: Center(
                 child: Text(
                   '设置',
                   style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.onSurface(isDark),
                   ),
                 ),
