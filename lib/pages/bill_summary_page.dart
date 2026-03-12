@@ -348,7 +348,7 @@ class _BillSummaryPageState extends State<BillSummaryPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  bill.billCategory ?? (isExpense ? '其他' : '其他'),
+                  _getCategoryLabel(bill),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -390,6 +390,19 @@ class _BillSummaryPageState extends State<BillSummaryPage> {
     } else {
       final category = BillIncomeCategory.fromName(categoryStr ?? '');
       return category?.icon ?? Icons.more_horiz_outlined;
+    }
+  }
+
+  String _getCategoryLabel(MemoryItem bill) {
+    final categoryStr = bill.billCategory;
+    final isExpense = bill.isExpense ?? true;
+
+    if (isExpense) {
+      final category = BillExpenseCategory.fromName(categoryStr ?? '');
+      return category?.label ?? (isExpense ? '其他' : '其他');
+    } else {
+      final category = BillIncomeCategory.fromName(categoryStr ?? '');
+      return category?.label ?? (isExpense ? '其他' : '其他');
     }
   }
 }

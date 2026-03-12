@@ -1078,7 +1078,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           Text(
             '${_formatTime(_memory.createdAt)} · ${_memory.category.label}',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 14,
               color: AppColors.onSurfaceQuaternary(isDark),
             ),
           ),
@@ -1290,7 +1290,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           Text(
             '$createdAt · ${_memory.category.label}',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 14,
               color: AppColors.onSurfaceQuaternary(isDark),
             ),
           ),
