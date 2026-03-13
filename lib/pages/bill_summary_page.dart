@@ -289,6 +289,22 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                                 ),
                               ),
                             ),
+                            if (monthlyData.isEmpty)
+                              SliverToBoxAdapter(
+                                child: Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 32),
+                                    child: Text(
+                                      '暂无账单',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: AppColors.onSurfaceQuaternary(isDark),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (monthlyData.isNotEmpty) ...[
                             // 第一个月卡片占位
                             SliverToBoxAdapter(
                               child: Padding(
@@ -385,6 +401,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                                 ),
                               ];
                             }),
+                            ],
                             // 底部留白（含安全区）
                             SliverToBoxAdapter(
                               child: SizedBox(
@@ -395,7 +412,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                           ],
                         ),
                         // 吸顶月卡片 - 显示当前活跃月份，连贯过渡
-                        if (activeMonth != null)
+                        if (activeMonth != null && monthlyData.isNotEmpty)
                           Positioned(
                             top: _getStickyTop(),
                             left: 16,

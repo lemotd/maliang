@@ -589,32 +589,41 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final hasMemories = _memories.isNotEmpty || hasLoading;
 
     if (!hasMemories) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.square_pencil,
-              size: 64,
-              color: AppColors.onSurfaceOctonary(isDark),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '开始记录你的第一条记忆',
-              style: TextStyle(
-                fontSize: 16,
-                color: AppColors.onSurfaceQuaternary(isDark),
+      // 获取 MainAppBar 占用的高度（包含状态栏），使内容相对整个屏幕居中
+      final statusBarHeight = MediaQuery.of(context).padding.top;
+      final appBarHeight = _scrollOffset > 20 ? 56.0 : 130.0;
+      final topOffset = statusBarHeight + appBarHeight;
+
+      return Transform.translate(
+        offset: Offset(0, -topOffset / 2),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(
+                'assets/home_empty.png',
+                width: 200,
+                height: 200,
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '点击下方按钮或分享图片到这里',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.onSurfaceOctonary(isDark),
+              const SizedBox(height: 6),
+              Text(
+                '开始，收集碎片记忆',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.onSurfaceQuaternary(isDark),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                '点击下方按钮或分享图片到这里',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.onSurfaceOctonary(isDark),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }

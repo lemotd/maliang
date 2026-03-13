@@ -305,7 +305,7 @@ class _SettingsPageState extends State<SettingsPage> {
         children: [
           _buildInputFieldContent(
             context: context,
-            title: 'API地址',
+            title: 'API 地址',
             controller: _apiAddressController,
             placeholder: '请输入API地址',
             focusNode: _apiAddressFocusNode,
@@ -361,7 +361,7 @@ class _SettingsPageState extends State<SettingsPage> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: AppColors.onSurface(isDark),
+              color: AppColors.onSurfaceQuaternary(isDark),
             ),
           ),
           const SizedBox(height: 8),
@@ -504,8 +504,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   Text(
                     'API Key 配置说明',
                     style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
                       color: isDark
                           ? const Color(0xFFFFFFFF)
                           : const Color(0xFF1A1A1A),
