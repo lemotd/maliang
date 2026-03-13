@@ -35,7 +35,7 @@ class SwipeableMemoryItem extends StatefulWidget {
 }
 
 class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late AnimationController _resetController;
   late Animation<double> _resetAnimation;
   double _dragExtent = 0;
@@ -47,6 +47,9 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
   bool _isPressed = false;
   bool _isActionPressed = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -75,25 +78,19 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
         oldWidget.memory.imagePath != widget.memory.imagePath) {
       _loadImage();
     }
-    if (oldWidget.memory.title != widget.memory.title ||
-        oldWidget.memory.amount != widget.memory.amount ||
-        oldWidget.memory.billCategory != widget.memory.billCategory ||
-        oldWidget.memory.note != widget.memory.note) {
-      setState(() {});
-    }
   }
 
   void _loadImage() async {
     final path = widget.memory.thumbnailPath ?? widget.memory.imagePath;
     if (path != null) {
       final cachedSize = _imageCacheService.getCachedImageSize(path);
-      if (cachedSize != null && mounted) {
+      if (cachedSize != null) {
+        return;
+      }
+      final size = await _imageCacheService.getImageSize(path);
+      if (mounted && size != null) {
+        _imageCacheService.cacheImageSize(path, size);
         setState(() {});
-      } else {
-        final size = await _imageCacheService.getImageSize(path);
-        if (mounted && size != null) {
-          setState(() {});
-        }
       }
     }
   }
@@ -333,6 +330,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
     final halfScreen = screenWidth * 0.5;
@@ -696,12 +694,16 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image(
-          image: imageProvider,
-          width: displayWidth,
-          height: displayHeight,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildPlaceholderIcon(),
+        child: RepaintBoundary(
+          child: Image(
+            image: imageProvider,
+            width: displayWidth,
+            height: displayHeight,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => _buildPlaceholderIcon(),
+          ),
         ),
       );
     }

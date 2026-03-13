@@ -23,6 +23,11 @@ import 'theme/app_colors.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 增加图片缓存大小
+  PaintingBinding.instance.imageCache.maximumSize = 500;
+  PaintingBinding.instance.imageCache.maximumSizeBytes =
+      200 * 1024 * 1024; // 200MB
+
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   SystemChrome.setSystemUIOverlayStyle(
@@ -44,17 +49,20 @@ class MaliangNotesApp extends StatefulWidget {
 class _MaliangNotesAppState extends State<MaliangNotesApp> {
   bool _imagePrecached = false;
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
+  Future<void> _precacheImage(BuildContext context) async {
     if (!_imagePrecached) {
-      precacheImage(AssetImage('assets/bill_top_picture.png'), context);
+      await precacheImage(AssetImage('assets/bill_top_picture.png'), context);
       _imagePrecached = true;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // 在 build 方法中预加载图片
+    if (!_imagePrecached) {
+      _precacheImage(context);
+    }
+
     return MaterialApp(
       title: '马良神记',
       debugShowCheckedModeBanner: false,
@@ -612,6 +620,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final totalItems = _loadingCount + _memories.length;
 
     return ListView.builder(
+      addAutomaticKeepAlives: true,
+      addRepaintBoundaries: true,
+      cacheExtent: 500,
       controller: _scrollController,
       physics: const BouncingScrollPhysics(
         parent: AlwaysScrollableScrollPhysics(),

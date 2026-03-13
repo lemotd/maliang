@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../theme/app_colors.dart';
 import '../models/memory_item.dart';
 import 'bill_card.dart';
@@ -60,7 +61,7 @@ class _CollectionSectionState extends State<CollectionSection> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    CupertinoPageRoute(
                       builder: (context) =>
                           BillSummaryPage(bills: widget.memories),
                     ),

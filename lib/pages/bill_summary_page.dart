@@ -14,11 +14,15 @@ class BillSummaryPage extends StatefulWidget {
   State<BillSummaryPage> createState() => _BillSummaryPageState();
 }
 
-class _BillSummaryPageState extends State<BillSummaryPage> {
+class _BillSummaryPageState extends State<BillSummaryPage>
+    with AutomaticKeepAliveClientMixin {
   bool _isHidden = false;
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
   bool _isAnimating = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -139,6 +143,7 @@ class _BillSummaryPageState extends State<BillSummaryPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isCollapsed = _scrollOffset > 50;
 
@@ -200,6 +205,8 @@ class _BillSummaryPageState extends State<BillSummaryPage> {
                                 width: 200,
                                 height: 200,
                                 fit: BoxFit.contain,
+                                gaplessPlayback: true,
+                                filterQuality: FilterQuality.medium,
                               ),
                             ),
                           ),

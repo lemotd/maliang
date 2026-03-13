@@ -11,18 +11,14 @@ class SkeletonListItem extends StatefulWidget {
 class _SkeletonListItemState extends State<SkeletonListItem>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-    _animation = Tween<double>(begin: 0.2, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
-    );
+      duration: const Duration(milliseconds: 4000),
+    )..repeat();
   }
 
   @override
@@ -31,15 +27,26 @@ class _SkeletonListItemState extends State<SkeletonListItem>
     super.dispose();
   }
 
+  Color _getSmoothAIColor(double value) {
+    final colors = [
+      const Color(0xFF6366F1), // Indigo
+      const Color(0xFF8B5CF6), // Purple
+      const Color(0xFFEC4899), // Pink
+      const Color(0xFF06B6D4), // Cyan
+      const Color(0xFF10B981), // Emerald
+      const Color(0xFF6366F1), // Indigo (循环)
+    ];
+
+    final scaledValue = value * (colors.length - 1);
+    final index = scaledValue.floor();
+    final t = scaledValue - index;
+
+    return Color.lerp(colors[index], colors[index + 1], t)!;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseColor = isDark
-        ? const Color(0xFF2C2C2E)
-        : const Color(0xFFF2F2F7);
-    final highlightColor = isDark
-        ? const Color(0xFF3A3A3C)
-        : const Color(0xFFE5E5EA);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -59,81 +66,15 @@ class _SkeletonListItemState extends State<SkeletonListItem>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    AnimatedBuilder(
-                      animation: _animation,
-                      builder: (context, child) {
-                        return Container(
-                          height: 18,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Color.lerp(
-                              baseColor,
-                              highlightColor,
-                              _animation.value,
-                            ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        );
-                      },
-                    ),
+                    _buildShimmerBox(isDark, height: 18),
                     const SizedBox(height: 4),
-                    SizedBox(
-                      height: 40,
-                      child: AnimatedBuilder(
-                        animation: _animation,
-                        builder: (context, child) {
-                          return Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Color.lerp(
-                                baseColor,
-                                highlightColor,
-                                _animation.value,
-                              ),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+                    SizedBox(height: 40, child: _buildShimmerBox(isDark)),
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        AnimatedBuilder(
-                          animation: _animation,
-                          builder: (context, child) {
-                            return Container(
-                              height: 12,
-                              width: 80,
-                              decoration: BoxDecoration(
-                                color: Color.lerp(
-                                  baseColor,
-                                  highlightColor,
-                                  _animation.value,
-                                ),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            );
-                          },
-                        ),
+                        _buildShimmerBox(isDark, height: 12, width: 80),
                         const SizedBox(width: 8),
-                        AnimatedBuilder(
-                          animation: _animation,
-                          builder: (context, child) {
-                            return Container(
-                              height: 12,
-                              width: 50,
-                              decoration: BoxDecoration(
-                                color: Color.lerp(
-                                  baseColor,
-                                  highlightColor,
-                                  _animation.value,
-                                ),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            );
-                          },
-                        ),
+                        _buildShimmerBox(isDark, height: 12, width: 50),
                       ],
                     ),
                   ],
@@ -144,22 +85,11 @@ class _SkeletonListItemState extends State<SkeletonListItem>
                 width: 72,
                 height: 72,
                 child: Center(
-                  child: AnimatedBuilder(
-                    animation: _animation,
-                    builder: (context, child) {
-                      return Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          color: Color.lerp(
-                            baseColor,
-                            highlightColor,
-                            _animation.value,
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      );
-                    },
+                  child: _buildShimmerBox(
+                    isDark,
+                    width: 72,
+                    height: 72,
+                    borderRadius: 8,
                   ),
                 ),
               ),
@@ -167,6 +97,35 @@ class _SkeletonListItemState extends State<SkeletonListItem>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildShimmerBox(
+    bool isDark, {
+    double? width,
+    double? height,
+    double borderRadius = 4,
+  }) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final baseColor = isDark
+            ? const Color(0xFF2C2C2E)
+            : const Color(0xFFE5E5EA);
+        final highlightColor = _getSmoothAIColor(_controller.value);
+
+        final intensity =
+            0.2 + Curves.easeInOutSine.transform(_controller.value) * 0.15;
+
+        return Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(borderRadius),
+            color: Color.lerp(baseColor, highlightColor, intensity)!,
+          ),
+        );
+      },
     );
   }
 }

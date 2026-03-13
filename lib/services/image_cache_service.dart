@@ -10,7 +10,7 @@ class ImageCacheService {
   final Map<String, ImageProvider> _imageProviders = {};
   final Map<String, Size> _imageSizes = {};
 
-  static const int _maxCacheSize = 100;
+  static const int _maxCacheSize = 1000;
 
   ImageProvider? getImageProvider(String? path) {
     if (path == null || path.isEmpty) return null;
