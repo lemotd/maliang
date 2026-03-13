@@ -85,7 +85,8 @@ class _BillCardState extends State<BillCard> {
                 Text(
                   _isHidden ? '****' : '¥${_monthTotal.toStringAsFixed(2)}',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontFamily: 'DINPro',
+                    fontSize: 22,
                     fontWeight: FontWeight.w600,
                     color: AppColors.onSurface(isDark),
                   ),

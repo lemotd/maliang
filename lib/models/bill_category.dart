@@ -82,8 +82,17 @@ enum BillExpenseCategory {
   }
 
   static BillExpenseCategory? fromName(String name) {
+    final normalized = name.trim().toLowerCase();
     for (final category in BillExpenseCategory.values) {
-      if (category.name == name || category.label == name) {
+      if (category.name.toLowerCase() == normalized ||
+          category.label == name.trim()) {
+        return category;
+      }
+    }
+    // 模糊匹配：AI可能返回包含关键词的变体
+    for (final category in BillExpenseCategory.values) {
+      if (normalized.contains(category.name.toLowerCase()) ||
+          category.name.toLowerCase().contains(normalized)) {
         return category;
       }
     }
@@ -91,18 +100,14 @@ enum BillExpenseCategory {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'label': label,
-      'icon': icon,
-    };
+    return {'name': name, 'label': label, 'icon': icon};
   }
 
   static List<Map<String, dynamic>> get allMaps =>
       values.map((e) => e.toMap()).toList();
 
   static String get aiPromptList =>
-      values.map((e) => e.label).join('、');
+      values.map((e) => '${e.name}(${e.label})').join('、');
 }
 
 enum BillIncomeCategory {
@@ -142,8 +147,17 @@ enum BillIncomeCategory {
   }
 
   static BillIncomeCategory? fromName(String name) {
+    final normalized = name.trim().toLowerCase();
     for (final category in BillIncomeCategory.values) {
-      if (category.name == name || category.label == name) {
+      if (category.name.toLowerCase() == normalized ||
+          category.label == name.trim()) {
+        return category;
+      }
+    }
+    // 模糊匹配：AI可能返回包含关键词的变体
+    for (final category in BillIncomeCategory.values) {
+      if (normalized.contains(category.name.toLowerCase()) ||
+          category.name.toLowerCase().contains(normalized)) {
         return category;
       }
     }
@@ -151,16 +165,12 @@ enum BillIncomeCategory {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'label': label,
-      'icon': icon,
-    };
+    return {'name': name, 'label': label, 'icon': icon};
   }
 
   static List<Map<String, dynamic>> get allMaps =>
       values.map((e) => e.toMap()).toList();
 
   static String get aiPromptList =>
-      values.map((e) => e.label).join('、');
+      values.map((e) => '${e.name}(${e.label})').join('、');
 }

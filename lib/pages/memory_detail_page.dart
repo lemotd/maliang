@@ -298,6 +298,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                         Text(
                           '¥',
                           style: TextStyle(
+                            fontFamily: 'DINPro',
                             fontSize: 20,
                             fontWeight: FontWeight.w500,
                             color: AppColors.onSurfaceQuaternary(isDark),
@@ -317,6 +318,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                               ),
                             ],
                             style: TextStyle(
+                              fontFamily: 'DINPro',
                               fontSize: 32,
                               fontWeight: FontWeight.w500,
                               color: AppColors.onSurface(isDark),
@@ -325,6 +327,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                               border: InputBorder.none,
                               hintText: '0.00',
                               hintStyle: TextStyle(
+                                fontFamily: 'DINPro',
                                 fontSize: 32,
                                 fontWeight: FontWeight.w500,
                                 color: AppColors.onSurfaceOctonary(isDark),
@@ -1382,6 +1385,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           Text(
             formattedAmount,
             style: TextStyle(
+              fontFamily: 'DINPro',
               fontSize: 36,
               fontWeight: FontWeight.w500,
               color: amountColor,

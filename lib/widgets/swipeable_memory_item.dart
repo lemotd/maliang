@@ -578,6 +578,9 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
                 Text(
                   _getDisplayTitle(),
                   style: TextStyle(
+                    fontFamily: widget.memory.category == MemoryCategory.bill
+                        ? 'DINPro'
+                        : null,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: textColor,

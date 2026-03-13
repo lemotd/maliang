@@ -17,31 +17,14 @@ class _SkeletonListItemState extends State<SkeletonListItem>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 4000),
-    )..repeat();
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-
-  Color _getSmoothAIColor(double value) {
-    final colors = [
-      const Color(0xFF6366F1), // Indigo
-      const Color(0xFF8B5CF6), // Purple
-      const Color(0xFFEC4899), // Pink
-      const Color(0xFF06B6D4), // Cyan
-      const Color(0xFF10B981), // Emerald
-      const Color(0xFF6366F1), // Indigo (循环)
-    ];
-
-    final scaledValue = value * (colors.length - 1);
-    final index = scaledValue.floor();
-    final t = scaledValue - index;
-
-    return Color.lerp(colors[index], colors[index + 1], t)!;
   }
 
   @override
@@ -112,17 +95,18 @@ class _SkeletonListItemState extends State<SkeletonListItem>
         final baseColor = isDark
             ? const Color(0xFF2C2C2E)
             : const Color(0xFFE5E5EA);
-        final highlightColor = _getSmoothAIColor(_controller.value);
+        final highlightColor = isDark
+            ? const Color(0xFF3A3A3C)
+            : const Color(0xFFF2F2F5);
 
-        final intensity =
-            0.2 + Curves.easeInOutSine.transform(_controller.value) * 0.15;
+        final t = Curves.easeInOut.transform(_controller.value);
 
         return Container(
           width: width,
           height: height,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(borderRadius),
-            color: Color.lerp(baseColor, highlightColor, intensity)!,
+            color: Color.lerp(baseColor, highlightColor, t)!,
           ),
         );
       },

@@ -101,7 +101,8 @@ class AiService {
     final base64Image = base64Encode(imageBytes);
     debugPrint('最终图片大小: ${imageBytes.length} bytes');
 
-    final systemPrompt = '''你是一个智能助手
+    final systemPrompt =
+        '''你是一个智能助手
 专门分析用户分享的图片内容。请根据图片内容进行分析：
 
 1. 判断图片属于哪个分类（请仔细判断，不要误分类）：
@@ -149,7 +150,7 @@ class AiService {
 5. 对于账单类型，请提取以下信息：
    - amount(金额，带符号如"-35.00")
    - isExpense(布尔值，true表示支出，false表示收入)
-   - billCategory(账单分类，必须从以下分类中选择一个最匹配的)
+   - billCategory(账单分类，必须从以下分类中选择一个最匹配的英文名称，如dining、transport等)
    - billTime(账单时间，格式为"YYYY-MM-DD HH:mm")
    - paymentMethod(支付方式)
    - merchantName(商户名称)
@@ -167,7 +168,7 @@ class AiService {
 2. 对于所有非账单类型（取餐码、取件码、随手记），必须填写infoSections，将图片中识别出的所有重要信息组织成结构化格式
 3. 对于账单类型，填写amount、isExpense、billCategory等字段，infoSections可以留空
 4. 只填写图片中实际存在的信息，不存在的字段请省略或留空
-5. billCategory必须从上面列出的分类中选择，不要自创分类名称
+5. billCategory必须从上面列出的分类中选择英文名称（如dining、transport、salary等），不要自创分类名称，不要使用中文分类名
 6. billTime格式为"YYYY-MM-DD HH:mm"，如"2024-01-15 14:30"
 7. 随手记类型要详细分析图片内容，提取所有有价值的信息，可以适当联想丰富内容，标题应该是对图片的概括性描述''';
 

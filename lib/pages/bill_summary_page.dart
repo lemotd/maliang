@@ -4,6 +4,7 @@ import '../theme/app_colors.dart';
 import '../models/memory_item.dart';
 import '../models/bill_category.dart';
 import '../widgets/glass_button.dart';
+import 'memory_detail_page.dart';
 
 class BillSummaryPage extends StatefulWidget {
   final List<MemoryItem> bills;
@@ -20,6 +21,9 @@ class _BillSummaryPageState extends State<BillSummaryPage>
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
   bool _isAnimating = false;
+  final List<GlobalKey> _monthKeys = [];
+  int _activeMonthIndex = 0;
+  final GlobalKey _stackKey = GlobalKey();
 
   @override
   bool get wantKeepAlive => true;
@@ -41,21 +45,71 @@ class _BillSummaryPageState extends State<BillSummaryPage>
     if (_isAnimating) return;
     setState(() {
       _scrollOffset = _scrollController.offset;
+      _updateActiveMonth();
     });
+  }
+
+  void _updateActiveMonth() {
+    int active = 0;
+    for (int i = 1; i < _monthKeys.length; i++) {
+      final key = _monthKeys[i];
+      final ctx = key.currentContext;
+      if (ctx != null) {
+        final box = ctx.findRenderObject() as RenderBox;
+        final pos = box.localToGlobal(Offset.zero);
+        // 当月卡片的顶部滚到吸顶区域时，切换
+        if (pos.dy <= 100) {
+          active = i;
+        }
+      }
+    }
+    _activeMonthIndex = active;
+  }
+
+  /// 获取吸顶卡片的 top 值
+  double _getStickyTop() {
+    if (_activeMonthIndex == 0) {
+      // 第一个月：从图片下方自然位置过渡到 0
+      return (232 - _scrollOffset).clamp(0, double.infinity).toDouble();
+    }
+    // 其他月份：跟踪列表中对应月卡片的位置
+    final key = _monthKeys[_activeMonthIndex];
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      final box = ctx.findRenderObject() as RenderBox;
+      // 获取相对于 Stack 父级的位置
+      final stackCtx = _stackKey.currentContext;
+      if (stackCtx != null) {
+        final stackBox = stackCtx.findRenderObject() as RenderBox;
+        final pos = box.localToGlobal(Offset.zero, ancestor: stackBox);
+        // 16 是列表中月卡片的 top padding
+        return pos.dy.clamp(0, double.infinity).toDouble();
+      }
+    }
+    return 0;
+  }
+
+  /// 判断吸顶卡片是否处于悬浮状态（已钉住顶部）
+  bool get _isStickyPinned {
+    if (_activeMonthIndex == 0) {
+      return _scrollOffset > 232;
+    }
+    return _getStickyTop() <= 0;
   }
 
   void _onScrollEnd() {
     if (_isAnimating) return;
 
-    const double collapseThreshold = 50.0;
-    const double snapThreshold = 100.0;
+    // 图片区域高度 (200 + 16*2 padding = 232)
+    const double imageAreaHeight = 232.0;
+    const double snapStart = 50.0;
 
-    if (_scrollOffset > collapseThreshold && _scrollOffset < snapThreshold) {
+    if (_scrollOffset > snapStart && _scrollOffset < imageAreaHeight) {
       _isAnimating = true;
       _scrollController
           .animateTo(
-            snapThreshold,
-            duration: const Duration(milliseconds: 200),
+            imageAreaHeight,
+            duration: const Duration(milliseconds: 250),
             curve: Curves.easeOut,
           )
           .then((_) {
@@ -91,54 +145,55 @@ class _BillSummaryPageState extends State<BillSummaryPage>
     return today.difference(firstDay).inDays + 1;
   }
 
-  List<MemoryItem> get _monthBills {
-    final now = DateTime.now();
-    final monthStart = DateTime(now.year, now.month, 1);
-    return widget.bills.where((bill) {
-      if (bill.category != MemoryCategory.bill) return false;
-      final billDate = bill.billTime ?? bill.createdAt;
-      return billDate.isAfter(monthStart) ||
-          billDate.isAtSameMomentAs(monthStart);
-    }).toList();
-  }
-
-  double get _monthExpense {
-    double total = 0;
-    for (final bill in _monthBills) {
-      if (bill.isExpense ?? true) {
-        final amount = bill.amount ?? '0';
-        final value =
-            double.tryParse(amount.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
-        total += value;
-      }
+  List<_MonthData> get _allMonthlyData {
+    final allBills = widget.bills
+        .where((bill) => bill.category == MemoryCategory.bill)
+        .toList();
+    final Map<String, List<MemoryItem>> byMonth = {};
+    for (final bill in allBills) {
+      final d = bill.billTime ?? bill.createdAt;
+      final key = '${d.year}-${d.month.toString().padLeft(2, '0')}';
+      byMonth.putIfAbsent(key, () => []).add(bill);
     }
-    return total;
-  }
-
-  double get _monthIncome {
-    double total = 0;
-    for (final bill in _monthBills) {
-      if (!(bill.isExpense ?? true)) {
-        final amount = bill.amount ?? '0';
-        final value =
-            double.tryParse(amount.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
-        total += value;
-      }
-    }
-    return total;
-  }
-
-  Map<DateTime, List<MemoryItem>> get _billsByDate {
-    final Map<DateTime, List<MemoryItem>> result = {};
-    for (final bill in _monthBills) {
-      final billDate = bill.billTime ?? bill.createdAt;
-      final dateKey = DateTime(billDate.year, billDate.month, billDate.day);
-      result.putIfAbsent(dateKey, () => []).add(bill);
-    }
-    final sortedKeys = result.keys.toList()..sort((a, b) => b.compareTo(a));
-    return Map.fromEntries(
-      sortedKeys.map((key) => MapEntry(key, result[key]!)),
-    );
+    final months =
+        byMonth.entries.map((entry) {
+          final bills = entry.value;
+          final d = bills.first.billTime ?? bills.first.createdAt;
+          double expense = 0, income = 0;
+          for (final bill in bills) {
+            final v =
+                double.tryParse(
+                  (bill.amount ?? '0').replaceAll(RegExp(r'[^\d.]'), ''),
+                ) ??
+                0;
+            if (bill.isExpense ?? true) {
+              expense += v;
+            } else {
+              income += v;
+            }
+          }
+          final Map<DateTime, List<MemoryItem>> byDate = {};
+          for (final bill in bills) {
+            final bd = bill.billTime ?? bill.createdAt;
+            final dateKey = DateTime(bd.year, bd.month, bd.day);
+            byDate.putIfAbsent(dateKey, () => []).add(bill);
+          }
+          final sortedKeys = byDate.keys.toList()
+            ..sort((a, b) => b.compareTo(a));
+          return _MonthData(
+            year: d.year,
+            month: d.month,
+            expense: expense,
+            income: income,
+            billsByDate: Map.fromEntries(
+              sortedKeys.map((k) => MapEntry(k, byDate[k]!)),
+            ),
+          );
+        }).toList()..sort((a, b) {
+          final c = b.year.compareTo(a.year);
+          return c != 0 ? c : b.month.compareTo(a.month);
+        });
+    return months;
   }
 
   @override
@@ -146,6 +201,18 @@ class _BillSummaryPageState extends State<BillSummaryPage>
     super.build(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isCollapsed = _scrollOffset > 50;
+    final monthlyData = _allMonthlyData;
+    // 确保 keys 数量匹配
+    while (_monthKeys.length < monthlyData.length) {
+      _monthKeys.add(GlobalKey());
+    }
+    final activeMonth = monthlyData.isNotEmpty
+        ? monthlyData[_activeMonthIndex.clamp(0, monthlyData.length - 1)]
+        : null;
+    final firstMonth = monthlyData.isNotEmpty ? monthlyData.first : null;
+    final restMonths = monthlyData.length > 1
+        ? monthlyData.sublist(1)
+        : <_MonthData>[];
 
     return Scaffold(
       backgroundColor: isDark
@@ -174,6 +241,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
             ),
           ),
           SafeArea(
+            bottom: false,
             child: Column(
               children: [
                 _buildAppBar(isDark, isCollapsed),
@@ -185,44 +253,183 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                       }
                       return false;
                     },
-                    child: ListView(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(16),
-                      physics: const BouncingScrollPhysics(
-                        parent: AlwaysScrollableScrollPhysics(),
-                      ),
+                    child: Stack(
+                      key: _stackKey,
+                      clipBehavior: Clip.none,
                       children: [
-                        // 装饰图区域
-                        AnimatedOpacity(
-                          duration: const Duration(milliseconds: 150),
-                          curve: Curves.easeOut,
-                          opacity: isCollapsed ? 0 : 1,
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: Center(
-                              child: Image.asset(
-                                'assets/bill_top_picture.png',
-                                width: 200,
-                                height: 200,
-                                fit: BoxFit.contain,
-                                gaplessPlayback: true,
-                                filterQuality: FilterQuality.medium,
+                        CustomScrollView(
+                          controller: _scrollController,
+                          physics: const BouncingScrollPhysics(
+                            parent: AlwaysScrollableScrollPhysics(),
+                          ),
+                          slivers: [
+                            // 装饰图区域
+                            SliverToBoxAdapter(
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 150),
+                                curve: Curves.easeOut,
+                                opacity: isCollapsed ? 0 : 1,
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    16,
+                                    16,
+                                    16,
+                                  ),
+                                  child: Center(
+                                    child: Image.asset(
+                                      'assets/bill_top_picture.png',
+                                      width: 200,
+                                      height: 200,
+                                      fit: BoxFit.contain,
+                                      gaplessPlayback: true,
+                                      filterQuality: FilterQuality.medium,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // 第一个月卡片占位
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                key: _monthKeys[0],
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                child: const SizedBox(height: 80),
+                              ),
+                            ),
+                            // 第一个月的日卡片
+                            if (firstMonth != null)
+                              SliverPadding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  16,
+                                  16,
+                                  0,
+                                ),
+                                sliver: SliverList(
+                                  delegate: SliverChildListDelegate([
+                                    ...firstMonth.billsByDate.entries.map((
+                                      entry,
+                                    ) {
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 12,
+                                        ),
+                                        child: _buildDayCard(
+                                          entry.key,
+                                          entry.value,
+                                          isDark,
+                                        ),
+                                      );
+                                    }),
+                                  ]),
+                                ),
+                              ),
+                            // 其余月份：月卡片 + 日卡片
+                            ...restMonths.asMap().entries.expand((monthEntry) {
+                              final monthIdx =
+                                  monthEntry.key +
+                                  1; // +1 because first month is index 0
+                              final monthData = monthEntry.value;
+                              return [
+                                SliverToBoxAdapter(
+                                  child: Padding(
+                                    key: _monthKeys[monthIdx],
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      16,
+                                      16,
+                                      0,
+                                    ),
+                                    child: Opacity(
+                                      opacity: _activeMonthIndex == monthIdx
+                                          ? 0
+                                          : 1,
+                                      child: _buildMonthCard(
+                                        isDark,
+                                        year: monthData.year,
+                                        month: monthData.month,
+                                        expense: monthData.expense,
+                                        income: monthData.income,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SliverPadding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    16,
+                                    16,
+                                    0,
+                                  ),
+                                  sliver: SliverList(
+                                    delegate: SliverChildListDelegate([
+                                      ...monthData.billsByDate.entries.map((
+                                        entry,
+                                      ) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 12,
+                                          ),
+                                          child: _buildDayCard(
+                                            entry.key,
+                                            entry.value,
+                                            isDark,
+                                          ),
+                                        );
+                                      }),
+                                    ]),
+                                  ),
+                                ),
+                              ];
+                            }),
+                            // 底部留白（含安全区）
+                            SliverToBoxAdapter(
+                              child: SizedBox(
+                                height:
+                                    16 + MediaQuery.of(context).padding.bottom,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // 吸顶月卡片 - 显示当前活跃月份，连贯过渡
+                        if (activeMonth != null)
+                          Positioned(
+                            top: _getStickyTop(),
+                            left: 16,
+                            right: 16,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: _isStickyPinned
+                                    ? const BorderRadius.only(
+                                        bottomLeft: Radius.circular(20),
+                                        bottomRight: Radius.circular(20),
+                                      )
+                                    : BorderRadius.circular(20),
+                                boxShadow: _isStickyPinned
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.06,
+                                          ),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ]
+                                    : [],
+                              ),
+                              child: _buildMonthCard(
+                                isDark,
+                                year: activeMonth.year,
+                                month: activeMonth.month,
+                                expense: activeMonth.expense,
+                                income: activeMonth.income,
+                                pinned: _isStickyPinned,
                               ),
                             ),
                           ),
-                        ),
-                        _buildMonthCard(isDark),
-                        const SizedBox(height: 16),
-                        ..._billsByDate.entries.map((entry) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildDayCard(
-                              entry.key,
-                              entry.value,
-                              isDark,
-                            ),
-                          );
-                        }),
                       ],
                     ),
                   ),
@@ -335,36 +542,42 @@ class _BillSummaryPageState extends State<BillSummaryPage>
     );
   }
 
-  Widget _buildMonthCard(bool isDark) {
-    final now = DateTime.now();
-
+  Widget _buildMonthCard(
+    bool isDark, {
+    required int year,
+    required int month,
+    required double expense,
+    required double income,
+    bool pinned = false,
+  }) {
+    final radius = pinned
+        ? const BorderRadius.only(
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(20),
+          )
+        : BorderRadius.circular(20);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh(isDark),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: radius,
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainer(isDark),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Column(
               mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${now.year}',
+                  '$year年',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 14,
                     color: AppColors.onSurfaceQuaternary(isDark),
                   ),
                 ),
                 Text(
-                  '${now.month}月',
+                  '$month月',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
@@ -373,70 +586,84 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      '支出',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.onSurfaceQuaternary(isDark),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _isHidden = !_isHidden;
-                        });
-                      },
-                      child: Icon(
-                        _isHidden ? Icons.visibility_off : Icons.visibility,
-                        size: 14,
-                        color: AppColors.onSurfaceQuaternary(isDark),
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  _isHidden ? '****' : '¥${_monthExpense.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.onSurface(isDark),
-                  ),
-                ),
-              ],
+            const SizedBox(width: 16),
+            VerticalDivider(
+              width: 0.6,
+              thickness: 0.6,
+              color: AppColors.outline(isDark),
             ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '收入',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.onSurfaceQuaternary(isDark),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        '支出',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.onSurfaceQuaternary(isDark),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isHidden = !_isHidden;
+                          });
+                        },
+                        child: Icon(
+                          _isHidden ? Icons.visibility_off : Icons.visibility,
+                          size: 14,
+                          color: AppColors.onSurfaceQuaternary(isDark),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                Text(
-                  _isHidden ? '****' : '¥${_monthIncome.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.onSurface(isDark),
+                  Text(
+                    _isHidden ? '****' : '¥${expense.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontFamily: 'DINPro',
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurface(isDark),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+            VerticalDivider(
+              width: 0.6,
+              thickness: 0.6,
+              color: AppColors.outline(isDark),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '收入',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.onSurfaceQuaternary(isDark),
+                    ),
+                  ),
+                  Text(
+                    _isHidden ? '****' : '¥${income.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontFamily: 'DINPro',
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurface(isDark),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -458,7 +685,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh(isDark),
         borderRadius: BorderRadius.circular(20),
@@ -468,18 +695,9 @@ class _BillSummaryPageState extends State<BillSummaryPage>
           Row(
             children: [
               Text(
-                '${date.day}日',
+                '${date.month}月${date.day}日 周${weekDays[date.weekday - 1]}',
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.onSurface(isDark),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '周${weekDays[date.weekday - 1]}',
-                style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 14,
                   color: AppColors.onSurfaceQuaternary(isDark),
                 ),
               ),
@@ -488,7 +706,8 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                 Text(
                   '支出 ¥${dayExpense.toStringAsFixed(2)}',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontFamily: 'DINPro',
+                    fontSize: 14,
                     color: AppColors.onSurfaceQuaternary(isDark),
                   ),
                 ),
@@ -497,20 +716,27 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                 Text(
                   '收入 ¥${dayIncome.toStringAsFixed(2)}',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontFamily: 'DINPro',
+                    fontSize: 14,
                     color: AppColors.onSurfaceQuaternary(isDark),
                   ),
                 ),
             ],
           ),
           const SizedBox(height: 12),
-          ...bills.map((bill) => _buildBillItem(bill, isDark)),
+          ...bills.asMap().entries.map(
+            (entry) => _buildBillItem(
+              entry.value,
+              isDark,
+              isLast: entry.key == bills.length - 1,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildBillItem(MemoryItem bill, bool isDark) {
+  Widget _buildBillItem(MemoryItem bill, bool isDark, {bool isLast = false}) {
     final category = _getCategoryIcon(bill);
     final billDate = bill.billTime ?? bill.createdAt;
     final timeStr =
@@ -521,56 +747,72 @@ class _BillSummaryPageState extends State<BillSummaryPage>
     final isExpense = bill.isExpense ?? true;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainer(isDark),
-              borderRadius: BorderRadius.circular(8),
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
+      child: _PressableBillItem(
+        onTap: () {
+          Navigator.push(
+            context,
+            CupertinoPageRoute(
+              builder: (context) => MemoryDetailPage(memory: bill),
             ),
-            child: Icon(
-              category,
-              size: 18,
-              color: AppColors.onSurfaceSecondary(isDark),
+          );
+        },
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainer(isDark),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(
+                category,
+                size: 18,
+                color: AppColors.onSurfaceSecondary(isDark),
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _getCategoryLabel(bill),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.onSurface(isDark),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _getCategoryLabel(bill),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.onSurface(isDark),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Text(
-                  '$timeStr | ${bill.merchantName ?? bill.note ?? ''}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.onSurfaceQuaternary(isDark),
+                  Text(
+                    (bill.merchantName ?? bill.note) != null
+                        ? '$timeStr | ${bill.merchantName ?? bill.note}'
+                        : timeStr,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.onSurfaceQuaternary(isDark),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Text(
-            '${isExpense ? "-" : "+"}¥${value.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.onSurface(isDark),
+            const SizedBox(width: 6),
+            Text(
+              '${isExpense ? "-" : "+"}¥${value.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontFamily: 'DINPro',
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.onSurface(isDark),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -599,5 +841,52 @@ class _BillSummaryPageState extends State<BillSummaryPage>
       final category = BillIncomeCategory.fromName(categoryStr ?? '');
       return category?.label ?? (isExpense ? '其他' : '其他');
     }
+  }
+}
+
+class _MonthData {
+  final int year;
+  final int month;
+  final double expense;
+  final double income;
+  final Map<DateTime, List<MemoryItem>> billsByDate;
+
+  _MonthData({
+    required this.year,
+    required this.month,
+    required this.expense,
+    required this.income,
+    required this.billsByDate,
+  });
+}
+
+class _PressableBillItem extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _PressableBillItem({required this.child, required this.onTap});
+
+  @override
+  State<_PressableBillItem> createState() => _PressableBillItemState();
+}
+
+class _PressableBillItemState extends State<_PressableBillItem> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        child: widget.child,
+      ),
+    );
   }
 }
