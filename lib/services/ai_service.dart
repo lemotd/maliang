@@ -68,6 +68,80 @@ class AiService {
     }
   }
 
+  /// 流式 chat，通过 onToken 回调逐步返回生成的文字
+  Stream<String> chatStream(String message, {String? systemPrompt}) async* {
+    final apiAddress = await _configService.getApiAddress();
+    final apiKey = await _configService.getApiKey();
+    final isUsingDefault = await _configService.isUsingDefaultApiKey();
+
+    if (apiKey.isEmpty) {
+      throw Exception('API密钥未配置，请在设置中填写API密钥');
+    }
+
+    final messages = <Map<String, dynamic>>[];
+    if (systemPrompt != null && systemPrompt.isNotEmpty) {
+      messages.add({'role': 'system', 'content': systemPrompt});
+    }
+    messages.add({'role': 'user', 'content': message});
+
+    final url = Uri.parse('$apiAddress/chat/completions');
+    final request = http.Request('POST', url);
+    request.headers.addAll({
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $apiKey',
+    });
+    request.body = jsonEncode({
+      'model': 'glm-4-flashx',
+      'messages': messages,
+      'temperature': 0.7,
+      'max_tokens': 2048,
+      'stream': true,
+    });
+
+    final client = http.Client();
+    try {
+      final streamedResponse = await client.send(request);
+
+      if (streamedResponse.statusCode != 200) {
+        final body = await streamedResponse.stream.bytesToString();
+        final errorData = jsonDecode(body);
+        final errorMessage =
+            errorData['error']?['message'] ?? '请求失败: ${streamedResponse.statusCode}';
+        if (isUsingDefault) {
+          throw ApiKeyInvalidException('默认API密钥无效，请在设置中配置您自己的API密钥');
+        }
+        throw Exception(errorMessage);
+      }
+
+      String buffer = '';
+      await for (final chunk in streamedResponse.stream.transform(utf8.decoder)) {
+        buffer += chunk;
+        final lines = buffer.split('\n');
+        // 保留最后一个可能不完整的行
+        buffer = lines.removeLast();
+
+        for (final line in lines) {
+          final trimmed = line.trim();
+          if (trimmed.isEmpty || !trimmed.startsWith('data:')) continue;
+          final data = trimmed.substring(5).trim();
+          if (data == '[DONE]') return;
+
+          try {
+            final json = jsonDecode(data);
+            final delta = json['choices']?[0]?['delta']?['content'] as String?;
+            if (delta != null && delta.isNotEmpty) {
+              yield delta;
+            }
+          } catch (_) {
+            // 忽略解析失败的行
+          }
+        }
+      }
+    } finally {
+      client.close();
+    }
+  }
+
   Future<String?> analyzeImage(String imagePath) async {
     final apiAddress = await _configService.getApiAddress();
     final apiKey = await _configService.getApiKey();

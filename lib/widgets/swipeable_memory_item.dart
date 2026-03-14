@@ -9,16 +9,20 @@ import '../services/image_cache_service.dart';
 
 class SwipeableMemoryItem extends StatefulWidget {
   final MemoryItem memory;
+  final bool isNew;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
   final VoidCallback? onToggleComplete;
+  final VoidCallback? onAnimationComplete;
 
   const SwipeableMemoryItem({
     super.key,
     required this.memory,
+    this.isNew = false,
     this.onTap,
     this.onDelete,
     this.onToggleComplete,
+    this.onAnimationComplete,
   });
 
   static _SwipeableMemoryItemState? _openedState;
@@ -48,6 +52,10 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
   bool _isPressed = false;
   bool _isActionPressed = false;
 
+  // 打字机动画
+  int _visibleChars = 0;
+  bool _isTypewriting = false;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -69,6 +77,9 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
           }
         });
     _loadImage();
+    if (widget.isNew) {
+      _startTypewriter();
+    }
   }
 
   @override
@@ -93,6 +104,27 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
         setState(() {});
       }
     }
+  }
+
+  void _startTypewriter() {
+    final subtitle = _getSubtitle();
+    if (subtitle.isEmpty) return;
+    _isTypewriting = true;
+    _visibleChars = 0;
+    _typeNextChar(subtitle);
+  }
+
+  void _typeNextChar(String text) {
+    if (!mounted || !_isTypewriting) return;
+    if (_visibleChars >= text.length) {
+      setState(() => _isTypewriting = false);
+      widget.onAnimationComplete?.call();
+      return;
+    }
+    setState(() => _visibleChars++);
+    Future.delayed(const Duration(milliseconds: 30), () {
+      _typeNextChar(text);
+    });
   }
 
   @override
@@ -558,6 +590,9 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     // 副标题和时间颜色
     final subTextColor = AppColors.onSurfaceQuaternary(isDark);
     final subtitle = _getSubtitle();
+    final displaySubtitle = _isTypewriting
+        ? subtitle.substring(0, _visibleChars)
+        : subtitle;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -593,7 +628,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
                 SizedBox(
                   height: 40, // 两行文字高度 (14 * 1.4 * 2 ≈ 39)
                   child: Text(
-                    subtitle.isNotEmpty ? subtitle : '',
+                    displaySubtitle.isNotEmpty ? displaySubtitle : '',
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.4,

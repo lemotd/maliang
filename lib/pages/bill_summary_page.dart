@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../models/memory_item.dart';
 import '../models/bill_category.dart';
 import '../widgets/glass_button.dart';
+import '../widgets/ai_glow_border.dart';
+import '../widgets/ai_chat_sheet.dart';
+import '../services/ai_service.dart';
 import 'memory_detail_page.dart';
 
 class BillSummaryPage extends StatefulWidget {
@@ -24,6 +28,10 @@ class _BillSummaryPageState extends State<BillSummaryPage>
   final List<GlobalKey> _monthKeys = [];
   int _activeMonthIndex = 0;
   final GlobalKey _stackKey = GlobalKey();
+  String? _aiSummary;
+  bool _isLoadingSummary = false;
+  final AiService _aiService = AiService();
+  final GlobalKey _aiCardKey = GlobalKey();
 
   @override
   bool get wantKeepAlive => true;
@@ -32,6 +40,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _generateAiSummary();
   }
 
   @override
@@ -39,6 +48,103 @@ class _BillSummaryPageState extends State<BillSummaryPage>
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _generateAiSummary() async {
+    final allBills = widget.bills
+        .where((b) => b.category == MemoryCategory.bill)
+        .toList();
+    if (allBills.isEmpty) return;
+
+    setState(() {
+      _isLoadingSummary = true;
+      _aiSummary = '';
+    });
+
+    try {
+      // 构建账单摘要数据
+      double totalExpense = 0, totalIncome = 0;
+      final Map<String, double> categoryExpense = {};
+      final Map<String, int> merchantCount = {};
+
+      for (final bill in allBills) {
+        final v = double.tryParse(
+              (bill.amount ?? '0').replaceAll(RegExp(r'[^\d.]'), ''),
+            ) ?? 0;
+        if (bill.isExpense ?? true) {
+          totalExpense += v;
+          final catName = bill.billCategory ?? '其他';
+          final cat = BillExpenseCategory.fromName(catName)?.label ?? catName;
+          categoryExpense[cat] = (categoryExpense[cat] ?? 0) + v;
+        } else {
+          totalIncome += v;
+        }
+        final merchant = bill.merchantName;
+        if (merchant != null && merchant.isNotEmpty) {
+          merchantCount[merchant] = (merchantCount[merchant] ?? 0) + 1;
+        }
+      }
+
+      final topCategories = (categoryExpense.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value)))
+          .take(3)
+          .map((e) => '${e.key}(¥${e.value.toStringAsFixed(0)})')
+          .join('、');
+
+      final topMerchants = (merchantCount.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value)))
+          .take(3)
+          .map((e) => '${e.key}(${e.value}次)')
+          .join('、');
+
+      final prompt = '''你是一个贴心的个人财务助理。请根据以下账单数据，用一段简短亲和的话（50-80字）给出个性化分析。
+每次分析角度要不同，可以从以下角度随机选一个：
+- 消费偏好和习惯
+- 最大花销提醒
+- 消费结构是否合理
+- 省钱小建议
+- 常去的商家分析
+
+账单数据：
+- 总支出：¥${totalExpense.toStringAsFixed(2)}
+- 总收入：¥${totalIncome.toStringAsFixed(2)}
+- 账单笔数：${allBills.length}笔
+- 记账天数：$_billDays天
+- 支出分类TOP3：$topCategories
+- 常去商家：${topMerchants.isEmpty ? '无' : topMerchants}
+
+要求：语气亲和自然，像朋友聊天一样，不要用"您"，直接说"你"。只返回分析文字，不要加标题或前缀。''';
+
+      await for (final token in _aiService.chatStream(prompt)) {
+        if (!mounted) return;
+        setState(() {
+          _aiSummary = (_aiSummary ?? '') + token;
+        });
+      }
+      if (mounted) {
+        setState(() {
+          _isLoadingSummary = false;
+          _aiSummary = _aiSummary?.trim();
+        });
+        // 强制在下一帧刷新布局，确保按钮高度被计入
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() {});
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingSummary = false);
+      }
+    }
+  }
+
+  Widget _buildAskAiButton(bool isDark) {
+    return Center(
+      child: _AskAiButton(
+        isDark: isDark,
+        onTap: () => AiChatSheet.show(context, widget.bills),
+      ),
+    );
   }
 
   void _onScroll() {
@@ -66,11 +172,29 @@ class _BillSummaryPageState extends State<BillSummaryPage>
     _activeMonthIndex = active;
   }
 
+  /// AI卡片的实际渲染高度
+  double get _aiCardHeight {
+    final ctx = _aiCardKey.currentContext;
+    if (ctx != null) {
+      final box = ctx.findRenderObject() as RenderBox?;
+      if (box != null && box.hasSize) {
+        return box.size.height;
+      }
+    }
+    // 未渲染时，如果有账单且正在加载或已有内容，返回默认高度
+    final allBills = widget.bills
+        .where((b) => b.category == MemoryCategory.bill)
+        .toList();
+    if (allBills.isEmpty && !_isLoadingSummary && _aiSummary == null) return 0;
+    return 96;
+  }
+
   /// 获取吸顶卡片的 top 值
   double _getStickyTop() {
+    final imageAndAiHeight = 232 + _aiCardHeight;
     if (_activeMonthIndex == 0) {
       // 第一个月：从图片下方自然位置过渡到 0
-      return (232 - _scrollOffset).clamp(0, double.infinity).toDouble();
+      return (imageAndAiHeight - _scrollOffset).clamp(0, double.infinity).toDouble();
     }
     // 其他月份：跟踪列表中对应月卡片的位置
     final key = _monthKeys[_activeMonthIndex];
@@ -92,7 +216,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
   /// 判断吸顶卡片是否处于悬浮状态（已钉住顶部）
   bool get _isStickyPinned {
     if (_activeMonthIndex == 0) {
-      return _scrollOffset > 232;
+      return _scrollOffset > 232 + _aiCardHeight;
     }
     return _getStickyTop() <= 0;
   }
@@ -100,8 +224,8 @@ class _BillSummaryPageState extends State<BillSummaryPage>
   void _onScrollEnd() {
     if (_isAnimating) return;
 
-    // 图片区域高度 (200 + 16*2 padding = 232)
-    const double imageAreaHeight = 232.0;
+    // 图片区域高度 + AI卡片高度
+    final double imageAreaHeight = 232.0 + _aiCardHeight;
     const double snapStart = 50.0;
 
     if (_scrollOffset > snapStart && _scrollOffset < imageAreaHeight) {
@@ -289,6 +413,50 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                                 ),
                               ),
                             ),
+                            // AI 智能总结卡片
+                            if (_isLoadingSummary || (_aiSummary != null && _aiSummary!.isNotEmpty))
+                              SliverToBoxAdapter(
+                                child: Padding(
+                                  key: _aiCardKey,
+                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                                  child: (_isLoadingSummary && (_aiSummary == null || _aiSummary!.isEmpty))
+                                      ? AIGlowBorder(
+                                          borderRadius: BorderRadius.circular(20),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(16),
+                                            height: 80,
+                                            decoration: BoxDecoration(
+                                              color: AppColors.surfaceHigh(isDark),
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: _AiSummaryShimmer(isDark: isDark),
+                                          ),
+                                        )
+                                      : Container(
+                                          padding: const EdgeInsets.all(16),
+                                          constraints: const BoxConstraints(minHeight: 80),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.surfaceHigh(isDark),
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                _aiSummary ?? '',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  color: AppColors.onSurface(isDark),
+                                                  height: 1.5,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              _buildAskAiButton(isDark),
+                                            ],
+                                          ),
+                                        ),
+                                ),
+                              ),
                             if (monthlyData.isEmpty)
                               SliverToBoxAdapter(
                                 child: Center(
@@ -906,4 +1074,155 @@ class _PressableBillItemState extends State<_PressableBillItem> {
       ),
     );
   }
+}
+
+class _AiSummaryShimmer extends StatefulWidget {
+  final bool isDark;
+  const _AiSummaryShimmer({required this.isDark});
+
+  @override
+  State<_AiSummaryShimmer> createState() => _AiSummaryShimmerState();
+}
+
+class _AiSummaryShimmerState extends State<_AiSummaryShimmer>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _buildShimmerBox(width: double.infinity, height: 16),
+        const SizedBox(height: 12),
+        _buildShimmerBox(width: 200, height: 16),
+      ],
+    );
+  }
+
+  Widget _buildShimmerBox({double? width, double? height}) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final baseColor = widget.isDark
+            ? const Color(0xFF2C2C2E)
+            : const Color(0xFFE5E5EA);
+        final highlightColor = widget.isDark
+            ? const Color(0xFF3A3A3C)
+            : const Color(0xFFF2F2F5);
+        final t = Curves.easeInOut.transform(_controller.value);
+        return Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            color: Color.lerp(baseColor, highlightColor, t)!,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AskAiButton extends StatefulWidget {
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _AskAiButton({required this.isDark, required this.onTap});
+
+  @override
+  State<_AskAiButton> createState() => _AskAiButtonState();
+}
+
+class _AskAiButtonState extends State<_AskAiButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) async {
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (mounted) setState(() => _isPressed = false);
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        widget.onTap();
+      },
+      child: AnimatedScale(
+        scale: _isPressed ? 0.92 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        child: CustomPaint(
+          painter: _GradientBorderPainter(),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceHigh(widget.isDark),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Color(0xFF6366F1), Color(0xFFEC4899)],
+                  ).createShader(bounds),
+                  child: const Icon(
+                    CupertinoIcons.sparkles,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '问 AI',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.onSurface(widget.isDark),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GradientBorderPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(18));
+    final paint = Paint()
+      ..shader = const LinearGradient(
+        colors: [Color(0xFF6366F1), Color(0xFFEC4899), Color(0xFF06B6D4)],
+      ).createShader(rect)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    canvas.drawRRect(rrect, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

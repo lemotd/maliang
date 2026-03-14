@@ -6,17 +6,21 @@ import '../models/memory_item.dart';
 class MemoryListItem extends StatelessWidget {
   final MemoryItem? memory;
   final bool isLoading;
+  final bool isNew;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
   final VoidCallback? onToggleComplete;
+  final VoidCallback? onAnimationComplete;
 
   const MemoryListItem({
     super.key,
     this.memory,
     this.isLoading = false,
+    this.isNew = false,
     this.onTap,
     this.onDelete,
     this.onToggleComplete,
+    this.onAnimationComplete,
   });
 
   @override
@@ -31,6 +35,8 @@ class MemoryListItem extends StatelessWidget {
 
     return SwipeableMemoryItem(
       memory: memory!,
+      isNew: isNew,
+      onAnimationComplete: onAnimationComplete,
       onTap: onTap,
       onDelete: onDelete,
       onToggleComplete: onToggleComplete,

@@ -133,6 +133,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   List<MemoryItem> _memories = [];
 
   int _loadingCount = 0;
+  final Set<String> _newlyAddedIds = {};
   bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
@@ -462,6 +463,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         setState(() {
           _memories = memories;
           _loadingCount--;
+          _newlyAddedIds.add(memory.id);
         });
 
         // 显示待办事项通知
@@ -654,8 +656,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         }
         final memoryIndex = adjustedIndex - _loadingCount;
         final memory = _memories[memoryIndex];
+        final isNew = _newlyAddedIds.contains(memory.id);
         return MemoryListItem(
           memory: memory,
+          isNew: isNew,
+          onAnimationComplete: () {
+            _newlyAddedIds.remove(memory.id);
+          },
           onTap: () => _showMemoryDetail(memory),
           onDelete: () => _deleteMemory(memory),
           onToggleComplete: () => _toggleComplete(memory),
