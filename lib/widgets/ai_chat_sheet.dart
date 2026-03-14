@@ -53,10 +53,13 @@ class _AiChatSheetState extends State<AiChatSheet>
   bool _isAiLoading = false;
   bool _speechAvailable = false;
   Timer? _silenceTimer;
+
   /// 标记当前这轮监听是否收到了新文字
   bool _gotNewWordsInSession = false;
+
   /// 防止多次 pop
   bool _isClosing = false;
+
   /// 无语音 done 的连续次数，用于判断是否真的没人说话
   int _emptyDoneCount = 0;
 
@@ -136,7 +139,9 @@ class _AiChatSheetState extends State<AiChatSheet>
   }
 
   void _onSpeechStatus(String status) {
-    debugPrint('[Speech] onStatus: $status, text="${_recognizedText}", newWords=$_gotNewWordsInSession, closing=$_isClosing, relistening=$_isRelistening');
+    debugPrint(
+      '[Speech] onStatus: $status, text="${_recognizedText}", newWords=$_gotNewWordsInSession, closing=$_isClosing, relistening=$_isRelistening',
+    );
     if (!mounted || _mode != _SheetMode.listening || _isClosing) return;
     if (_isRelistening) return;
     if (status == 'done' || status == 'notListening') {
@@ -153,7 +158,9 @@ class _AiChatSheetState extends State<AiChatSheet>
       } else if (_gotNewWordsInSession) {
         _silenceTimer?.cancel();
         _silenceTimer = Timer(const Duration(seconds: 2), () {
-          if (mounted && _recognizedText.isNotEmpty && _mode == _SheetMode.listening) {
+          if (mounted &&
+              _recognizedText.isNotEmpty &&
+              _mode == _SheetMode.listening) {
             _sendToAi(_recognizedText);
           }
         });
@@ -163,7 +170,9 @@ class _AiChatSheetState extends State<AiChatSheet>
         // 如果计时器已经不在跑了（极端情况），补一个
         if (_silenceTimer == null || !_silenceTimer!.isActive) {
           _silenceTimer = Timer(const Duration(seconds: 2), () {
-            if (mounted && _recognizedText.isNotEmpty && _mode == _SheetMode.listening) {
+            if (mounted &&
+                _recognizedText.isNotEmpty &&
+                _mode == _SheetMode.listening) {
               _sendToAi(_recognizedText);
             }
           });
@@ -173,7 +182,9 @@ class _AiChatSheetState extends State<AiChatSheet>
   }
 
   void _onSpeechError(dynamic error) {
-    debugPrint('[Speech] onError: $error, text="${_recognizedText}", closing=$_isClosing');
+    debugPrint(
+      '[Speech] onError: $error, text="${_recognizedText}", closing=$_isClosing',
+    );
     if (!mounted || _mode != _SheetMode.listening || _isClosing) return;
     if (_recognizedText.isEmpty) {
       _silenceTimer?.cancel();
@@ -198,7 +209,11 @@ class _AiChatSheetState extends State<AiChatSheet>
     await _speech.cancel();
     await Future.delayed(const Duration(milliseconds: 200));
     _isRelistening = false;
-    if (!mounted || _mode != _SheetMode.listening || !_speechAvailable || _isClosing) return;
+    if (!mounted ||
+        _mode != _SheetMode.listening ||
+        !_speechAvailable ||
+        _isClosing)
+      return;
     _gotNewWordsInSession = false;
     _previousSessionText = _recognizedText; // 保存当前文字，新一轮的 partial results 会拼在后面
     try {
@@ -231,7 +246,9 @@ class _AiChatSheetState extends State<AiChatSheet>
       // 每次有新文字，重置 2 秒静默计时器
       _silenceTimer?.cancel();
       _silenceTimer = Timer(const Duration(seconds: 2), () {
-        if (mounted && _recognizedText.isNotEmpty && _mode == _SheetMode.listening) {
+        if (mounted &&
+            _recognizedText.isNotEmpty &&
+            _mode == _SheetMode.listening) {
           _sendToAi(_recognizedText);
         }
       });
@@ -305,7 +322,8 @@ class _AiChatSheetState extends State<AiChatSheet>
 
     try {
       final billSummary = _buildBillContext();
-      final prompt = '''你是一个贴心的个人财务助理。用户问了一个关于账单的问题，请根据以下账单数据回答。
+      final prompt =
+          '''你是一个贴心的个人财务助理。用户问了一个关于账单的问题，请根据以下账单数据回答。
 注意：「花钱」「消费」「花的钱」都是指【支出】，不要把【收入】算进去。
 语气亲和自然，像朋友聊天一样，不要用"您"，直接说"你"。回答简洁明了。
 
@@ -347,9 +365,11 @@ $billSummary
     final List<String> incomeBills = [];
 
     for (final bill in allBills) {
-      final v = double.tryParse(
+      final v =
+          double.tryParse(
             (bill.amount ?? '0').replaceAll(RegExp(r'[^\d.]'), ''),
-          ) ?? 0;
+          ) ??
+          0;
       final date = bill.billTime ?? bill.createdAt;
       final dayKey = '${date.month}/${date.day}';
       final isExp = bill.isExpense ?? true;
@@ -361,7 +381,9 @@ $billSummary
         categoryExpense[cat] = (categoryExpense[cat] ?? 0) + v;
         dailyExpense[dayKey] = (dailyExpense[dayKey] ?? 0) + v;
         if (expenseBills.length < 30) {
-          expenseBills.add('$dayKey ${bill.merchantName ?? cat} ¥${v.toStringAsFixed(2)}');
+          expenseBills.add(
+            '$dayKey ${bill.merchantName ?? cat} ¥${v.toStringAsFixed(2)}',
+          );
         }
       } else {
         totalIncome += v;
@@ -370,7 +392,9 @@ $billSummary
         categoryIncome[cat] = (categoryIncome[cat] ?? 0) + v;
         dailyIncome[dayKey] = (dailyIncome[dayKey] ?? 0) + v;
         if (incomeBills.length < 15) {
-          incomeBills.add('$dayKey ${bill.merchantName ?? cat} ¥${v.toStringAsFixed(2)}');
+          incomeBills.add(
+            '$dayKey ${bill.merchantName ?? cat} ¥${v.toStringAsFixed(2)}',
+          );
         }
       }
 
@@ -380,23 +404,26 @@ $billSummary
       }
     }
 
-    final topExpCat = (categoryExpense.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value)))
-        .take(5)
-        .map((e) => '${e.key}: ¥${e.value.toStringAsFixed(2)}')
-        .join('\n');
+    final topExpCat =
+        (categoryExpense.entries.toList()
+              ..sort((a, b) => b.value.compareTo(a.value)))
+            .take(5)
+            .map((e) => '${e.key}: ¥${e.value.toStringAsFixed(2)}')
+            .join('\n');
 
-    final topDailyExp = (dailyExpense.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value)))
-        .take(5)
-        .map((e) => '${e.key}: ¥${e.value.toStringAsFixed(2)}')
-        .join('\n');
+    final topDailyExp =
+        (dailyExpense.entries.toList()
+              ..sort((a, b) => b.value.compareTo(a.value)))
+            .take(5)
+            .map((e) => '${e.key}: ¥${e.value.toStringAsFixed(2)}')
+            .join('\n');
 
-    final topMerchants = (merchantCount.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value)))
-        .take(5)
-        .map((e) => '${e.key}: ${e.value}次')
-        .join('\n');
+    final topMerchants =
+        (merchantCount.entries.toList()
+              ..sort((a, b) => b.value.compareTo(a.value)))
+            .take(5)
+            .map((e) => '${e.key}: ${e.value}次')
+            .join('\n');
 
     return '''=== 支出汇总 ===
 总支出：¥${totalExpense.toStringAsFixed(2)}
@@ -544,7 +571,9 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white.withValues(alpha: 0.15),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Icon(
                         CupertinoIcons.keyboard,
@@ -576,24 +605,38 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-                      ),
-                      child: Text(
-                        _recognizedText.isEmpty ? '我在听，请说...' : _recognizedText,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withValues(alpha: _recognizedText.isEmpty ? 0.6 : 0.95),
-                          height: 1.3,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.25),
                         ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
+                      child: _recognizedText.isEmpty
+                          ? Text(
+                              '我在听，请说...',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white.withValues(alpha: 0.6),
+                                height: 1.3,
+                              ),
+                              textAlign: TextAlign.center,
+                            )
+                          : StreamingText(
+                              text: _recognizedText,
+                              charDuration: const Duration(milliseconds: 50),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white.withValues(alpha: 0.95),
+                                height: 1.3,
+                              ),
+                            ),
                     ),
                   ),
                 ),
@@ -627,7 +670,9 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white.withValues(alpha: 0.15),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Icon(
                         CupertinoIcons.xmark,
@@ -675,14 +720,19 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     constraints: BoxConstraints(
                       maxWidth: MediaQuery.of(context).size.width * 0.65,
                     ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.15),
+                      ),
                     ),
                     child: Text(
                       _recognizedText,
@@ -705,11 +755,16 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.1),
+                      ),
                     ),
                     child: Text(
                       _aiResponse,
@@ -777,9 +832,15 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white.withValues(alpha: 0.15),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
                   ),
-                  child: Icon(CupertinoIcons.mic_fill, color: Colors.white.withValues(alpha: 0.8), size: 18),
+                  child: Icon(
+                    CupertinoIcons.mic_fill,
+                    color: Colors.white.withValues(alpha: 0.8),
+                    size: 18,
+                  ),
                 ),
               ),
             ),
@@ -797,17 +858,27 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
                   ),
                   alignment: Alignment.center,
                   child: TextField(
                     controller: _textController,
                     focusNode: _focusNode,
-                    style: const TextStyle(fontSize: 15, color: Colors.white, height: 1.2),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: Colors.white,
+                      height: 1.2,
+                    ),
                     textAlignVertical: TextAlignVertical.center,
                     decoration: InputDecoration(
                       hintText: '输入问题...',
-                      hintStyle: TextStyle(fontSize: 15, color: Colors.white.withValues(alpha: 0.3), height: 1.2),
+                      hintStyle: TextStyle(
+                        fontSize: 15,
+                        color: Colors.white.withValues(alpha: 0.3),
+                        height: 1.2,
+                      ),
                       border: InputBorder.none,
                       isCollapsed: true,
                       contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -831,7 +902,11 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
                   colors: [Color(0xFF6366F1), Color(0xFF06B6D4)],
                 ),
               ),
-              child: const Icon(CupertinoIcons.arrow_up, color: Colors.white, size: 18),
+              child: const Icon(
+                CupertinoIcons.arrow_up,
+                color: Colors.white,
+                size: 18,
+              ),
             ),
           ),
         ],
@@ -840,6 +915,85 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
   }
 }
 
+/// 逐字渐显动画组件
+class StreamingText extends StatefulWidget {
+  final String text;
+  final TextStyle? style;
+  final Duration charDuration;
+  final TextAlign textAlign;
+
+  const StreamingText({
+    super.key,
+    required this.text,
+    this.style,
+    this.charDuration = const Duration(milliseconds: 50),
+    this.textAlign = TextAlign.center,
+  });
+
+  @override
+  State<StreamingText> createState() => _StreamingTextState();
+}
+
+class _StreamingTextState extends State<StreamingText> {
+  int _displayLength = 0;
+  List<double> _charOpacities = [];
+  bool _isStreaming = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayLength = 0;
+    _charOpacities = [];
+  }
+
+  @override
+  void didUpdateWidget(StreamingText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.text.length > _displayLength) {
+      _startStreaming();
+    }
+  }
+
+  void _startStreaming() {
+    if (_isStreaming) return;
+    _isStreaming = true;
+    _streamNextChar();
+  }
+
+  void _streamNextChar() {
+    if (!mounted) return;
+    if (_displayLength < widget.text.length) {
+      setState(() {
+        _displayLength++;
+        while (_charOpacities.length < _displayLength) {
+          _charOpacities.add(0.0);
+        }
+        _charOpacities[_displayLength - 1] = 1.0;
+      });
+      Future.delayed(widget.charDuration, _streamNextChar);
+    } else {
+      _isStreaming = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_displayLength == 0 && widget.text.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.text.isNotEmpty) {
+          _startStreaming();
+        }
+      });
+    }
+
+    final displayText = widget.text.substring(
+      0,
+      _displayLength.clamp(0, widget.text.length),
+    );
+
+    return Text(displayText, style: widget.style, textAlign: widget.textAlign);
+  }
+}
 
 class _BottomGlowPainter extends CustomPainter {
   final double animationValue;
@@ -911,7 +1065,3 @@ class _BottomGlowPainter extends CustomPainter {
   bool shouldRepaint(covariant _BottomGlowPainter oldDelegate) =>
       oldDelegate.animationValue != animationValue;
 }
-
-
-
-
