@@ -33,6 +33,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
   bool _isLoadingSummary = false;
   final AiService _aiService = AiService();
   final GlobalKey _aiCardKey = GlobalKey();
+  late List<MemoryItem> _bills;
 
   @override
   bool get wantKeepAlive => true;
@@ -40,6 +41,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
   @override
   void initState() {
     super.initState();
+    _bills = List<MemoryItem>.from(widget.bills);
     _scrollController.addListener(_onScroll);
     _generateAiSummary();
   }
@@ -52,7 +54,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
   }
 
   Future<void> _generateAiSummary() async {
-    final allBills = widget.bills
+    final allBills = _bills
         .where((b) => b.category == MemoryCategory.bill)
         .toList();
     if (allBills.isEmpty) return;
@@ -143,7 +145,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
     return Center(
       child: _AskAiButton(
         isDark: isDark,
-        onTap: () => AiChatSheet.show(context, widget.bills),
+        onTap: () => AiChatSheet.show(context, _bills),
       ),
     );
   }
@@ -183,7 +185,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
       }
     }
     // 未渲染时，如果有账单且正在加载或已有内容，返回默认高度
-    final allBills = widget.bills
+    final allBills = _bills
         .where((b) => b.category == MemoryCategory.bill)
         .toList();
     if (allBills.isEmpty && !_isLoadingSummary && _aiSummary == null) return 0;
@@ -244,8 +246,8 @@ class _BillSummaryPageState extends State<BillSummaryPage>
   }
 
   int get _billDays {
-    if (widget.bills.isEmpty) return 0;
-    final billItems = widget.bills
+    if (_bills.isEmpty) return 0;
+    final billItems = _bills
         .where((item) => item.category == MemoryCategory.bill)
         .toList();
     if (billItems.isEmpty) return 0;
@@ -271,7 +273,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
   }
 
   List<_MonthData> get _allMonthlyData {
-    final allBills = widget.bills
+    final allBills = _bills
         .where((bill) => bill.category == MemoryCategory.bill)
         .toList();
     final Map<String, List<MemoryItem>> byMonth = {};
@@ -937,13 +939,21 @@ class _BillSummaryPageState extends State<BillSummaryPage>
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
       child: _PressableBillItem(
-        onTap: () {
-          Navigator.push(
+        onTap: () async {
+          final result = await Navigator.push<MemoryItem>(
             context,
             CupertinoPageRoute(
               builder: (context) => MemoryDetailPage(memory: bill),
             ),
           );
+          if (result != null) {
+            final idx = _bills.indexWhere((b) => b.id == result.id);
+            if (idx != -1) {
+              setState(() {
+                _bills[idx] = result;
+              });
+            }
+          }
         },
         child: Row(
           children: [

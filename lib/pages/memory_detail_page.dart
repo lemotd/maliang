@@ -10,6 +10,7 @@ import '../services/memory_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
 import '../utils/scroll_edge_haptic.dart';
+import 'image_viewer_page.dart';
 
 class _MildBounceCurve extends Curve {
   const _MildBounceCurve();
@@ -19,6 +20,36 @@ class _MildBounceCurve extends Curve {
     const c1 = 0.8;
     const c3 = c1 + 1;
     return 1 + c3 * math.pow(t - 1, 3) + c1 * math.pow(t - 1, 2);
+  }
+}
+
+class _Pressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  const _Pressable({required this.child, required this.onTap});
+  @override
+  State<_Pressable> createState() => _PressableState();
+}
+
+class _PressableState extends State<_Pressable> {
+  bool _pressed = false;
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        child: widget.child,
+      ),
+    );
   }
 }
 
@@ -92,10 +123,6 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
 
   String _formatTimeShort(DateTime date) {
     return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.year}年${date.month}月${date.day}日 ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   Future<void> _selectDate() async {
@@ -819,15 +846,20 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
                 ],
               ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  // 内置尺码
-                  ...builtInSizes.map((size) => _buildSizeChip(size, isDark, isCustom: false)),
-                  // 自定义尺码
-                  ...customSizes.map((size) => _buildSizeChip(size, isDark, isCustom: true)),
-                ],
+              AnimatedSize(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                alignment: Alignment.topCenter,
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    // 内置尺码
+                    ...builtInSizes.map((size) => _buildSizeChip(size, isDark, isCustom: false)),
+                    // 自定义尺码
+                    ...customSizes.map((size) => _buildSizeChip(size, isDark, isCustom: true)),
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
               Row(
@@ -902,7 +934,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary(isDark).withOpacity(0.1)
-              : AppColors.surfaceContainer(isDark),
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected
@@ -951,7 +983,7 @@ class MemoryDetailPage extends StatefulWidget {
 }
 
 class _MemoryDetailPageState extends State<MemoryDetailPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late MemoryItem _memory;
   Size? _imageSize;
   bool _isLoading = true;
@@ -968,10 +1000,16 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
 
   // 服饰编辑状态
   bool _isEditingClothing = false;
+  late AnimationController _editController;
+  late Animation<double> _editAnimation;
   late TextEditingController _clothingNameCtrl;
   late TextEditingController _clothingTypeCtrl;
   late TextEditingController _clothingBrandCtrl;
   late TextEditingController _clothingPriceCtrl;
+  final FocusNode _clothingNameFocus = FocusNode();
+  final FocusNode _clothingTypeFocus = FocusNode();
+  final FocusNode _clothingBrandFocus = FocusNode();
+  final FocusNode _clothingPriceFocus = FocusNode();
   List<String> _editingColors = [];
   List<String> _editingSeasons = [];
   String _editingSize = '';
@@ -983,6 +1021,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   void initState() {
     super.initState();
     _memory = widget.memory;
+    _customClothingSizes = List<String>.from(widget.memory.customClothingSizes);
+    _customShoeSizes = List<String>.from(widget.memory.customShoeSizes);
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 350),
@@ -991,6 +1031,14 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     _clothingTypeCtrl = TextEditingController();
     _clothingBrandCtrl = TextEditingController();
     _clothingPriceCtrl = TextEditingController();
+    _editController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _editAnimation = CurvedAnimation(
+      parent: _editController,
+      curve: Curves.easeInOut,
+    );
     _loadImageSize();
   }
 
@@ -1015,12 +1063,17 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   @override
   void dispose() {
     _controller.dispose();
+    _editController.dispose();
     _scrollController.dispose();
     _selectionFocusNode.dispose();
     _clothingNameCtrl.dispose();
     _clothingTypeCtrl.dispose();
     _clothingBrandCtrl.dispose();
     _clothingPriceCtrl.dispose();
+    _clothingNameFocus.dispose();
+    _clothingTypeFocus.dispose();
+    _clothingBrandFocus.dispose();
+    _clothingPriceFocus.dispose();
     super.dispose();
   }
 
@@ -1348,11 +1401,20 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                     : Colors.transparent,
                 child: Stack(
                   children: [
-                    if (!_isEditingClothing)
-                      Positioned(
-                        left: 8,
-                        top: 0,
-                        bottom: 0,
+                    // 返回按钮 - 编辑时淡出
+                    Positioned(
+                      left: 8,
+                      top: 0,
+                      bottom: 0,
+                      child: AnimatedBuilder(
+                        animation: _editAnimation,
+                        builder: (context, child) => Opacity(
+                          opacity: 1.0 - _editAnimation.value,
+                          child: IgnorePointer(
+                            ignoring: _isEditingClothing,
+                            child: child,
+                          ),
+                        ),
                         child: GlassButton(
                           icon: CupertinoIcons.back,
                           onTap: () {
@@ -1361,14 +1423,26 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                           },
                         ),
                       ),
-                    if (_isEditingClothing)
+                    ),
+                    // 编辑中标题 - 编辑时淡入
+                    if (_memory.category == MemoryCategory.clothing)
                       Center(
-                        child: Text(
-                          '编辑中',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.onSurface(isDark),
+                        child: AnimatedBuilder(
+                          animation: _editAnimation,
+                          builder: (context, child) => Opacity(
+                            opacity: _editAnimation.value,
+                            child: Transform.translate(
+                              offset: Offset(0, 6 * (1.0 - _editAnimation.value)),
+                              child: child,
+                            ),
+                          ),
+                          child: Text(
+                            '编辑中',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.onSurface(isDark),
+                            ),
                           ),
                         ),
                       ),
@@ -1377,13 +1451,21 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                         right: 8,
                         top: 0,
                         bottom: 0,
-                        child: GlassButton(
-                          icon: _isEditingClothing
-                              ? CupertinoIcons.checkmark_alt
-                              : CupertinoIcons.pencil,
-                          onTap: _isEditingClothing
-                              ? _saveClothingEdits
-                              : _enterClothingEditMode,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 250),
+                          transitionBuilder: (child, anim) => FadeTransition(
+                            opacity: anim,
+                            child: ScaleTransition(scale: anim, child: child),
+                          ),
+                          child: GlassButton(
+                            key: ValueKey(_isEditingClothing),
+                            icon: _isEditingClothing
+                                ? CupertinoIcons.checkmark_alt
+                                : CupertinoIcons.pencil,
+                            onTap: _isEditingClothing
+                                ? _saveClothingEdits
+                                : _enterClothingEditMode,
+                          ),
                         ),
                       ),
                   ],
@@ -1462,26 +1544,32 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     _imageDisplayHeight = displayHeight + verticalMargin * 2;
 
     return Center(
-      child: Container(
-        margin: EdgeInsets.symmetric(vertical: verticalMargin),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              blurRadius: 20,
-              spreadRadius: 0,
-              offset: const Offset(0, 8),
+      child: GestureDetector(
+        onTap: () => _openImageViewer(),
+        child: Container(
+          margin: EdgeInsets.symmetric(vertical: verticalMargin),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 20,
+                spreadRadius: 0,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Hero(
+              tag: 'memory_image_${_memory.id}',
+              child: Image.file(
+                File(_memory.imagePath!),
+                width: displayWidth,
+                height: displayHeight,
+                fit: BoxFit.cover,
+              ),
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Image.file(
-            File(_memory.imagePath!),
-            width: displayWidth,
-            height: displayHeight,
-            fit: BoxFit.cover,
           ),
         ),
       ),
@@ -2023,21 +2111,39 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     return '${time.year}年${time.month}月${time.day}日 ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
+  void _openImageViewer() {
+    if (_memory.imagePath == null) return;
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        opaque: false,
+        pageBuilder: (_, animation, __) => ImageViewerPage(
+          imagePath: _memory.imagePath!,
+          heroTag: 'memory_image_${_memory.id}',
+          animation: animation,
+        ),
+        transitionsBuilder: (_, __, ___, child) => child,
+        transitionDuration: const Duration(milliseconds: 300),
+        reverseTransitionDuration: const Duration(milliseconds: 300),
+      ),
+    );
+  }
+
   void _enterClothingEditMode() {
-    setState(() {
-      _isEditingClothing = true;
-      _clothingNameCtrl.text = _memory.clothingName ?? '';
-      _clothingTypeCtrl.text = _memory.clothingType ?? '';
-      _clothingBrandCtrl.text = _memory.clothingBrand ?? '';
-      _clothingPriceCtrl.text = _memory.clothingPrice ?? '';
-      _editingColors = List<String>.from(_memory.clothingColors);
-      _editingSeasons = List<String>.from(_memory.clothingSeasons);
-      _editingSize = _memory.clothingSize ?? '';
-      _editingPurchaseDate = _memory.clothingPurchaseDate ?? '';
-    });
+    _clothingNameCtrl.text = _memory.clothingName ?? '';
+    _clothingTypeCtrl.text = _memory.clothingType ?? '';
+    _clothingBrandCtrl.text = _memory.clothingBrand ?? '';
+    _clothingPriceCtrl.text = _memory.clothingPrice ?? '';
+    _editingColors = List<String>.from(_memory.clothingColors);
+    _editingSeasons = List<String>.from(_memory.clothingSeasons);
+    _editingSize = _memory.clothingSize ?? '';
+    _editingPurchaseDate = _memory.clothingPurchaseDate ?? '';
+    setState(() => _isEditingClothing = true);
+    _editController.forward();
   }
 
   Future<void> _saveClothingEdits() async {
+    FocusScope.of(context).unfocus();
     final updated = _memory.copyWith(
       clothingName: _clothingNameCtrl.text.trim(),
       clothingType: _clothingTypeCtrl.text.trim(),
@@ -2047,17 +2153,27 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       clothingSeasons: _editingSeasons,
       clothingSize: _editingSize,
       clothingPurchaseDate: _editingPurchaseDate,
+      customClothingSizes: _customClothingSizes,
+      customShoeSizes: _customShoeSizes,
     );
     final memoryService = MemoryService();
     await memoryService.updateMemory(updated);
+    await _editController.reverse();
     setState(() {
       _memory = updated;
       _isEditingClothing = false;
     });
   }
 
+  void _unfocusAllFields() {
+    _clothingNameFocus.unfocus();
+    _clothingTypeFocus.unfocus();
+    _clothingBrandFocus.unfocus();
+    _clothingPriceFocus.unfocus();
+  }
+
   void _showColorPicker(bool isDark) {
-    FocusScope.of(context).unfocus();
+    _unfocusAllFields();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2076,7 +2192,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   void _showSizePicker(bool isDark) {
-    FocusScope.of(context).unfocus();
+    _unfocusAllFields();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2106,7 +2222,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   Future<void> _showPurchaseDatePicker() async {
-    FocusScope.of(context).unfocus();
+    _unfocusAllFields();
     final now = DateTime.now();
     DateTime initial = now;
     if (_editingPurchaseDate.isNotEmpty) {
@@ -2156,29 +2272,33 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
               color: AppColors.onSurface(isDark),
             ),
           ),
-          const SizedBox(height: 16),
-          _isEditingClothing
-              ? _buildEditableRow('名称', _clothingNameCtrl, isDark)
-              : _buildFlexInfoRow('名称', m.clothingName ?? '', isDark),
-          const SizedBox(height: 16),
-          _isEditingClothing
-              ? _buildEditableRow('分类', _clothingTypeCtrl, isDark)
-              : _buildFlexInfoRow('分类', m.clothingType ?? '', isDark),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+          _buildAnimatedRow('名称', isDark,
+            viewingValue: _valueText(m.clothingName ?? '', isDark),
+            editingValue: _valueTextField(_clothingNameCtrl, isDark, focusNode: _clothingNameFocus),
+          ),
+          const SizedBox(height: 14),
+          _buildAnimatedRow('分类', isDark,
+            viewingValue: _valueText(m.clothingType ?? '', isDark),
+            editingValue: _valueTextField(_clothingTypeCtrl, isDark, focusNode: _clothingTypeFocus),
+          ),
+          const SizedBox(height: 14),
           // 色系
           _buildColorRow(isDark),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           // 适用季节
           _buildSeasonRow(isDark),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           // 尺码
-          _isEditingClothing
-              ? _buildTappableRow('尺码', _editingSize, isDark, onTap: () => _showSizePicker(isDark))
-              : _buildFlexInfoRow('尺码', m.clothingSize ?? '', isDark),
-          const SizedBox(height: 16),
-          _isEditingClothing
-              ? _buildEditableRow('品牌', _clothingBrandCtrl, isDark)
-              : _buildFlexInfoRow('品牌', m.clothingBrand ?? '', isDark),
+          _buildAnimatedRow('尺码', isDark,
+            viewingValue: _valueText(m.clothingSize ?? '', isDark),
+            editingValue: _valueTappable(_editingSize, isDark, onTap: () => _showSizePicker(isDark)),
+          ),
+          const SizedBox(height: 14),
+          _buildAnimatedRow('品牌', isDark,
+            viewingValue: _valueText(m.clothingBrand ?? '', isDark),
+            editingValue: _valueTextField(_clothingBrandCtrl, isDark, focusNode: _clothingBrandFocus),
+          ),
         ],
       ),
     ));
@@ -2198,14 +2318,16 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
               color: AppColors.onSurface(isDark),
             ),
           ),
-          const SizedBox(height: 16),
-          _isEditingClothing
-              ? _buildEditableRow('价格', _clothingPriceCtrl, isDark)
-              : _buildFlexInfoRow('价格', m.clothingPrice ?? '', isDark),
-          const SizedBox(height: 16),
-          _isEditingClothing
-              ? _buildTappableRow('购买日期', _editingPurchaseDate, isDark, onTap: _showPurchaseDatePicker)
-              : _buildFlexInfoRow('购买日期', m.clothingPurchaseDate ?? '', isDark),
+          const SizedBox(height: 14),
+          _buildAnimatedRow('价格', isDark,
+            viewingValue: _valueText(m.clothingPrice ?? '', isDark),
+            editingValue: _valueTextField(_clothingPriceCtrl, isDark, focusNode: _clothingPriceFocus),
+          ),
+          const SizedBox(height: 14),
+          _buildAnimatedRow('购买日期', isDark,
+            viewingValue: _valueText(m.clothingPurchaseDate ?? '', isDark),
+            editingValue: _valueTappable(_editingPurchaseDate, isDark, onTap: _showPurchaseDatePicker),
+          ),
         ],
       ),
     ));
@@ -2218,13 +2340,15 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
 
   Widget _buildColorRow(bool isDark) {
     final colors = _isEditingClothing ? _editingColors : _memory.clothingColors;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
+    return SizedBox(
+      height: 36,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
         Text(
           '色系',
           style: TextStyle(
-            fontSize: 15,
+            fontSize: 16,
             color: AppColors.onSurfaceQuaternary(isDark),
           ),
         ),
@@ -2241,28 +2365,38 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                   ) ?? 0xFF888888;
                   return Padding(
                     padding: const EdgeInsets.only(left: 8),
-                    child: GestureDetector(
-                      onTap: _isEditingClothing
-                          ? () {
+                    child: _isEditingClothing
+                        ? _Pressable(
+                            onTap: () {
+                              _unfocusAllFields();
                               setState(() => _editingColors.remove(hex));
-                            }
-                          : null,
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: Color(colorValue),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.outline(isDark),
-                            width: 1.5,
+                            },
+                            child: Container(
+                              width: 30,
+                              height: 30,
+                              decoration: BoxDecoration(
+                                color: Color(colorValue),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppColors.outline(isDark),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Icon(CupertinoIcons.xmark, size: 12, color: Colors.white.withOpacity(0.8)),
+                            ),
+                          )
+                        : Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: Color(colorValue),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.outline(isDark),
+                                width: 1.5,
+                              ),
+                            ),
                           ),
-                        ),
-                        child: _isEditingClothing
-                            ? Icon(CupertinoIcons.xmark, size: 12, color: Colors.white.withOpacity(0.8))
-                            : null,
-                      ),
-                    ),
                   );
                 })
               else if (!_isEditingClothing)
@@ -2270,11 +2404,11 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
               if (_isEditingClothing && colors.length < 5)
                 Padding(
                   padding: const EdgeInsets.only(left: 8),
-                  child: GestureDetector(
+                  child: _Pressable(
                     onTap: () => _showColorPicker(isDark),
                     child: Container(
-                      width: 28,
-                      height: 28,
+                      width: 30,
+                      height: 30,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
@@ -2294,6 +2428,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           ),
         ),
       ],
+      ),
     );
   }
 
@@ -2310,13 +2445,15 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   Widget _buildSeasonRow(bool isDark) {
     final seasons = _isEditingClothing ? _editingSeasons : _memory.clothingSeasons;
     const allSeasons = ['春季', '夏季', '秋季', '冬季'];
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          '季节',
+    return SizedBox(
+      height: 36,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            '季节',
           style: TextStyle(
-            fontSize: 15,
+            fontSize: 16,
             color: AppColors.onSurfaceQuaternary(isDark),
           ),
         ),
@@ -2330,8 +2467,9 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                   children: allSeasons.map((season) {
                     final selected = _editingSeasons.contains(season);
                     final color = _seasonColor(season);
-                    return GestureDetector(
+                    return _Pressable(
                       onTap: () {
+                        _unfocusAllFields();
                         setState(() {
                           if (selected) {
                             _editingSeasons.remove(season);
@@ -2356,7 +2494,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                         child: Text(
                           season,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 16,
                             fontWeight: FontWeight.w500,
                             color: selected
                                 ? color
@@ -2386,7 +2524,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                           child: Text(
                             season,
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 16,
                               fontWeight: FontWeight.w500,
                               color: color,
                             ),
@@ -2397,91 +2535,57 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                   : const SizedBox.shrink(),
         ),
       ],
+      ),
     );
   }
 
-  /// 可编辑文本行（带下划线）
-  Widget _buildEditableRow(String label, TextEditingController ctrl, bool isDark) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 15,
-            color: AppColors.onSurfaceQuaternary(isDark),
-          ),
-        ),
-        const SizedBox(width: 24),
-        Expanded(
-          child: TextField(
-            controller: ctrl,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontSize: 15,
-              color: AppColors.onSurface(isDark),
-            ),
-            decoration: InputDecoration(
-              isDense: true,
-              contentPadding: const EdgeInsets.only(bottom: 4),
-              enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.outline(isDark)),
-              ),
-              focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.primary(isDark)),
-              ),
-              hintText: '',
-              hintStyle: TextStyle(
-                fontSize: 15,
-                color: AppColors.onSurfaceOctonary(isDark),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// 可点击行（胶囊描边样式，用于选择器）
-  Widget _buildTappableRow(String label, String value, bool isDark, {required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
+  /// 编辑/查看模式切换 — 标签不动，只对值部分做位移动画
+  Widget _buildAnimatedRow(String label, bool isDark, {required Widget editingValue, required Widget viewingValue}) {
+    return SizedBox(
+      height: 36,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             label,
             style: TextStyle(
-              fontSize: 15,
+              fontSize: 16,
               color: AppColors.onSurfaceQuaternary(isDark),
             ),
           ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.outline(isDark)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  value.isEmpty ? '请选择' : value,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: value.isEmpty
-                        ? AppColors.onSurfaceOctonary(isDark)
-                        : AppColors.onSurface(isDark),
+          const SizedBox(width: 24),
+          Expanded(
+            child: AnimatedBuilder(
+              animation: _editAnimation,
+              builder: (context, _) {
+                final t = _editAnimation.value;
+                return ClipRect(
+                  child: Stack(
+                    children: [
+                      Transform.translate(
+                        offset: Offset(-20 * t, 0),
+                        child: Opacity(
+                          opacity: 1.0 - t,
+                          child: IgnorePointer(
+                            ignoring: _isEditingClothing,
+                            child: viewingValue,
+                          ),
+                        ),
+                      ),
+                      Transform.translate(
+                        offset: Offset(20 * (1.0 - t), 0),
+                        child: Opacity(
+                          opacity: t,
+                          child: IgnorePointer(
+                            ignoring: !_isEditingClothing,
+                            child: editingValue,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  CupertinoIcons.chevron_right,
-                  size: 12,
-                  color: AppColors.onSurfaceQuaternary(isDark),
-                ),
-              ],
+                );
+              },
             ),
           ),
         ],
@@ -2489,30 +2593,86 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     );
   }
 
-  /// 自适应宽度的信息行，label 不固定宽度
-  Widget _buildFlexInfoRow(String label, String value, bool isDark) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 15,
-            color: AppColors.onSurfaceQuaternary(isDark),
+  /// 纯文本值（查看态）
+  Widget _valueText(String value, bool isDark) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Text(
+        value,
+        textAlign: TextAlign.right,
+        style: TextStyle(
+          fontSize: 16,
+          color: AppColors.onSurface(isDark),
+        ),
+      ),
+    );
+  }
+
+  /// 输入框值（编辑态）
+  Widget _valueTextField(TextEditingController ctrl, bool isDark, {FocusNode? focusNode}) {
+    return TextField(
+      controller: ctrl,
+      focusNode: focusNode,
+      textAlign: TextAlign.right,
+      style: TextStyle(
+        fontSize: 16,
+        color: AppColors.onSurface(isDark),
+      ),
+      decoration: InputDecoration(
+        isDense: true,
+        contentPadding: const EdgeInsets.only(bottom: 4),
+        enabledBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: AppColors.outline(isDark)),
+        ),
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: AppColors.primary(isDark)),
+        ),
+        hintText: '',
+        hintStyle: TextStyle(
+          fontSize: 16,
+          color: AppColors.onSurfaceOctonary(isDark),
+        ),
+      ),
+    );
+  }
+
+  /// 胶囊选择器值（编辑态）
+  Widget _valueTappable(String value, bool isDark, {required VoidCallback onTap}) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: _Pressable(
+        onTap: () {
+          _unfocusAllFields();
+          onTap();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.outline(isDark)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value.isEmpty ? '请选择' : value,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: value.isEmpty
+                      ? AppColors.onSurfaceOctonary(isDark)
+                      : AppColors.onSurface(isDark),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                CupertinoIcons.chevron_right,
+                size: 12,
+                color: AppColors.onSurfaceQuaternary(isDark),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 24),
-        Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              fontSize: 15,
-              color: AppColors.onSurface(isDark),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 

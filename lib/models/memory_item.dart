@@ -89,6 +89,8 @@ class MemoryItem {
   final String? clothingPrice; // 价格
   final String? clothingSize; // 尺码
   final String? clothingPurchaseDate; // 购买日期
+  final List<String> customClothingSizes; // 自定义衣服尺码
+  final List<String> customShoeSizes; // 自定义鞋子尺码
 
   MemoryItem({
     required this.id,
@@ -123,6 +125,8 @@ class MemoryItem {
     this.clothingPrice,
     this.clothingSize,
     this.clothingPurchaseDate,
+    this.customClothingSizes = const [],
+    this.customShoeSizes = const [],
   });
 
   MemoryItem copyWith({
@@ -158,6 +162,8 @@ class MemoryItem {
     String? clothingPrice,
     String? clothingSize,
     String? clothingPurchaseDate,
+    List<String>? customClothingSizes,
+    List<String>? customShoeSizes,
   }) {
     return MemoryItem(
       id: id ?? this.id,
@@ -192,6 +198,8 @@ class MemoryItem {
       clothingPrice: clothingPrice ?? this.clothingPrice,
       clothingSize: clothingSize ?? this.clothingSize,
       clothingPurchaseDate: clothingPurchaseDate ?? this.clothingPurchaseDate,
+      customClothingSizes: customClothingSizes ?? this.customClothingSizes,
+      customShoeSizes: customShoeSizes ?? this.customShoeSizes,
     );
   }
 
@@ -229,6 +237,8 @@ class MemoryItem {
       'clothingPrice': clothingPrice,
       'clothingSize': clothingSize,
       'clothingPurchaseDate': clothingPurchaseDate,
+      'customClothingSizes': customClothingSizes,
+      'customShoeSizes': customShoeSizes,
     };
   }
 
@@ -281,6 +291,14 @@ class MemoryItem {
       clothingPrice: json['clothingPrice'] as String?,
       clothingSize: json['clothingSize'] as String?,
       clothingPurchaseDate: json['clothingPurchaseDate'] as String?,
+      customClothingSizes: (json['customClothingSizes'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      customShoeSizes: (json['customShoeSizes'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
     );
   }
 

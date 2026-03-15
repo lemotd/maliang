@@ -70,5 +70,7 @@
 	<string>需要麦克风权限来进行语音输入</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>需要语音识别权限来将语音转为文字</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>需要相册权限来保存图片</string>
 </dict>
 </plist>

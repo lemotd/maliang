@@ -1,0 +1,261 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
+import 'dart:io';
+import 'package:gal/gal.dart';
+
+class ImageViewerPage extends StatefulWidget {
+  final String imagePath;
+  final String heroTag;
+  final Animation<double> animation;
+
+  const ImageViewerPage({
+    super.key,
+    required this.imagePath,
+    required this.heroTag,
+    required this.animation,
+  });
+
+  @override
+  State<ImageViewerPage> createState() => _ImageViewerPageState();
+}
+
+class _ImageViewerPageState extends State<ImageViewerPage> {
+  bool _isSaving = false;
+  final TransformationController _transformCtrl = TransformationController();
+  double _dragOffset = 0.0;
+  bool _isDragging = false;
+  double? _dismissOpacity; // 记录下滑退出时的背景透明度
+
+  bool get _isZoomed {
+    final scale = _transformCtrl.value.getMaxScaleOnAxis();
+    return scale > 1.01;
+  }
+
+  void _onVerticalDragStart(DragStartDetails details) {
+    if (_isZoomed) return;
+    setState(() => _isDragging = true);
+  }
+
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    if (!_isDragging) return;
+    setState(() {
+      _dragOffset += details.delta.dy;
+      // 只允许下滑
+      if (_dragOffset < 0) _dragOffset = 0;
+    });
+  }
+
+  void _onVerticalDragEnd(DragEndDetails details) {
+    if (!_isDragging) return;
+    final velocity = details.primaryVelocity ?? 0;
+    if (_dragOffset > 100 || velocity > 800) {
+      // 记录当前背景透明度，让退出动画从这个值开始衰减
+      final dragProgress = (_dragOffset / 300).clamp(0.0, 1.0);
+      _dismissOpacity = 1.0 - dragProgress;
+      Navigator.pop(context);
+    } else {
+      setState(() {
+        _dragOffset = 0;
+        _isDragging = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _transformCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveToGallery() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      await Gal.putImage(widget.imagePath);
+      HapticFeedback.mediumImpact();
+      if (mounted) _showToast('已保存到相册');
+    } catch (e) {
+      if (mounted) {
+        final hasAccess = await Gal.hasAccess();
+        if (!hasAccess) {
+          final granted = await Gal.requestAccess();
+          if (granted) {
+            try {
+              await Gal.putImage(widget.imagePath);
+              HapticFeedback.mediumImpact();
+              if (mounted) _showToast('已保存到相册');
+            } catch (_) {
+              if (mounted) _showToast('保存失败');
+            }
+          } else {
+            if (mounted) _showToast('需要相册权限');
+          }
+        } else {
+          _showToast('保存失败');
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  void _showToast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, textAlign: TextAlign.center),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).size.height * 0.1,
+          left: 60,
+          right: 60,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dragProgress = (_dragOffset / 300).clamp(0.0, 1.0);
+
+    return AnimatedBuilder(
+      animation: widget.animation,
+      builder: (context, child) {
+        final double bgOpacity;
+        if (_dismissOpacity != null) {
+          bgOpacity = widget.animation.value * _dismissOpacity!;
+        } else {
+          bgOpacity = widget.animation.value * (1.0 - dragProgress);
+        }
+
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              // 黑色背景单独淡入淡出 + 下滑渐隐
+              Container(
+                color: Colors.black.withValues(alpha: bgOpacity),
+              ),
+              // 图片 + Hero + 下滑手势
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                onVerticalDragStart: _onVerticalDragStart,
+                onVerticalDragUpdate: _onVerticalDragUpdate,
+                onVerticalDragEnd: _onVerticalDragEnd,
+                child: AnimatedContainer(
+                  duration: _isDragging
+                      ? Duration.zero
+                      : const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  transform: Matrix4.translationValues(0, _dragOffset, 0),
+                  child: SizedBox.expand(
+                    child: InteractiveViewer(
+                      transformationController: _transformCtrl,
+                      minScale: 1.0,
+                      maxScale: 5.0,
+                      child: Center(
+                        child: Hero(
+                          tag: widget.heroTag,
+                          flightShuttleBuilder: (flightContext, anim, direction,
+                              fromHeroContext, toHeroContext) {
+                            return AnimatedBuilder(
+                              animation: anim,
+                              builder: (context, child) {
+                                final radius = 16.0 * (1.0 - anim.value);
+                                return ClipRRect(
+                                  borderRadius: BorderRadius.circular(radius),
+                                  child: child,
+                                );
+                              },
+                              child: Image.file(
+                                File(widget.imagePath),
+                                fit: BoxFit.cover,
+                              ),
+                            );
+                          },
+                          child: Image.file(
+                            File(widget.imagePath),
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // 保存按钮 - 下滑时跟随淡出
+              Positioned(
+                left: 20,
+                bottom: MediaQuery.of(context).padding.bottom + 20,
+                child: FadeTransition(
+                  opacity: widget.animation,
+                  child: Opacity(
+                    opacity: _dismissOpacity != null
+                        ? widget.animation.value.clamp(0.0, 1.0)
+                        : (1.0 - dragProgress).clamp(0.0, 1.0),
+                    child: _SaveButton(
+                      isSaving: _isSaving,
+                      onTap: _saveToGallery,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SaveButton extends StatefulWidget {
+  final bool isSaving;
+  final VoidCallback onTap;
+  const _SaveButton({required this.isSaving, required this.onTap});
+  @override
+  State<_SaveButton> createState() => _SaveButtonState();
+}
+
+class _SaveButtonState extends State<_SaveButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.12),
+              width: 0.5,
+            ),
+          ),
+          child: widget.isSaving
+              ? const CupertinoActivityIndicator(color: Colors.white)
+              : const Icon(
+                  CupertinoIcons.arrow_down_to_line,
+                  color: Colors.white,
+                  size: 20,
+                ),
+        ),
+      ),
+    );
+  }
+}
