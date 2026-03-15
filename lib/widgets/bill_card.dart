@@ -46,7 +46,9 @@ class _BillCardState extends State<BillCard> {
     for (final bill in widget.bills) {
       if (bill.category == MemoryCategory.bill) {
         final billDate = bill.billTime ?? bill.createdAt;
-        final daysDiff = billDate.difference(weekStart).inDays;
+        // 归一化到当天 00:00:00，避免时间差导致 inDays 计算偏移
+        final billDay = DateTime(billDate.year, billDate.month, billDate.day);
+        final daysDiff = billDay.difference(weekStart).inDays;
         if (daysDiff >= 0 && daysDiff < 7) {
           final amount = bill.amount ?? '0';
           final value =
@@ -76,7 +78,7 @@ class _BillCardState extends State<BillCard> {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -110,7 +112,7 @@ class _BillCardState extends State<BillCard> {
             Text(
               '本月总支出',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 14,
                 color: AppColors.onSurfaceQuaternary(isDark),
               ),
             ),

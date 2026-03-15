@@ -504,7 +504,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
       final memory = await _analyzeImageWithAI(localPath);
       if (memory == null) {
-        _handleProcessingError('AI 分析失败');
+        _handleProcessingError('AI 分析失败，请重试');
         return;
       }
 

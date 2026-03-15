@@ -45,6 +45,8 @@ dependencies:
   url_launcher: ^6.2.1
   speech_to_text: ^7.0.0
   gal: ^2.3.2
+  geolocator: ^13.0.2
+  geocoding: ^3.0.0
 
 dev_dependencies:
   flutter_test:

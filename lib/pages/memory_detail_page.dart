@@ -1544,7 +1544,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     _imageDisplayHeight = displayHeight + verticalMargin * 2;
 
     return Center(
-      child: GestureDetector(
+      child: _Pressable(
         onTap: () => _openImageViewer(),
         child: Container(
           margin: EdgeInsets.symmetric(vertical: verticalMargin),

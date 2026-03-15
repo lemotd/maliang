@@ -3,8 +3,10 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_colors.dart';
 import '../models/memory_item.dart';
 import 'bill_card.dart';
+import 'clothing_card.dart';
 import 'add_collection_card.dart';
 import '../pages/bill_summary_page.dart';
+import '../pages/wardrobe_page.dart';
 
 class CollectionSection extends StatefulWidget {
   final List<MemoryItem> memories;
@@ -17,6 +19,7 @@ class CollectionSection extends StatefulWidget {
 
 class _CollectionSectionState extends State<CollectionSection> {
   bool _isBillCardPressed = false;
+  bool _isClothingCardPressed = false;
   bool _isAddCardPressed = false;
 
   @override
@@ -77,8 +80,35 @@ class _CollectionSectionState extends State<CollectionSection> {
               const SizedBox(width: 12),
               GestureDetector(
                 onTapDown: (_) {
-                  setState(() => _isAddCardPressed = true);
+                  setState(() => _isClothingCardPressed = true);
                 },
+                onTapUp: (_) async {
+                  await Future.delayed(const Duration(milliseconds: 150));
+                  if (mounted) {
+                    setState(() => _isClothingCardPressed = false);
+                  }
+                },
+                onTapCancel: () {
+                  setState(() => _isClothingCardPressed = false);
+                },
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    CupertinoPageRoute(
+                      builder: (context) =>
+                          WardrobePage(clothes: widget.memories),
+                    ),
+                  );
+                },
+                child: AnimatedScale(
+                  scale: _isClothingCardPressed ? 0.95 : 1.0,
+                  duration: const Duration(milliseconds: 150),
+                  curve: Curves.easeOut,
+                  child: ClothingCard(clothes: widget.memories),
+                ),
+              ),
+              const SizedBox(width: 12),
+              GestureDetector(
                 onTapUp: (_) async {
                   await Future.delayed(const Duration(milliseconds: 150));
                   if (mounted) {

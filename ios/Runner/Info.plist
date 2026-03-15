@@ -72,5 +72,7 @@
 	<string>需要语音识别权限来将语音转为文字</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>需要相册权限来保存图片</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>需要位置权限来获取当地天气，为你提供穿衣搭配建议</string>
 </dict>
 </plist>
