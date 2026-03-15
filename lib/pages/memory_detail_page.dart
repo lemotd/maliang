@@ -2339,7 +2339,6 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   Widget _buildColorRow(bool isDark) {
-    final colors = _isEditingClothing ? _editingColors : _memory.clothingColors;
     return SizedBox(
       height: 36,
       child: Row(
@@ -2354,81 +2353,120 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         ),
         const SizedBox(width: 24),
         Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              if (colors.isNotEmpty)
-                ...colors.take(5).map((hex) {
-                  final colorValue = int.tryParse(
-                    hex.replaceAll('#', 'FF'),
-                    radix: 16,
-                  ) ?? 0xFF888888;
-                  return Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: _isEditingClothing
-                        ? _Pressable(
-                            onTap: () {
-                              _unfocusAllFields();
-                              setState(() => _editingColors.remove(hex));
-                            },
-                            child: Container(
-                              width: 30,
-                              height: 30,
-                              decoration: BoxDecoration(
-                                color: Color(colorValue),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: AppColors.outline(isDark),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Icon(CupertinoIcons.xmark, size: 12, color: Colors.white.withOpacity(0.8)),
-                            ),
-                          )
-                        : Container(
-                            width: 30,
-                            height: 30,
-                            decoration: BoxDecoration(
-                              color: Color(colorValue),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.outline(isDark),
-                                width: 1.5,
-                              ),
-                            ),
+          child: AnimatedBuilder(
+            animation: _editAnimation,
+            builder: (context, _) {
+              final t = _editAnimation.value;
+              return ClipRect(
+                child: Stack(
+                  children: [
+                    // 查看态
+                    Positioned.fill(
+                      child: Transform.translate(
+                        offset: Offset(-20 * t, 0),
+                        child: Opacity(
+                          opacity: 1.0 - t,
+                          child: IgnorePointer(
+                            ignoring: _isEditingClothing,
+                            child: _buildColorChips(_memory.clothingColors, isDark, editing: false),
                           ),
-                  );
-                })
-              else if (!_isEditingClothing)
-                const SizedBox.shrink(),
-              if (_isEditingClothing && colors.length < 5)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: _Pressable(
-                    onTap: () => _showColorPicker(isDark),
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.onSurfaceQuaternary(isDark),
-                          width: 1.5,
                         ),
                       ),
-                      child: Icon(
-                        CupertinoIcons.add,
-                        size: 14,
-                        color: AppColors.onSurfaceQuaternary(isDark),
+                    ),
+                    // 编辑态
+                    Positioned.fill(
+                      child: Transform.translate(
+                        offset: Offset(20 * (1.0 - t), 0),
+                        child: Opacity(
+                          opacity: t,
+                          child: IgnorePointer(
+                            ignoring: !_isEditingClothing,
+                            child: _buildColorChips(_editingColors, isDark, editing: true),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-            ],
+              );
+            },
           ),
         ),
       ],
       ),
+    );
+  }
+
+  Widget _buildColorChips(List<String> colors, bool isDark, {required bool editing}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        if (colors.isNotEmpty)
+          ...colors.take(5).map((hex) {
+            final colorValue = int.tryParse(
+              hex.replaceAll('#', 'FF'),
+              radix: 16,
+            ) ?? 0xFF888888;
+            return Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: editing
+                  ? _Pressable(
+                      onTap: () {
+                        _unfocusAllFields();
+                        setState(() => _editingColors.remove(hex));
+                      },
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: Color(colorValue),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.outline(isDark),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Icon(CupertinoIcons.xmark, size: 12, color: Colors.white.withOpacity(0.8)),
+                      ),
+                    )
+                  : Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: Color(colorValue),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.outline(isDark),
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+            );
+          }),
+        if (editing && colors.length < 5)
+          Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: _Pressable(
+              onTap: () => _showColorPicker(isDark),
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.onSurfaceQuaternary(isDark),
+                    width: 1.5,
+                  ),
+                ),
+                child: Icon(
+                  CupertinoIcons.add,
+                  size: 14,
+                  color: AppColors.onSurfaceQuaternary(isDark),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -2443,7 +2481,6 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   Widget _buildSeasonRow(bool isDark) {
-    final seasons = _isEditingClothing ? _editingSeasons : _memory.clothingSeasons;
     const allSeasons = ['春季', '夏季', '秋季', '冬季'];
     return SizedBox(
       height: 36,
@@ -2459,84 +2496,127 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         ),
         const SizedBox(width: 24),
         Expanded(
-          child: _isEditingClothing
-              ? Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: allSeasons.map((season) {
-                    final selected = _editingSeasons.contains(season);
-                    final color = _seasonColor(season);
-                    return _Pressable(
-                      onTap: () {
-                        _unfocusAllFields();
-                        setState(() {
-                          if (selected) {
-                            _editingSeasons.remove(season);
-                          } else {
-                            _editingSeasons.add(season);
-                          }
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? color.withOpacity(0.1)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: selected
-                                ? color.withOpacity(0.4)
-                                : AppColors.outline(isDark),
-                          ),
-                        ),
-                        child: Text(
-                          season,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: selected
-                                ? color
-                                : AppColors.onSurfaceQuaternary(isDark),
+          child: AnimatedBuilder(
+            animation: _editAnimation,
+            builder: (context, _) {
+              final t = _editAnimation.value;
+              return ClipRect(
+                child: Stack(
+                  children: [
+                    // 查看态
+                    Positioned.fill(
+                      child: Transform.translate(
+                        offset: Offset(-20 * t, 0),
+                        child: Opacity(
+                          opacity: 1.0 - t,
+                          child: IgnorePointer(
+                            ignoring: _isEditingClothing,
+                            child: _buildSeasonChips(_memory.clothingSeasons, isDark, allSeasons: allSeasons, editing: false),
                           ),
                         ),
                       ),
-                    );
-                  }).toList(),
-                )
-              : seasons.isNotEmpty
-                  ? Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: seasons.map((season) {
-                        final color = _seasonColor(season);
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: color.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: color.withOpacity(0.4),
-                            ),
+                    ),
+                    // 编辑态
+                    Positioned.fill(
+                      child: Transform.translate(
+                        offset: Offset(20 * (1.0 - t), 0),
+                        child: Opacity(
+                          opacity: t,
+                          child: IgnorePointer(
+                            ignoring: !_isEditingClothing,
+                            child: _buildSeasonChips(_editingSeasons, isDark, allSeasons: allSeasons, editing: true),
                           ),
-                          child: Text(
-                            season,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: color,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    )
-                  : const SizedBox.shrink(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ],
       ),
     );
+  }
+
+  Widget _buildSeasonChips(List<String> seasons, bool isDark, {required List<String> allSeasons, required bool editing}) {
+    if (editing) {
+      return Wrap(
+        alignment: WrapAlignment.end,
+        spacing: 6,
+        runSpacing: 6,
+        children: allSeasons.map((season) {
+          final selected = seasons.contains(season);
+          final color = _seasonColor(season);
+          return _Pressable(
+            onTap: () {
+              _unfocusAllFields();
+              setState(() {
+                if (selected) {
+                  _editingSeasons.remove(season);
+                } else {
+                  _editingSeasons.add(season);
+                }
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: selected
+                    ? color.withOpacity(0.1)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: selected
+                      ? color.withOpacity(0.4)
+                      : AppColors.outline(isDark),
+                ),
+              ),
+              child: Text(
+                season,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: selected
+                      ? color
+                      : AppColors.onSurfaceQuaternary(isDark),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      );
+    }
+    if (seasons.isNotEmpty) {
+      return Wrap(
+        alignment: WrapAlignment.end,
+        spacing: 6,
+        runSpacing: 6,
+        children: seasons.map((season) {
+          final color = _seasonColor(season);
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: color.withOpacity(0.4),
+              ),
+            ),
+            child: Text(
+              season,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
+            ),
+          );
+        }).toList(),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   /// 编辑/查看模式切换 — 标签不动，只对值部分做位移动画
