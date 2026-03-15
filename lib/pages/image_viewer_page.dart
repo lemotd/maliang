@@ -25,41 +25,12 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
   final TransformationController _transformCtrl = TransformationController();
   double _dragOffset = 0.0;
   bool _isDragging = false;
-  double? _dismissOpacity; // 记录下滑退出时的背景透明度
+  double? _dismissOpacity;
+  int _pointerCount = 0;
 
   bool get _isZoomed {
     final scale = _transformCtrl.value.getMaxScaleOnAxis();
     return scale > 1.01;
-  }
-
-  void _onVerticalDragStart(DragStartDetails details) {
-    if (_isZoomed) return;
-    setState(() => _isDragging = true);
-  }
-
-  void _onVerticalDragUpdate(DragUpdateDetails details) {
-    if (!_isDragging) return;
-    setState(() {
-      _dragOffset += details.delta.dy;
-      // 只允许下滑
-      if (_dragOffset < 0) _dragOffset = 0;
-    });
-  }
-
-  void _onVerticalDragEnd(DragEndDetails details) {
-    if (!_isDragging) return;
-    final velocity = details.primaryVelocity ?? 0;
-    if (_dragOffset > 100 || velocity > 800) {
-      // 记录当前背景透明度，让退出动画从这个值开始衰减
-      final dragProgress = (_dragOffset / 300).clamp(0.0, 1.0);
-      _dismissOpacity = 1.0 - dragProgress;
-      Navigator.pop(context);
-    } else {
-      setState(() {
-        _dragOffset = 0;
-        _isDragging = false;
-      });
-    }
   }
 
   @override
@@ -132,78 +103,120 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
 
         return Scaffold(
           backgroundColor: Colors.transparent,
-          body: Stack(
-            fit: StackFit.expand,
-            children: [
-              // 黑色背景单独淡入淡出 + 下滑渐隐
-              Container(
-                color: Colors.black.withValues(alpha: bgOpacity),
-              ),
-              // 图片 + Hero + 下滑手势
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                onVerticalDragStart: _onVerticalDragStart,
-                onVerticalDragUpdate: _onVerticalDragUpdate,
-                onVerticalDragEnd: _onVerticalDragEnd,
-                child: AnimatedContainer(
-                  duration: _isDragging
-                      ? Duration.zero
-                      : const Duration(milliseconds: 200),
-                  curve: Curves.easeOut,
-                  transform: Matrix4.translationValues(0, _dragOffset, 0),
-                  child: SizedBox.expand(
-                    child: InteractiveViewer(
-                      transformationController: _transformCtrl,
-                      minScale: 1.0,
-                      maxScale: 5.0,
-                      child: Center(
-                        child: Hero(
-                          tag: widget.heroTag,
-                          flightShuttleBuilder: (flightContext, anim, direction,
-                              fromHeroContext, toHeroContext) {
-                            return AnimatedBuilder(
-                              animation: anim,
-                              builder: (context, child) {
-                                final radius = 16.0 * (1.0 - anim.value);
-                                return ClipRRect(
-                                  borderRadius: BorderRadius.circular(radius),
-                                  child: child,
-                                );
-                              },
-                              child: Image.file(
-                                File(widget.imagePath),
-                                fit: BoxFit.cover,
-                              ),
-                            );
-                          },
-                          child: Image.file(
-                            File(widget.imagePath),
-                            fit: BoxFit.contain,
+          body: Listener(
+            onPointerDown: (_) => _pointerCount++,
+            onPointerUp: (_) {
+              _pointerCount--;
+              // 单指抬起时结束拖拽
+              if (_isDragging && _pointerCount <= 0) {
+                _pointerCount = 0;
+                if (_dragOffset > 100) {
+                  final dp = (_dragOffset / 300).clamp(0.0, 1.0);
+                  _dismissOpacity = 1.0 - dp;
+                  Navigator.pop(context);
+                } else {
+                  setState(() {
+                    _dragOffset = 0;
+                    _isDragging = false;
+                  });
+                }
+              }
+            },
+            onPointerCancel: (_) {
+              _pointerCount = (_pointerCount - 1).clamp(0, 99);
+            },
+            onPointerMove: (event) {
+              // 只在单指 + 未缩放时处理下滑
+              if (_pointerCount != 1 || _isZoomed) {
+                if (_isDragging) {
+                  // 第二根手指按下，取消拖拽
+                  setState(() {
+                    _dragOffset = 0;
+                    _isDragging = false;
+                  });
+                }
+                return;
+              }
+              final dy = event.delta.dy;
+              if (!_isDragging) {
+                // 只有明显向下滑动才开始拖拽
+                if (dy > 1.5) {
+                  setState(() => _isDragging = true);
+                }
+                return;
+              }
+              setState(() {
+                _dragOffset = (_dragOffset + dy).clamp(0.0, double.infinity);
+              });
+            },
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Container(
+                  color: Colors.black.withValues(alpha: bgOpacity),
+                ),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: AnimatedContainer(
+                    duration: _isDragging
+                        ? Duration.zero
+                        : const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                    transform: Matrix4.translationValues(0, _dragOffset, 0),
+                    child: SizedBox.expand(
+                      child: InteractiveViewer(
+                        transformationController: _transformCtrl,
+                        minScale: 1.0,
+                        maxScale: 5.0,
+                        child: Center(
+                          child: Hero(
+                            tag: widget.heroTag,
+                            flightShuttleBuilder: (flightContext, anim,
+                                direction, fromHeroContext, toHeroContext) {
+                              return AnimatedBuilder(
+                                animation: anim,
+                                builder: (context, child) {
+                                  final radius = 16.0 * (1.0 - anim.value);
+                                  return ClipRRect(
+                                    borderRadius:
+                                        BorderRadius.circular(radius),
+                                    child: child,
+                                  );
+                                },
+                                child: Image.file(
+                                  File(widget.imagePath),
+                                  fit: BoxFit.cover,
+                                ),
+                              );
+                            },
+                            child: Image.file(
+                              File(widget.imagePath),
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              // 保存按钮 - 下滑时跟随淡出
-              Positioned(
-                left: 20,
-                bottom: MediaQuery.of(context).padding.bottom + 20,
-                child: FadeTransition(
-                  opacity: widget.animation,
-                  child: Opacity(
-                    opacity: _dismissOpacity != null
-                        ? widget.animation.value.clamp(0.0, 1.0)
-                        : (1.0 - dragProgress).clamp(0.0, 1.0),
-                    child: _SaveButton(
-                      isSaving: _isSaving,
-                      onTap: _saveToGallery,
+                Positioned(
+                  left: 20,
+                  bottom: MediaQuery.of(context).padding.bottom + 20,
+                  child: FadeTransition(
+                    opacity: widget.animation,
+                    child: Opacity(
+                      opacity: _dismissOpacity != null
+                          ? widget.animation.value.clamp(0.0, 1.0)
+                          : (1.0 - dragProgress).clamp(0.0, 1.0),
+                      child: _SaveButton(
+                        isSaving: _isSaving,
+                        onTap: _saveToGallery,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
