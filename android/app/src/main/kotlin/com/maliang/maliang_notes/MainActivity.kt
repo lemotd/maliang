@@ -110,6 +110,7 @@ class MainActivity : FlutterActivity() {
             "取餐码" -> R.drawable.ic_pickup_food
             "取件码" -> R.drawable.ic_pickup_package
             "账单" -> R.drawable.ic_bill
+            "服饰" -> R.drawable.ic_clothing
             else -> R.drawable.ic_note
         }
     }

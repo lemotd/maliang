@@ -176,14 +176,30 @@ class AiService {
     debugPrint('最终图片大小: ${imageBytes.length} bytes');
 
     final systemPrompt =
-        '''你是一个智能助手
-专门分析用户分享的图片内容。请根据图片内容进行分析：
+        '''你是一个智能助手，专门分析用户分享的图片内容。
 
-1. 判断图片属于哪个分类（请仔细判断，不要误分类）：
-   - 取餐码：必须包含明确的取餐码/取餐号/排队号等数字编码，如"A001"、"12号"、"B-03"等。注意：仅有餐厅菜单、食物图片、店铺信息但没有取餐码的，不属于取餐码类型
-   - 取件码：必须包含明确的快递取件码/取件号，如"12-3-4567"、"丰巢取件码"等。注意：仅有快递单号但没有取件码的，不属于取件码类型
-   - 账单：包含消费金额、支付信息的图片，如支付截图、小票、发票等
-   - 随手记：其他无法归类的图片，如截图、文档、名片、海报、通知、菜单、食物照片、风景、物品等
+【重要】分类判断必须按以下顺序逐步检查，命中即停：
+
+第一步：图片中是否涉及服饰？
+服饰物品包括：上衣（T恤、衬衫、卫衣、毛衣、夹克、外套、大衣、羽绒服、马甲、polo衫、背心、风衣、西装）、下装（裤子、牛仔裤、短裤、运动裤、裙子、连衣裙、半身裙）、鞋子（运动鞋、靴子、凉鞋、拖鞋、皮鞋、帆布鞋、高跟鞋、板鞋）、配饰（帽子、围巾、手套、腰带、领带）、袜子、内衣等。
+以下任何一种情况都必须归类为"服饰"：
+  a) 服饰实物照片（穿搭照、平铺展示、挂在衣架上、试衣间自拍等）
+  b) 服饰商品图或电商商品详情页截图
+  c) 服饰订单截图、购买记录截图（如淘宝/京东/拼多多/得物/抖音等平台的服饰订单页面）
+  d) 任何截图中只要涉及的商品是服饰类（如订单中的商品名称包含衣服、裤子、鞋等关键词，或商品缩略图是服饰）
+简单来说：只要图片内容和服饰相关，不管是实物还是截图还是订单，category都必须填"服饰"，绝对不能填"随手记"。
+
+第二步：如果不是服饰，检查是否是取餐码？
+必须包含明确的取餐码/取餐号/排队号等数字编码，如"A001"、"12号"。仅有餐厅菜单、食物图片不算。
+
+第三步：如果不是取餐码，检查是否是取件码？
+必须包含明确的快递取件码/取件号，如"12-3-4567"。
+
+第四步：如果不是取件码，检查是否是账单？
+包含消费金额、支付信息的图片，如支付截图、小票、发票等。
+
+第五步：以上都不是，归类为"随手记"。
+随手记是兜底分类，只有确认不是服饰、取餐码、取件码、账单后才能归为随手记。
 
 2. 根据分类提取关键信息作为标题（标题要精简，不要重复分类名称）：
    - 取餐码：只提取店铺名称和取餐码，格式如"肯德基 A001"或"A001"（无店铺名时）
@@ -192,9 +208,10 @@ class AiService {
      * 支出：格式如"-¥35.00"
      * 收入：格式如"+¥100.00"
      * 无法判断时默认为支出
+   - 服饰：用服饰名称作为标题，如"白色圆领T恤"、"黑色牛仔裤"、"Nike Air Max 运动鞋"
    - 随手记：用一句话概括图片的主要内容，如"周末公园散步"、"公司年会合影"、"新买的咖啡机"、"餐厅菜单推荐"等
 
-3. 对于所有非账单类型（取餐码、取件码、随手记），必须将识别出的信息组织成结构化的信息区域（infoSections）：
+3. 对于所有非账单非服饰类型（取餐码、取件码、随手记），必须将识别出的信息组织成结构化的信息区域（infoSections）：
    - 每个信息区域包含：
      * title：小标题名称，根据内容类型命名，可添加合适的emoji表情，如"📋 基本信息"、"📍 地点信息"、"📅 时间信息"、"📝 内容详情"等
      * items：信息项列表，每项包含label（标签名）和value（值）
@@ -235,16 +252,27 @@ class AiService {
    收入：${BillIncomeCategory.aiPromptList}
 
 请严格按照以下JSON格式返回，不要包含其他内容：
-{"category":"分类名称","title":"提取的标题","summary":"一段话总结图片内容","infoSections":[{"title":"小标题","items":[{"label":"标签","value":"值"}]}],"amount":"金额","isExpense":true/false,"billCategory":"账单分类","paymentMethod":"支付方式","merchantName":"商户名称","billTime":"账单时间"}
+{"category":"分类名称","title":"提取的标题","summary":"一段话总结图片内容","infoSections":[{"title":"小标题","items":[{"label":"标签","value":"值"}]}],"amount":"金额","isExpense":true/false,"billCategory":"账单分类","paymentMethod":"支付方式","merchantName":"商户名称","billTime":"账单时间","clothingName":"服饰名称","clothingType":"分类","clothingColors":["#hex"],"clothingSeasons":["季节"],"clothingBrand":"品牌","clothingPrice":"价格","clothingSize":"尺码","clothingPurchaseDate":"购买日期"}
 
 注意：
-1. 对于所有类型（取餐码、取件码、账单、随手记），必须填写summary字段，用简洁明了的一段话总结图片的相关内容
-2. 对于所有非账单类型（取餐码、取件码、随手记），必须填写infoSections，将图片中识别出的所有重要信息组织成结构化格式
+1. 对于所有类型（取餐码、取件码、账单、服饰、随手记），必须填写summary字段，用简洁明了的一段话总结图片的相关内容
+2. 对于所有非账单非服饰类型（取餐码、取件码、随手记），必须填写infoSections，将图片中识别出的所有重要信息组织成结构化格式
 3. 对于账单类型，填写amount、isExpense、billCategory等字段，infoSections可以留空
 4. 只填写图片中实际存在的信息，不存在的字段请省略或留空
 5. billCategory必须从上面列出的分类中选择英文名称（如dining、transport、salary等），不要自创分类名称，不要使用中文分类名
 6. billTime格式为"YYYY-MM-DD HH:mm"，如"2024-01-15 14:30"
-7. 随手记类型要详细分析图片内容，提取所有有价值的信息，可以适当联想丰富内容，标题应该是对图片的概括性描述''';
+7. 对于服饰类型，请提取以下信息（只填写图片中能识别到的，不确定的不要填）：
+   - clothingName(服饰名称，如"条纹圆领T恤")
+   - clothingType(具体分类，如T恤、衬衫、牛仔裤、连衣裙、运动鞋、卫衣、西装外套等)
+   - clothingColors(色系列表，返回hex色值数组，最多5个主要颜色，如["#FFFFFF","#000000"])
+   - clothingSeasons(适用季节列表，从"春季"、"夏季"、"秋季"、"冬季"中选择，如["春季","秋季"])
+   - clothingBrand(品牌名称)
+   - clothingPrice(价格，如"¥299")
+   - clothingSize(尺码，如"L"、"175/92A"、"42码")
+   - clothingPurchaseDate(购买日期，格式"YYYY-MM-DD")
+   - summary(一句话描述这件服饰)
+8. 随手记类型要详细分析图片内容，提取所有有价值的信息，可以适当联想丰富内容，标题应该是对图片的概括性描述
+9. 【再次强调】如果图片中出现了任何服饰物品、服饰商品图、服饰订单截图、服饰购买记录，category必须是"服饰"，绝对不能是"随手记"。订单截图中的商品如果是衣服鞋子等服饰，也必须归类为"服饰"''';
 
     final url = Uri.parse('$apiAddress/chat/completions');
     debugPrint('请求URL: $url');
@@ -267,12 +295,12 @@ class AiService {
                     'type': 'image_url',
                     'image_url': {'url': 'data:image/jpeg;base64,$base64Image'},
                   },
-                  {'type': 'text', 'text': '请分析这张图片'},
+                  {'type': 'text', 'text': '请分析这张图片。分类时请注意：如果图片中出现了服饰相关内容（包括服饰实物、服饰商品图、服饰订单截图、服饰购买记录等），必须归类为"服饰"，不要归类为"随手记"。'},
                 ],
               },
             ],
             'temperature': 0.3,
-            'max_tokens': 500,
+            'max_tokens': 800,
           }),
         )
         .timeout(const Duration(seconds: 60));
@@ -328,8 +356,39 @@ class AiService {
         case '账单':
           category = MemoryCategory.bill;
           break;
+        case '服饰':
+          category = MemoryCategory.clothing;
+          break;
         default:
           category = MemoryCategory.note;
+      }
+
+      // 二次校验：如果 AI 分类为随手记，但内容中包含服饰关键词，强制改为服饰
+      if (category == MemoryCategory.note) {
+        final fullText = '$title ${json['summary'] ?? ''} ${jsonStr}'.toLowerCase();
+        const clothingKeywords = [
+          // 上衣
+          't恤', '衬衫', '卫衣', '毛衣', '夹克', '外套', '大衣', '羽绒服',
+          '马甲', 'polo', '背心', '风衣', '西装', '棉服', '冲锋衣', '衬衣',
+          '短袖', '长袖', '上衣', '打底衫', '针织衫', '开衫',
+          // 下装
+          '裤子', '牛仔裤', '短裤', '运动裤', '裙子', '连衣裙', '半身裙',
+          '休闲裤', '西裤', '阔腿裤', '长裤', '裙裤', '百褶裙',
+          // 鞋
+          '运动鞋', '靴子', '凉鞋', '拖鞋', '皮鞋', '帆布鞋', '高跟鞋',
+          '板鞋', '跑鞋', '球鞋', '单鞋', '乐福鞋', '马丁靴', '雪地靴',
+          // 配饰
+          '帽子', '围巾', '手套', '腰带', '领带', '袜子',
+          // 通用
+          '服装', '服饰', '穿搭', '尺码', '码数', 'clothingname', 'clothingtype',
+        ];
+        for (final keyword in clothingKeywords) {
+          if (fullText.contains(keyword)) {
+            category = MemoryCategory.clothing;
+            debugPrint('二次校验命中服饰关键词: $keyword，强制改为服饰分类');
+            break;
+          }
+        }
       }
 
       // 辅助函数：获取非空字符串
@@ -420,6 +479,20 @@ class AiService {
         billTime: parseBillTime(getNonEmptyString(json, 'billTime')),
         summary: getNonEmptyString(json, 'summary'),
         infoSections: parseInfoSections(json['infoSections'] as List<dynamic>?),
+        clothingName: getNonEmptyString(json, 'clothingName'),
+        clothingType: getNonEmptyString(json, 'clothingType'),
+        clothingColors: (json['clothingColors'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
+        clothingSeasons: (json['clothingSeasons'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
+        clothingBrand: getNonEmptyString(json, 'clothingBrand'),
+        clothingPrice: getNonEmptyString(json, 'clothingPrice'),
+        clothingSize: getNonEmptyString(json, 'clothingSize'),
+        clothingPurchaseDate: getNonEmptyString(json, 'clothingPurchaseDate'),
       );
     } catch (e) {
       return MemoryItem(

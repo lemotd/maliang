@@ -9,6 +9,7 @@ import '../widgets/ai_glow_border.dart';
 import '../widgets/ai_chat_sheet.dart';
 import '../services/ai_service.dart';
 import 'memory_detail_page.dart';
+import '../utils/scroll_edge_haptic.dart';
 
 class BillSummaryPage extends StatefulWidget {
   final List<MemoryItem> bills;
@@ -370,7 +371,8 @@ class _BillSummaryPageState extends State<BillSummaryPage>
               children: [
                 _buildAppBar(isDark, isCollapsed),
                 Expanded(
-                  child: NotificationListener<ScrollNotification>(
+                  child: ScrollEdgeHaptic(
+                    child: NotificationListener<ScrollNotification>(
                     onNotification: (notification) {
                       if (notification is ScrollEndNotification) {
                         _onScrollEnd();
@@ -617,6 +619,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                           ),
                       ],
                     ),
+                  ),
                   ),
                 ),
               ],

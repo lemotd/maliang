@@ -8,6 +8,7 @@ import '../services/config_service.dart';
 import '../services/ai_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
+import '../utils/scroll_edge_haptic.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -134,7 +135,8 @@ class _SettingsPageState extends State<SettingsPage> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : ListView(
+                  : ScrollEdgeHaptic(
+                      child: ListView(
                       physics: const BouncingScrollPhysics(
                         parent: AlwaysScrollableScrollPhysics(),
                       ),
@@ -208,6 +210,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         const SizedBox(height: 12),
                         _buildApiKeyGuide(context),
                       ],
+                    ),
                     ),
             ),
           ],

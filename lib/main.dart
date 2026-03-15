@@ -19,6 +19,7 @@ import 'services/ai_service.dart';
 import 'services/notification_service.dart';
 import 'services/image_cache_service.dart';
 import 'theme/app_colors.dart';
+import 'utils/scroll_edge_haptic.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -632,7 +633,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     final totalItems = _loadingCount + _memories.length;
 
-    return ListView.builder(
+    return ScrollEdgeHaptic(
+      child: ListView.builder(
       addAutomaticKeepAlives: true,
       addRepaintBoundaries: true,
       cacheExtent: 500,
@@ -668,6 +670,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           onToggleComplete: () => _toggleComplete(memory),
         );
       },
+    ),
     );
   }
 
@@ -776,6 +779,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 _buildInfoRow('支付方式', memory.paymentMethod!),
               if (memory.merchantName != null)
                 _buildInfoRow('商户名称', memory.merchantName!),
+            ]),
+          );
+        }
+        break;
+      case MemoryCategory.clothing:
+        // 服饰详细信息
+        if (memory.clothingType != null ||
+            memory.clothingBrand != null ||
+            memory.clothingPrice != null) {
+          widgets.add(const SizedBox(height: 16));
+          widgets.add(
+            _buildInfoCard([
+              if (memory.clothingType != null)
+                _buildInfoRow('分类', memory.clothingType!),
+              if (memory.clothingBrand != null)
+                _buildInfoRow('品牌', memory.clothingBrand!),
+              if (memory.clothingPrice != null)
+                _buildInfoRow('价格', memory.clothingPrice!),
             ]),
           );
         }

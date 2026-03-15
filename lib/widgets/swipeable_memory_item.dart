@@ -698,6 +698,8 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
         return Icons.inventory_2;
       case MemoryCategory.bill:
         return Icons.receipt_long;
+      case MemoryCategory.clothing:
+        return Icons.checkroom;
       case MemoryCategory.note:
         return Icons.note_alt;
     }

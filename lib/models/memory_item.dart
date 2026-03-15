@@ -4,6 +4,7 @@ enum MemoryCategory {
   pickupCode('取餐码', Color(0xFFFF9500)),
   packageCode('取件码', Color(0xFF34C759)),
   bill('账单', Color(0xFF007AFF)),
+  clothing('服饰', Color(0xFFE91E63)),
   note('随手记', Color(0xFF8E8E93));
 
   final String label;
@@ -79,6 +80,16 @@ class MemoryItem {
   final String? summary; // AI生成的账单摘要
   final List<InfoSection> infoSections; // 结构化信息区域
 
+  // 服饰专属字段
+  final String? clothingName; // 服饰名称
+  final String? clothingType; // 分类（T恤、衬衫等）
+  final List<String> clothingColors; // 色系（hex色值列表）
+  final List<String> clothingSeasons; // 适用季节
+  final String? clothingBrand; // 品牌
+  final String? clothingPrice; // 价格
+  final String? clothingSize; // 尺码
+  final String? clothingPurchaseDate; // 购买日期
+
   MemoryItem({
     required this.id,
     required this.title,
@@ -104,6 +115,14 @@ class MemoryItem {
     this.billTime,
     this.summary,
     this.infoSections = const [],
+    this.clothingName,
+    this.clothingType,
+    this.clothingColors = const [],
+    this.clothingSeasons = const [],
+    this.clothingBrand,
+    this.clothingPrice,
+    this.clothingSize,
+    this.clothingPurchaseDate,
   });
 
   MemoryItem copyWith({
@@ -131,6 +150,14 @@ class MemoryItem {
     DateTime? billTime,
     String? summary,
     List<InfoSection>? infoSections,
+    String? clothingName,
+    String? clothingType,
+    List<String>? clothingColors,
+    List<String>? clothingSeasons,
+    String? clothingBrand,
+    String? clothingPrice,
+    String? clothingSize,
+    String? clothingPurchaseDate,
   }) {
     return MemoryItem(
       id: id ?? this.id,
@@ -157,6 +184,14 @@ class MemoryItem {
       billTime: billTime ?? this.billTime,
       summary: summary ?? this.summary,
       infoSections: infoSections ?? this.infoSections,
+      clothingName: clothingName ?? this.clothingName,
+      clothingType: clothingType ?? this.clothingType,
+      clothingColors: clothingColors ?? this.clothingColors,
+      clothingSeasons: clothingSeasons ?? this.clothingSeasons,
+      clothingBrand: clothingBrand ?? this.clothingBrand,
+      clothingPrice: clothingPrice ?? this.clothingPrice,
+      clothingSize: clothingSize ?? this.clothingSize,
+      clothingPurchaseDate: clothingPurchaseDate ?? this.clothingPurchaseDate,
     );
   }
 
@@ -186,6 +221,14 @@ class MemoryItem {
       'billTime': billTime?.toIso8601String(),
       'summary': summary,
       'infoSections': infoSections.map((e) => e.toJson()).toList(),
+      'clothingName': clothingName,
+      'clothingType': clothingType,
+      'clothingColors': clothingColors,
+      'clothingSeasons': clothingSeasons,
+      'clothingBrand': clothingBrand,
+      'clothingPrice': clothingPrice,
+      'clothingSize': clothingSize,
+      'clothingPurchaseDate': clothingPurchaseDate,
     };
   }
 
@@ -224,6 +267,20 @@ class MemoryItem {
               ?.map((e) => InfoSection.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      clothingName: json['clothingName'] as String?,
+      clothingType: json['clothingType'] as String?,
+      clothingColors: (json['clothingColors'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      clothingSeasons: (json['clothingSeasons'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      clothingBrand: json['clothingBrand'] as String?,
+      clothingPrice: json['clothingPrice'] as String?,
+      clothingSize: json['clothingSize'] as String?,
+      clothingPurchaseDate: json['clothingPurchaseDate'] as String?,
     );
   }
 
@@ -283,6 +340,17 @@ class MemoryItem {
         }
         if (merchantName != null && merchantName!.isNotEmpty) {
           details.add(merchantName!);
+        }
+        break;
+      case MemoryCategory.clothing:
+        if (clothingType != null && clothingType!.isNotEmpty) {
+          details.add(clothingType!);
+        }
+        if (clothingBrand != null && clothingBrand!.isNotEmpty) {
+          details.add(clothingBrand!);
+        }
+        if (clothingPrice != null && clothingPrice!.isNotEmpty) {
+          details.add(clothingPrice!);
         }
         break;
       case MemoryCategory.note:

@@ -9,6 +9,7 @@ import '../models/bill_category.dart';
 import '../services/memory_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
+import '../utils/scroll_edge_haptic.dart';
 
 class _MildBounceCurve extends Curve {
   const _MildBounceCurve();
@@ -546,6 +547,400 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
   }
 }
 
+class _ColorPickerSheet extends StatefulWidget {
+  final bool isDark;
+  final List<String> selectedColors;
+  final ValueChanged<List<String>> onChanged;
+
+  const _ColorPickerSheet({
+    required this.isDark,
+    required this.selectedColors,
+    required this.onChanged,
+  });
+
+  @override
+  State<_ColorPickerSheet> createState() => _ColorPickerSheetState();
+}
+
+class _ColorPickerSheetState extends State<_ColorPickerSheet> {
+  late List<String> _selected;
+
+  static const _presetColors = [
+    '#000000', '#FFFFFF', '#FF0000', '#FF4500', '#FF6347',
+    '#FF69B4', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5',
+    '#2196F3', '#03A9F4', '#00BCD4', '#009688', '#4CAF50',
+    '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC107', '#FF9800',
+    '#795548', '#9E9E9E', '#607D8B', '#F5F5DC', '#C0C0C0',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = List<String>.from(widget.selectedColors);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceHigh(isDark),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  '选择颜色',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.onSurface(isDark),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${_selected.length}/5',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.onSurfaceQuaternary(isDark),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: _presetColors.map((hex) {
+                final colorValue = int.tryParse(
+                  hex.replaceAll('#', 'FF'),
+                  radix: 16,
+                ) ?? 0xFF888888;
+                final isSelected = _selected.contains(hex);
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (isSelected) {
+                        _selected.remove(hex);
+                      } else if (_selected.length < 5) {
+                        _selected.add(hex);
+                      }
+                    });
+                  },
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Color(colorValue),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColors.primary(isDark)
+                            : AppColors.outline(isDark),
+                        width: isSelected ? 3 : 1.5,
+                      ),
+                    ),
+                    child: isSelected
+                        ? const Icon(Icons.check, color: Colors.white, size: 18)
+                        : null,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: CupertinoButton(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                color: AppColors.primary(isDark),
+                borderRadius: BorderRadius.circular(24),
+                onPressed: () => widget.onChanged(_selected),
+                child: const Text(
+                  '确定',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SizePickerSheet extends StatefulWidget {
+  final bool isDark;
+  final String currentSize;
+  final ValueChanged<String> onSelected;
+  final VoidCallback onSizeCleared;
+  final List<String> customClothingSizes;
+  final List<String> customShoeSizes;
+  final void Function(List<String> clothingSizes, List<String> shoeSizes) onCustomSizesChanged;
+
+  const _SizePickerSheet({
+    required this.isDark,
+    required this.currentSize,
+    required this.onSelected,
+    required this.onSizeCleared,
+    required this.customClothingSizes,
+    required this.customShoeSizes,
+    required this.onCustomSizesChanged,
+  });
+
+  @override
+  State<_SizePickerSheet> createState() => _SizePickerSheetState();
+}
+
+class _SizePickerSheetState extends State<_SizePickerSheet> {
+  int _tab = 0;
+  final TextEditingController _customCtrl = TextEditingController();
+  late List<String> _customClothing;
+  late List<String> _customShoe;
+
+  static const _clothingSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+  static const _shoeSizes = [
+    '35', '35.5', '36', '36.5', '37', '37.5', '38', '38.5',
+    '39', '39.5', '40', '40.5', '41', '41.5', '42', '42.5',
+    '43', '43.5', '44', '44.5', '45',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _customClothing = List<String>.from(widget.customClothingSizes);
+    _customShoe = List<String>.from(widget.customShoeSizes);
+  }
+
+  @override
+  void dispose() {
+    _customCtrl.dispose();
+    super.dispose();
+  }
+
+  List<String> get _currentCustom => _tab == 0 ? _customClothing : _customShoe;
+
+  void _addCustomSize() {
+    final v = _customCtrl.text.trim();
+    if (v.isEmpty) return;
+    final builtIn = _tab == 0 ? _clothingSizes : _shoeSizes;
+    final custom = _tab == 0 ? _customClothing : _customShoe;
+    if (builtIn.contains(v) || custom.contains(v)) {
+      // Already exists, just select it
+      widget.onSelected(v);
+      return;
+    }
+    setState(() {
+      if (_tab == 0) {
+        _customClothing.add(v);
+      } else {
+        _customShoe.add(v);
+      }
+      _customCtrl.clear();
+    });
+    widget.onCustomSizesChanged(_customClothing, _customShoe);
+  }
+
+  void _removeCustomSize(String size) {
+    final wasSelected = widget.currentSize == size;
+    setState(() {
+      if (_tab == 0) {
+        _customClothing.remove(size);
+      } else {
+        _customShoe.remove(size);
+      }
+    });
+    widget.onCustomSizesChanged(_customClothing, _customShoe);
+    if (wasSelected) {
+      widget.onSizeCleared();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final builtInSizes = _tab == 0 ? _clothingSizes : _shoeSizes;
+    final customSizes = _currentCustom;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceHigh(isDark),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '选择尺码',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurface(isDark),
+                    ),
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    height: 32,
+                    child: CupertinoSlidingSegmentedControl<int>(
+                      groupValue: _tab,
+                      thumbColor: AppColors.containerList(isDark),
+                      children: const {
+                        0: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 10),
+                          child: Text('衣服', style: TextStyle(fontSize: 13)),
+                        ),
+                        1: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 10),
+                          child: Text('鞋子', style: TextStyle(fontSize: 13)),
+                        ),
+                      },
+                      onValueChanged: (v) {
+                        if (v != null) setState(() => _tab = v);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  // 内置尺码
+                  ...builtInSizes.map((size) => _buildSizeChip(size, isDark, isCustom: false)),
+                  // 自定义尺码
+                  ...customSizes.map((size) => _buildSizeChip(size, isDark, isCustom: true)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Text(
+                    '自定义',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.onSurfaceQuaternary(isDark),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _customCtrl,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.onSurface(isDark),
+                      ),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        hintText: '输入尺码',
+                        hintStyle: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.onSurfaceOctonary(isDark),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: BorderSide(color: AppColors.outline(isDark)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: BorderSide(color: AppColors.outline(isDark)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: BorderSide(color: AppColors.primary(isDark)),
+                        ),
+                      ),
+                      onSubmitted: (_) => _addCustomSize(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minSize: 32,
+                    onPressed: _addCustomSize,
+                    child: Text(
+                      '添加',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.primary(isDark),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSizeChip(String size, bool isDark, {required bool isCustom}) {
+    final selected = widget.currentSize == size;
+    return GestureDetector(
+      onTap: () => widget.onSelected(size),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary(isDark).withOpacity(0.1)
+              : AppColors.surfaceContainer(isDark),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary(isDark)
+                : AppColors.outline(isDark),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              size,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                color: selected
+                    ? AppColors.primary(isDark)
+                    : AppColors.onSurface(isDark),
+              ),
+            ),
+            if (isCustom) ...[
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => _removeCustomSize(size),
+                child: Icon(
+                  CupertinoIcons.xmark,
+                  size: 12,
+                  color: AppColors.onSurfaceQuaternary(isDark),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class MemoryDetailPage extends StatefulWidget {
   final MemoryItem memory;
 
@@ -571,6 +966,19 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   double _imageDisplayHeight = 0;
   double _requiredOffset = 1.0;
 
+  // 服饰编辑状态
+  bool _isEditingClothing = false;
+  late TextEditingController _clothingNameCtrl;
+  late TextEditingController _clothingTypeCtrl;
+  late TextEditingController _clothingBrandCtrl;
+  late TextEditingController _clothingPriceCtrl;
+  List<String> _editingColors = [];
+  List<String> _editingSeasons = [];
+  String _editingSize = '';
+  String _editingPurchaseDate = '';
+  List<String> _customClothingSizes = [];
+  List<String> _customShoeSizes = [];
+
   @override
   void initState() {
     super.initState();
@@ -579,6 +987,10 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       vsync: this,
       duration: const Duration(milliseconds: 350),
     );
+    _clothingNameCtrl = TextEditingController();
+    _clothingTypeCtrl = TextEditingController();
+    _clothingBrandCtrl = TextEditingController();
+    _clothingPriceCtrl = TextEditingController();
     _loadImageSize();
   }
 
@@ -605,6 +1017,10 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     _controller.dispose();
     _scrollController.dispose();
     _selectionFocusNode.dispose();
+    _clothingNameCtrl.dispose();
+    _clothingTypeCtrl.dispose();
+    _clothingBrandCtrl.dispose();
+    _clothingPriceCtrl.dispose();
     super.dispose();
   }
 
@@ -822,6 +1238,10 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
+          if (_isEditingClothing) {
+            _saveClothingEdits();
+            return;
+          }
           debugPrint('PopScope 返回数据: ${_memory.title}');
           Navigator.pop(context, _memory);
         }
@@ -876,7 +1296,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                       ),
                     ],
                   ),
-                  child: SingleChildScrollView(
+                  child: ScrollEdgeHaptic(
+                    child: SingleChildScrollView(
                     controller: _scrollController,
                     physics: _offset < 0.5 && !_isDragging
                         ? const BouncingScrollPhysics(
@@ -901,12 +1322,15 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                               const SizedBox(height: 20),
                               _buildSummarySection(isDark),
                             ],
+                          ] else if (_memory.category == MemoryCategory.clothing) ...[
+                            _buildClothingDetailInfo(isDark),
                           ] else ...[
                             _buildDetailInfo(isDark),
                           ],
                         ],
                       ),
                     ),
+                  ),
                   ),
                 ),
               ),
@@ -924,18 +1348,44 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                     : Colors.transparent,
                 child: Stack(
                   children: [
-                    Positioned(
-                      left: 8,
-                      top: 0,
-                      bottom: 0,
-                      child: GlassButton(
-                        icon: CupertinoIcons.back,
-                        onTap: () {
-                          debugPrint('返回按钮点击，返回数据: ${_memory.title}');
-                          Navigator.pop(context, _memory);
-                        },
+                    if (!_isEditingClothing)
+                      Positioned(
+                        left: 8,
+                        top: 0,
+                        bottom: 0,
+                        child: GlassButton(
+                          icon: CupertinoIcons.back,
+                          onTap: () {
+                            debugPrint('返回按钮点击，返回数据: ${_memory.title}');
+                            Navigator.pop(context, _memory);
+                          },
+                        ),
                       ),
-                    ),
+                    if (_isEditingClothing)
+                      Center(
+                        child: Text(
+                          '编辑中',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.onSurface(isDark),
+                          ),
+                        ),
+                      ),
+                    if (_memory.category == MemoryCategory.clothing)
+                      Positioned(
+                        right: 8,
+                        top: 0,
+                        bottom: 0,
+                        child: GlassButton(
+                          icon: _isEditingClothing
+                              ? CupertinoIcons.checkmark_alt
+                              : CupertinoIcons.pencil,
+                          onTap: _isEditingClothing
+                              ? _saveClothingEdits
+                              : _enterClothingEditMode,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -1246,6 +1696,17 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         }
         if (_memory.merchantName != null && _memory.merchantName!.isNotEmpty) {
           details.add(_buildInfoRow('商户', _memory.merchantName!, isDark));
+        }
+        break;
+      case MemoryCategory.clothing:
+        if (_memory.clothingType != null && _memory.clothingType!.isNotEmpty) {
+          details.add(_buildInfoRow('分类', _memory.clothingType!, isDark));
+        }
+        if (_memory.clothingBrand != null && _memory.clothingBrand!.isNotEmpty) {
+          details.add(_buildInfoRow('品牌', _memory.clothingBrand!, isDark));
+        }
+        if (_memory.clothingPrice != null && _memory.clothingPrice!.isNotEmpty) {
+          details.add(_buildInfoRow('价格', _memory.clothingPrice!, isDark));
         }
         break;
       case MemoryCategory.note:
@@ -1562,6 +2023,499 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     return '${time.year}年${time.month}月${time.day}日 ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
+  void _enterClothingEditMode() {
+    setState(() {
+      _isEditingClothing = true;
+      _clothingNameCtrl.text = _memory.clothingName ?? '';
+      _clothingTypeCtrl.text = _memory.clothingType ?? '';
+      _clothingBrandCtrl.text = _memory.clothingBrand ?? '';
+      _clothingPriceCtrl.text = _memory.clothingPrice ?? '';
+      _editingColors = List<String>.from(_memory.clothingColors);
+      _editingSeasons = List<String>.from(_memory.clothingSeasons);
+      _editingSize = _memory.clothingSize ?? '';
+      _editingPurchaseDate = _memory.clothingPurchaseDate ?? '';
+    });
+  }
+
+  Future<void> _saveClothingEdits() async {
+    final updated = _memory.copyWith(
+      clothingName: _clothingNameCtrl.text.trim(),
+      clothingType: _clothingTypeCtrl.text.trim(),
+      clothingBrand: _clothingBrandCtrl.text.trim(),
+      clothingPrice: _clothingPriceCtrl.text.trim(),
+      clothingColors: _editingColors,
+      clothingSeasons: _editingSeasons,
+      clothingSize: _editingSize,
+      clothingPurchaseDate: _editingPurchaseDate,
+    );
+    final memoryService = MemoryService();
+    await memoryService.updateMemory(updated);
+    setState(() {
+      _memory = updated;
+      _isEditingClothing = false;
+    });
+  }
+
+  void _showColorPicker(bool isDark) {
+    FocusScope.of(context).unfocus();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return _ColorPickerSheet(
+          isDark: isDark,
+          selectedColors: _editingColors,
+          onChanged: (colors) {
+            setState(() => _editingColors = colors);
+            Navigator.pop(ctx);
+          },
+        );
+      },
+    );
+  }
+
+  void _showSizePicker(bool isDark) {
+    FocusScope.of(context).unfocus();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return _SizePickerSheet(
+          isDark: isDark,
+          currentSize: _editingSize,
+          customClothingSizes: _customClothingSizes,
+          customShoeSizes: _customShoeSizes,
+          onSelected: (size) {
+            setState(() => _editingSize = size);
+            Navigator.pop(ctx);
+          },
+          onSizeCleared: () {
+            setState(() => _editingSize = '');
+          },
+          onCustomSizesChanged: (clothingSizes, shoeSizes) {
+            setState(() {
+              _customClothingSizes = clothingSizes;
+              _customShoeSizes = shoeSizes;
+            });
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showPurchaseDatePicker() async {
+    FocusScope.of(context).unfocus();
+    final now = DateTime.now();
+    DateTime initial = now;
+    if (_editingPurchaseDate.isNotEmpty) {
+      try {
+        initial = DateTime.parse(_editingPurchaseDate);
+      } catch (_) {}
+    }
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: now,
+    );
+    if (picked != null) {
+      setState(() {
+        _editingPurchaseDate =
+            '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      });
+    }
+  }
+
+  Widget _buildClothingDetailInfo(bool isDark) {
+    final m = _memory;
+    final children = <Widget>[];
+
+    // 标题和创建时间
+    children.add(_buildTitleCard(isDark));
+
+    // AI 总结
+    if (m.summary != null && m.summary!.isNotEmpty) {
+      children.add(const SizedBox(height: 20));
+      children.add(_buildSummarySection(isDark));
+    }
+
+    // 模块一：服饰属性
+    children.add(const SizedBox(height: 24));
+    children.add(Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '服饰属性',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppColors.onSurface(isDark),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _isEditingClothing
+              ? _buildEditableRow('名称', _clothingNameCtrl, isDark)
+              : _buildFlexInfoRow('名称', m.clothingName ?? '', isDark),
+          const SizedBox(height: 16),
+          _isEditingClothing
+              ? _buildEditableRow('分类', _clothingTypeCtrl, isDark)
+              : _buildFlexInfoRow('分类', m.clothingType ?? '', isDark),
+          const SizedBox(height: 16),
+          // 色系
+          _buildColorRow(isDark),
+          const SizedBox(height: 16),
+          // 适用季节
+          _buildSeasonRow(isDark),
+          const SizedBox(height: 16),
+          // 尺码
+          _isEditingClothing
+              ? _buildTappableRow('尺码', _editingSize, isDark, onTap: () => _showSizePicker(isDark))
+              : _buildFlexInfoRow('尺码', m.clothingSize ?? '', isDark),
+          const SizedBox(height: 16),
+          _isEditingClothing
+              ? _buildEditableRow('品牌', _clothingBrandCtrl, isDark)
+              : _buildFlexInfoRow('品牌', m.clothingBrand ?? '', isDark),
+        ],
+      ),
+    ));
+
+    // 模块二：交易信息
+    children.add(const SizedBox(height: 24));
+    children.add(Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '交易信息',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppColors.onSurface(isDark),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _isEditingClothing
+              ? _buildEditableRow('价格', _clothingPriceCtrl, isDark)
+              : _buildFlexInfoRow('价格', m.clothingPrice ?? '', isDark),
+          const SizedBox(height: 16),
+          _isEditingClothing
+              ? _buildTappableRow('购买日期', _editingPurchaseDate, isDark, onTap: _showPurchaseDatePicker)
+              : _buildFlexInfoRow('购买日期', m.clothingPurchaseDate ?? '', isDark),
+        ],
+      ),
+    ));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+  }
+
+  Widget _buildColorRow(bool isDark) {
+    final colors = _isEditingClothing ? _editingColors : _memory.clothingColors;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          '色系',
+          style: TextStyle(
+            fontSize: 15,
+            color: AppColors.onSurfaceQuaternary(isDark),
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (colors.isNotEmpty)
+                ...colors.take(5).map((hex) {
+                  final colorValue = int.tryParse(
+                    hex.replaceAll('#', 'FF'),
+                    radix: 16,
+                  ) ?? 0xFF888888;
+                  return Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: GestureDetector(
+                      onTap: _isEditingClothing
+                          ? () {
+                              setState(() => _editingColors.remove(hex));
+                            }
+                          : null,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: Color(colorValue),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.outline(isDark),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: _isEditingClothing
+                            ? Icon(CupertinoIcons.xmark, size: 12, color: Colors.white.withOpacity(0.8))
+                            : null,
+                      ),
+                    ),
+                  );
+                })
+              else if (!_isEditingClothing)
+                const SizedBox.shrink(),
+              if (_isEditingClothing && colors.length < 5)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: GestureDetector(
+                    onTap: () => _showColorPicker(isDark),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.onSurfaceQuaternary(isDark),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Icon(
+                        CupertinoIcons.add,
+                        size: 14,
+                        color: AppColors.onSurfaceQuaternary(isDark),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _seasonColor(String season) {
+    switch (season) {
+      case '春季': return const Color(0xFF4CAF50);
+      case '夏季': return const Color(0xFFFF9800);
+      case '秋季': return const Color(0xFFFF5722);
+      case '冬季': return const Color(0xFF2196F3);
+      default: return const Color(0xFF9E9E9E);
+    }
+  }
+
+  Widget _buildSeasonRow(bool isDark) {
+    final seasons = _isEditingClothing ? _editingSeasons : _memory.clothingSeasons;
+    const allSeasons = ['春季', '夏季', '秋季', '冬季'];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          '季节',
+          style: TextStyle(
+            fontSize: 15,
+            color: AppColors.onSurfaceQuaternary(isDark),
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: _isEditingClothing
+              ? Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: allSeasons.map((season) {
+                    final selected = _editingSeasons.contains(season);
+                    final color = _seasonColor(season);
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          if (selected) {
+                            _editingSeasons.remove(season);
+                          } else {
+                            _editingSeasons.add(season);
+                          }
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? color.withOpacity(0.1)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: selected
+                                ? color.withOpacity(0.4)
+                                : AppColors.outline(isDark),
+                          ),
+                        ),
+                        child: Text(
+                          season,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: selected
+                                ? color
+                                : AppColors.onSurfaceQuaternary(isDark),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                )
+              : seasons.isNotEmpty
+                  ? Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: seasons.map((season) {
+                        final color = _seasonColor(season);
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: color.withOpacity(0.4),
+                            ),
+                          ),
+                          child: Text(
+                            season,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: color,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    )
+                  : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  /// 可编辑文本行（带下划线）
+  Widget _buildEditableRow(String label, TextEditingController ctrl, bool isDark) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 15,
+            color: AppColors.onSurfaceQuaternary(isDark),
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: TextField(
+            controller: ctrl,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 15,
+              color: AppColors.onSurface(isDark),
+            ),
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: const EdgeInsets.only(bottom: 4),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: AppColors.outline(isDark)),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: AppColors.primary(isDark)),
+              ),
+              hintText: '',
+              hintStyle: TextStyle(
+                fontSize: 15,
+                color: AppColors.onSurfaceOctonary(isDark),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 可点击行（胶囊描边样式，用于选择器）
+  Widget _buildTappableRow(String label, String value, bool isDark, {required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 15,
+              color: AppColors.onSurfaceQuaternary(isDark),
+            ),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.outline(isDark)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value.isEmpty ? '请选择' : value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: value.isEmpty
+                        ? AppColors.onSurfaceOctonary(isDark)
+                        : AppColors.onSurface(isDark),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  CupertinoIcons.chevron_right,
+                  size: 12,
+                  color: AppColors.onSurfaceQuaternary(isDark),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 自适应宽度的信息行，label 不固定宽度
+  Widget _buildFlexInfoRow(String label, String value, bool isDark) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 15,
+            color: AppColors.onSurfaceQuaternary(isDark),
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 15,
+              color: AppColors.onSurface(isDark),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   IconData _getCategoryIcon(MemoryCategory category) {
     switch (category) {
       case MemoryCategory.pickupCode:
@@ -1570,6 +2524,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         return Icons.inventory_2;
       case MemoryCategory.bill:
         return Icons.receipt_long;
+      case MemoryCategory.clothing:
+        return Icons.checkroom;
       case MemoryCategory.note:
         return Icons.note_alt;
     }
