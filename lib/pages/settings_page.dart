@@ -5,6 +5,7 @@ import '../widgets/glass_button.dart';
 import '../utils/scroll_edge_haptic.dart';
 import 'ai_model_settings_page.dart';
 import 'backup_settings_page.dart';
+import 'about_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -73,6 +74,20 @@ class _SettingsPageState extends State<SettingsPage> {
                           if (result == true && mounted) {
                             Navigator.pop(context, true);
                           }
+                        },
+                      ),
+                      _buildSettingsItem(
+                        context,
+                        title: '关于软件',
+                        subtitle: '版本信息',
+                        icon: CupertinoIcons.info,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            CupertinoPageRoute(
+                              builder: (context) => const AboutPage(),
+                            ),
+                          );
                         },
                       ),
                     ],

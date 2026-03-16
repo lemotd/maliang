@@ -7,9 +7,12 @@ import 'dart:math' as math;
 import '../models/memory_item.dart';
 import '../models/bill_category.dart';
 import '../services/memory_service.dart';
+import '../services/ai_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
 import '../utils/scroll_edge_haptic.dart';
+import '../widgets/ai_glow_border.dart';
+import '../main.dart';
 import 'image_viewer_page.dart';
 
 class _MildBounceCurve extends Curve {
@@ -1068,6 +1071,16 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   double _imageDisplayHeight = 0;
   double _requiredOffset = 1.0;
   bool _eventPressed = false;
+  bool _isReanalyzing = false;
+  final GlobalKey _moreButtonKey = GlobalKey();
+  OverlayEntry? _menuOverlay;
+  // 流式文本动画
+  bool _isStreamingContent = false;
+  double _streamRevealFraction = 1.0;
+
+  // 服务
+  final _aiService = AiService();
+  final _memoryService = MemoryService();
 
   // 服饰编辑状态
   bool _isEditingClothing = false;
@@ -1145,6 +1158,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     _clothingTypeFocus.dispose();
     _clothingBrandFocus.dispose();
     _clothingPriceFocus.dispose();
+    _menuOverlay?.remove();
+    _menuOverlay = null;
     super.dispose();
   }
 
@@ -1427,37 +1442,42 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                       padding: EdgeInsets.only(bottom: safeAreaBottom + 20),
                       child: SelectionArea(
                         focusNode: _selectionFocusNode,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 20),
-                            if (_memory.category == MemoryCategory.bill) ...[
-                              _buildBillSummaryCard(isDark),
-                              const SizedBox(height: 20),
-                              _buildBillDetailInfo(isDark),
-                              if (_memory.summary != null &&
-                                  _memory.summary!.isNotEmpty) ...[
-                                const SizedBox(height: 20),
-                                _buildSummarySection(isDark),
-                              ],
-                              if (_memory.eventName != null &&
-                                  _memory.eventStartTime != null) ...[
-                                const SizedBox(height: 20),
-                                _buildEventSection(isDark),
-                              ],
-                            ] else if (_memory.category ==
-                                MemoryCategory.clothing) ...[
-                              _buildClothingDetailInfo(isDark),
-                              if (_memory.eventName != null &&
-                                  _memory.eventStartTime != null) ...[
-                                const SizedBox(height: 20),
-                                _buildEventSection(isDark),
-                              ],
-                            ] else ...[
-                              _buildDetailInfo(isDark),
-                            ],
-                          ],
-                        ),
+                        child: _isReanalyzing
+                            ? _buildSkeletonContent(isDark)
+                            : _wrapStreamReveal(
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 20),
+                                    if (_memory.category ==
+                                        MemoryCategory.bill) ...[
+                                      _buildBillSummaryCard(isDark),
+                                      const SizedBox(height: 20),
+                                      _buildBillDetailInfo(isDark),
+                                      if (_memory.summary != null &&
+                                          _memory.summary!.isNotEmpty) ...[
+                                        const SizedBox(height: 20),
+                                        _buildSummarySection(isDark),
+                                      ],
+                                      if (_memory.eventName != null &&
+                                          _memory.eventStartTime != null) ...[
+                                        const SizedBox(height: 20),
+                                        _buildEventSection(isDark),
+                                      ],
+                                    ] else if (_memory.category ==
+                                        MemoryCategory.clothing) ...[
+                                      _buildClothingDetailInfo(isDark),
+                                      if (_memory.eventName != null &&
+                                          _memory.eventStartTime != null) ...[
+                                        const SizedBox(height: 20),
+                                        _buildEventSection(isDark),
+                                      ],
+                                    ] else ...[
+                                      _buildDetailInfo(isDark),
+                                    ],
+                                  ],
+                                ),
+                              ),
                       ),
                     ),
                   ),
@@ -1525,7 +1545,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                       ),
                     if (_memory.category == MemoryCategory.clothing)
                       Positioned(
-                        right: 8,
+                        right: 54,
                         top: 0,
                         bottom: 0,
                         child: AnimatedSwitcher(
@@ -1545,6 +1565,29 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                           ),
                         ),
                       ),
+                    // 更多菜单按钮
+                    Positioned(
+                      right: 8,
+                      top: 0,
+                      bottom: 0,
+                      child: AnimatedBuilder(
+                        animation: _editAnimation,
+                        builder: (context, child) => Opacity(
+                          opacity: 1.0 - _editAnimation.value,
+                          child: IgnorePointer(
+                            ignoring: _isEditingClothing,
+                            child: child,
+                          ),
+                        ),
+                        child: GlassButton(
+                          key: _moreButtonKey,
+                          icon: CupertinoIcons.ellipsis,
+                          onTap: () => _showMoreMenu(
+                            Theme.of(context).brightness == Brightness.dark,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1673,7 +1716,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                               ),
                             if (_memory.category == MemoryCategory.clothing)
                               Positioned(
-                                right: 8,
+                                right: 54,
                                 top: 0,
                                 bottom: 0,
                                 child: AnimatedSwitcher(
@@ -1697,6 +1740,27 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                                   ),
                                 ),
                               ),
+                            // 更多菜单按钮
+                            Positioned(
+                              right: 8,
+                              top: 0,
+                              bottom: 0,
+                              child: AnimatedBuilder(
+                                animation: _editAnimation,
+                                builder: (context, child) => Opacity(
+                                  opacity: 1.0 - _editAnimation.value,
+                                  child: IgnorePointer(
+                                    ignoring: _isEditingClothing,
+                                    child: child,
+                                  ),
+                                ),
+                                child: GlassButton(
+                                  key: _moreButtonKey,
+                                  icon: CupertinoIcons.ellipsis,
+                                  onTap: () => _showMoreMenu(isDark),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1720,38 +1784,47 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                             ),
                             child: SelectionArea(
                               focusNode: _selectionFocusNode,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 20),
-                                  if (_memory.category ==
-                                      MemoryCategory.bill) ...[
-                                    _buildBillSummaryCard(isDark),
-                                    const SizedBox(height: 20),
-                                    _buildBillDetailInfo(isDark),
-                                    if (_memory.summary != null &&
-                                        _memory.summary!.isNotEmpty) ...[
-                                      const SizedBox(height: 20),
-                                      _buildSummarySection(isDark),
-                                    ],
-                                    if (_memory.eventName != null &&
-                                        _memory.eventStartTime != null) ...[
-                                      const SizedBox(height: 20),
-                                      _buildEventSection(isDark),
-                                    ],
-                                  ] else if (_memory.category ==
-                                      MemoryCategory.clothing) ...[
-                                    _buildClothingDetailInfo(isDark),
-                                    if (_memory.eventName != null &&
-                                        _memory.eventStartTime != null) ...[
-                                      const SizedBox(height: 20),
-                                      _buildEventSection(isDark),
-                                    ],
-                                  ] else ...[
-                                    _buildDetailInfo(isDark),
-                                  ],
-                                ],
-                              ),
+                              child: _isReanalyzing
+                                  ? _buildSkeletonContent(isDark)
+                                  : _wrapStreamReveal(
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const SizedBox(height: 20),
+                                          if (_memory.category ==
+                                              MemoryCategory.bill) ...[
+                                            _buildBillSummaryCard(isDark),
+                                            const SizedBox(height: 20),
+                                            _buildBillDetailInfo(isDark),
+                                            if (_memory.summary != null &&
+                                                _memory
+                                                    .summary!
+                                                    .isNotEmpty) ...[
+                                              const SizedBox(height: 20),
+                                              _buildSummarySection(isDark),
+                                            ],
+                                            if (_memory.eventName != null &&
+                                                _memory.eventStartTime !=
+                                                    null) ...[
+                                              const SizedBox(height: 20),
+                                              _buildEventSection(isDark),
+                                            ],
+                                          ] else if (_memory.category ==
+                                              MemoryCategory.clothing) ...[
+                                            _buildClothingDetailInfo(isDark),
+                                            if (_memory.eventName != null &&
+                                                _memory.eventStartTime !=
+                                                    null) ...[
+                                              const SizedBox(height: 20),
+                                              _buildEventSection(isDark),
+                                            ],
+                                          ] else ...[
+                                            _buildDetailInfo(isDark),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
@@ -1785,34 +1858,38 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       );
     }
 
+    final wideImageWidget = Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 20,
+            spreadRadius: 0,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Hero(
+          tag: 'memory_image_${_memory.id}',
+          child: Image.file(File(_memory.imagePath!), fit: BoxFit.contain),
+        ),
+      ),
+    );
+
     return _Pressable(
       onTap: () => _openImageViewer(),
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
-                  blurRadius: 20,
-                  spreadRadius: 0,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Hero(
-                tag: 'memory_image_${_memory.id}',
-                child: Image.file(
-                  File(_memory.imagePath!),
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-          ),
+          child: _isReanalyzing
+              ? AIGlowBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  child: wideImageWidget,
+                )
+              : wideImageWidget,
         ),
       ),
     );
@@ -1884,35 +1961,42 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     // 更新图片显示高度
     _imageDisplayHeight = displayHeight + verticalMargin * 2;
 
+    final imageWidget = Container(
+      margin: EdgeInsets.symmetric(vertical: verticalMargin),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 20,
+            spreadRadius: 0,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Hero(
+          tag: 'memory_image_${_memory.id}',
+          child: Image.file(
+            File(_memory.imagePath!),
+            width: displayWidth,
+            height: displayHeight,
+            fit: BoxFit.cover,
+          ),
+        ),
+      ),
+    );
+
     return Center(
       child: _Pressable(
         onTap: () => _openImageViewer(),
-        child: Container(
-          margin: EdgeInsets.symmetric(vertical: verticalMargin),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 20,
-                spreadRadius: 0,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Hero(
-              tag: 'memory_image_${_memory.id}',
-              child: Image.file(
-                File(_memory.imagePath!),
-                width: displayWidth,
-                height: displayHeight,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-        ),
+        child: _isReanalyzing
+            ? AIGlowBorder(
+                borderRadius: BorderRadius.circular(16),
+                child: imageWidget,
+              )
+            : imageWidget,
       ),
     );
   }
@@ -2140,6 +2224,253 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         ).showSnackBar(const SnackBar(content: Text('无法添加到日历')));
       }
     }
+  }
+
+  void _showMoreMenu(bool isDark) {
+    final renderBox =
+        _moreButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final buttonSize = renderBox.size;
+    final buttonPos = renderBox.localToGlobal(Offset.zero);
+    // 按钮中心点
+    final buttonCenter = Offset(
+      buttonPos.dx + buttonSize.width / 2,
+      buttonPos.dy + buttonSize.height / 2,
+    );
+
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+
+    void removeEntry() {
+      entry.remove();
+      _menuOverlay = null;
+    }
+
+    entry = OverlayEntry(
+      builder: (_) => _GlassMorphMenu(
+        isDark: isDark,
+        buttonCenter: buttonCenter,
+        buttonSize: 40.0, // GlassButton 内部圆形尺寸
+        onReanalyze: () {
+          removeEntry();
+          _confirmReanalyze(isDark);
+        },
+        onDelete: () {
+          removeEntry();
+          _confirmDelete(isDark);
+        },
+        onDismiss: removeEntry,
+      ),
+    );
+
+    _menuOverlay = entry;
+    overlay.insert(entry);
+  }
+
+  void _confirmReanalyze(bool isDark) {
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('AI 重新分析'),
+        content: const Text('将使用 AI 重新识别这张图片，当前内容会被覆盖。'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.pop(ctx);
+              _reanalyzeWithAI();
+            },
+            child: const Text('继续'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _reanalyzeWithAI() async {
+    if (_memory.imagePath == null) return;
+    setState(() => _isReanalyzing = true);
+
+    try {
+      final result = await _aiService.analyzeImage(_memory.imagePath!);
+      if (result == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('AI 分析失败，请重试')));
+        }
+        setState(() => _isReanalyzing = false);
+        return;
+      }
+
+      final newMemory = _aiService.parseAnalysisResult(
+        result,
+        _memory.imagePath!,
+        _memory.thumbnailPath,
+      );
+
+      if (newMemory != null) {
+        // 保留原始 id 和创建时间
+        final updated = newMemory.copyWith(
+          id: _memory.id,
+          createdAt: _memory.createdAt,
+        );
+        await _memoryService.updateMemory(updated);
+        HomePage.onDataChanged?.call();
+        if (mounted) {
+          setState(() {
+            _memory = updated;
+            _isReanalyzing = false;
+            _isStreamingContent = true;
+            _streamRevealFraction = 0.0;
+          });
+          _startStreamAnimation();
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('AI 分析失败，请重试')));
+          setState(() => _isReanalyzing = false);
+        }
+      }
+    } catch (e) {
+      debugPrint('AI 重新分析失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('分析失败: $e')));
+        setState(() => _isReanalyzing = false);
+      }
+    }
+  }
+
+  void _startStreamAnimation() {
+    const totalDuration = 800; // ms
+    const frameInterval = 16; // ~60fps
+    const totalFrames = totalDuration ~/ frameInterval;
+    int frame = 0;
+
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(milliseconds: frameInterval));
+      frame++;
+      if (!mounted || frame >= totalFrames) {
+        if (mounted) {
+          setState(() {
+            _streamRevealFraction = 1.0;
+            _isStreamingContent = false;
+          });
+        }
+        return false;
+      }
+      setState(() {
+        _streamRevealFraction = Curves.easeOut.transform(frame / totalFrames);
+      });
+      return true;
+    });
+  }
+
+  Widget _wrapStreamReveal(Widget child) {
+    if (!_isStreamingContent) return child;
+    return ShaderMask(
+      shaderCallback: (bounds) {
+        final stop = _streamRevealFraction.clamp(0.0, 1.0);
+        return LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: const [Colors.white, Colors.white, Colors.transparent],
+          stops: [0.0, (stop * 0.9).clamp(0.0, 1.0), stop],
+        ).createShader(bounds);
+      },
+      blendMode: BlendMode.dstIn,
+      child: child,
+    );
+  }
+
+  void _confirmDelete(bool isDark) {
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('删除记忆'),
+        content: const Text('确定要删除这条记忆吗？此操作不可撤销。'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () {
+              Navigator.pop(ctx);
+              _deleteMemory();
+            },
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteMemory() async {
+    await _memoryService.deleteMemory(_memory.id);
+    HomePage.onDataChanged?.call();
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已删除')));
+      Navigator.pop(context);
+    }
+  }
+
+  Widget _buildSkeletonContent(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 20),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SkeletonBox(isDark: isDark, height: 22, width: 200),
+              const SizedBox(height: 8),
+              _SkeletonBox(isDark: isDark, height: 14, width: 140),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SkeletonBox(isDark: isDark, height: 16),
+              const SizedBox(height: 10),
+              _SkeletonBox(isDark: isDark, height: 16),
+              const SizedBox(height: 10),
+              _SkeletonBox(isDark: isDark, height: 16, width: 240),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SkeletonBox(isDark: isDark, height: 16),
+              const SizedBox(height: 10),
+              _SkeletonBox(isDark: isDark, height: 16, width: 180),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildInfoSection(InfoSection section, bool isDark) {
@@ -3328,5 +3659,330 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       case MemoryCategory.note:
         return Icons.note_alt;
     }
+  }
+}
+
+class _SkeletonBox extends StatefulWidget {
+  final bool isDark;
+  final double? width;
+  final double height;
+
+  const _SkeletonBox({required this.isDark, this.width, this.height = 16});
+
+  @override
+  State<_SkeletonBox> createState() => _SkeletonBoxState();
+}
+
+class _SkeletonBoxState extends State<_SkeletonBox>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final baseColor = widget.isDark
+            ? const Color(0xFF2C2C2E)
+            : const Color(0xFFE5E5EA);
+        final highlightColor = widget.isDark
+            ? const Color(0xFF3A3A3C)
+            : const Color(0xFFF2F2F5);
+        final t = Curves.easeInOut.transform(_controller.value);
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            color: Color.lerp(baseColor, highlightColor, t),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _GlassMorphMenu extends StatefulWidget {
+  final bool isDark;
+  final Offset buttonCenter;
+  final double buttonSize;
+  final VoidCallback onReanalyze;
+  final VoidCallback onDelete;
+  final VoidCallback onDismiss;
+
+  const _GlassMorphMenu({
+    required this.isDark,
+    required this.buttonCenter,
+    required this.buttonSize,
+    required this.onReanalyze,
+    required this.onDelete,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_GlassMorphMenu> createState() => _GlassMorphMenuState();
+}
+
+class _GlassMorphMenuState extends State<_GlassMorphMenu>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _expandAnim;
+  late Animation<double> _contentFadeAnim;
+  bool _dismissing = false;
+
+  // 菜单尺寸
+  static const double _menuWidth = 200.0;
+  static const double _menuItemHeight = 48.0;
+  static const double _menuHeight = _menuItemHeight * 2 + 0.5; // 两项 + 分割线
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+      reverseDuration: const Duration(milliseconds: 220),
+    );
+    _expandAnim = CurvedAnimation(
+      parent: _controller,
+      curve: const _MildBounceCurve(),
+      reverseCurve: Curves.easeInCubic,
+    );
+    _contentFadeAnim = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
+      reverseCurve: const Interval(0.0, 0.5, curve: Curves.easeIn),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// 选择菜单项时：立即回调（overlay 由外部移除）
+  void _selectItem(VoidCallback action) {
+    if (_dismissing) return;
+    _dismissing = true;
+    action();
+  }
+
+  /// 点击空白区域关闭：播放收缩动画后回调
+  Future<void> _dismissWithAnimation() async {
+    if (_dismissing) return;
+    _dismissing = true;
+    await _controller.reverse(from: _controller.value);
+    widget.onDismiss();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _dismissWithAnimation(),
+      behavior: HitTestBehavior.translucent,
+      child: Material(
+        color: Colors.transparent,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final t = _expandAnim.value;
+            final contentOpacity = _contentFadeAnim.value;
+
+            // 从按钮圆形 → 菜单矩形的插值
+            final currentWidth = lerpDouble(widget.buttonSize, _menuWidth, t)!;
+            final currentHeight = lerpDouble(
+              widget.buttonSize,
+              _menuHeight,
+              t,
+            )!;
+            final currentRadius = lerpDouble(widget.buttonSize / 2, 14.0, t)!;
+
+            // 菜单右上角对齐按钮右上角
+            final right =
+                MediaQuery.of(context).size.width -
+                (widget.buttonCenter.dx + widget.buttonSize / 2);
+            final top = widget.buttonCenter.dy - widget.buttonSize / 2;
+
+            return Stack(
+              children: [
+                Positioned(
+                  right: right,
+                  top: top,
+                  child: SizedBox(
+                    width: currentWidth,
+                    height: currentHeight,
+                    child: UnconstrainedBox(
+                      alignment: Alignment.topRight,
+                      clipBehavior: Clip.hardEdge,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(currentRadius),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(
+                            sigmaX: 40 * t.clamp(0.1, 1.0),
+                            sigmaY: 40 * t.clamp(0.1, 1.0),
+                          ),
+                          child: Container(
+                            width: _menuWidth,
+                            height: _menuHeight,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(
+                                currentRadius,
+                              ),
+                              color: widget.isDark
+                                  ? const Color(
+                                      0xFF2C2C2E,
+                                    ).withOpacity(0.75 + 0.1 * t)
+                                  : Colors.white.withOpacity(0.65 + 0.15 * t),
+                              border: Border.all(
+                                color: widget.isDark
+                                    ? const Color(0xFF3A3A3C)
+                                    : Colors.white.withOpacity(0.8),
+                                width: 0.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.12 * t),
+                                  blurRadius: 24 * t,
+                                  offset: Offset(0, 8 * t),
+                                ),
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.06 * t),
+                                  blurRadius: 6 * t,
+                                  offset: Offset(0, 2 * t),
+                                ),
+                              ],
+                            ),
+                            child: Opacity(
+                              opacity: contentOpacity,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildMenuItem(
+                                    icon: CupertinoIcons.sparkles,
+                                    label: 'AI 重新分析',
+                                    onTap: () =>
+                                        _selectItem(widget.onReanalyze),
+                                  ),
+                                  Container(
+                                    height: 0.5,
+                                    color: widget.isDark
+                                        ? const Color(0xFF3A3A3C)
+                                        : const Color(0xFFE5E5EA),
+                                  ),
+                                  _buildMenuItem(
+                                    icon: CupertinoIcons.trash,
+                                    label: '删除',
+                                    isDestructive: true,
+                                    onTap: () => _selectItem(widget.onDelete),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String label,
+    bool isDestructive = false,
+    required VoidCallback onTap,
+  }) {
+    final color = isDestructive
+        ? AppColors.warning(widget.isDark)
+        : AppColors.onSurface(widget.isDark);
+
+    return _GlassMenuItem(
+      icon: icon,
+      label: label,
+      color: color,
+      isDark: widget.isDark,
+      onTap: onTap,
+    );
+  }
+}
+
+class _GlassMenuItem extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _GlassMenuItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  State<_GlassMenuItem> createState() => _GlassMenuItemState();
+}
+
+class _GlassMenuItemState extends State<_GlassMenuItem> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
+        height: _GlassMorphMenuState._menuItemHeight,
+        color: _pressed
+            ? (widget.isDark
+                  ? Colors.white.withOpacity(0.08)
+                  : Colors.black.withOpacity(0.06))
+            : Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            Icon(widget.icon, size: 20, color: widget.color),
+            const SizedBox(width: 12),
+            Text(
+              widget.label,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: widget.color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

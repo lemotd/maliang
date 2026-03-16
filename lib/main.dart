@@ -581,27 +581,35 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLow(isDark),
-      body: Column(
+      body: Stack(
         children: [
-          MainAppBar(
-            scrollOffset: _scrollOffset,
-            onSettingsTap: () {
-              final page = const SettingsPage();
-              if (!pushToDetailPane(context, page)) {
-                Navigator.push(
-                  context,
-                  CupertinoPageRoute(builder: (context) => page),
-                ).then((result) {
-                  if (result == true) _loadMemories();
-                });
-              }
-            },
+          Column(
+            children: [
+              MainAppBar(
+                scrollOffset: _scrollOffset,
+                onSettingsTap: () {
+                  final page = const SettingsPage();
+                  if (!pushToDetailPane(context, page)) {
+                    Navigator.push(
+                      context,
+                      CupertinoPageRoute(builder: (context) => page),
+                    ).then((result) {
+                      if (result == true) _loadMemories();
+                    });
+                  }
+                },
+              ),
+              Expanded(child: _buildBody()),
+            ],
           ),
-          Expanded(child: _buildBody()),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: MediaQuery.of(context).padding.bottom + 16,
+            child: Center(child: _AddButton(onPressed: _pickImage)),
+          ),
         ],
       ),
-      floatingActionButton: _AddButton(onPressed: _pickImage),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 

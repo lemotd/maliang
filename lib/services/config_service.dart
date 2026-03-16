@@ -4,8 +4,10 @@ class ConfigService {
   static const String _keyApiAddress = 'api_address';
   static const String _keyApiKey = 'api_key';
 
-  static const String defaultApiAddress = 'https://open.bigmodel.cn/api/paas/v4';
-  static const String defaultApiKey = '909c2ec4bab5450fb7860ce289c9924d.JiLRWyFJr9VGcESI';
+  static const String defaultApiAddress =
+      'https://open.bigmodel.cn/api/paas/v4';
+  static const String defaultApiKey =
+      '909c2ec4bab5450fb7860ce289c9924d.JiLRWyFJr9VGcESI';
 
   Future<SharedPreferences> _getPrefs() async {
     return await SharedPreferences.getInstance();
@@ -13,7 +15,7 @@ class ConfigService {
 
   Future<String> getApiAddress() async {
     final prefs = await _getPrefs();
-    return prefs.getString(_keyApiAddress) ?? defaultApiAddress;
+    return prefs.getString(_keyApiAddress) ?? '';
   }
 
   Future<void> setApiAddress(String address) async {
@@ -23,7 +25,7 @@ class ConfigService {
 
   Future<String> getApiKey() async {
     final prefs = await _getPrefs();
-    return prefs.getString(_keyApiKey) ?? defaultApiKey;
+    return prefs.getString(_keyApiKey) ?? '';
   }
 
   Future<void> setApiKey(String apiKey) async {
@@ -38,7 +40,8 @@ class ConfigService {
 
   Future<bool> isUsingDefaultApiKey() async {
     final prefs = await _getPrefs();
-    return !prefs.containsKey(_keyApiKey);
+    final key = prefs.getString(_keyApiKey) ?? '';
+    return key.isEmpty;
   }
 
   Future<void> clearConfig() async {

@@ -232,8 +232,8 @@ class AiService {
 
 6. 日程识别（适用于所有分类）：如果图片中包含日程、活动、会议、截止日期、预约、航班、火车票、演出、考试等时间相关信息，额外提取：
    - eventName：日程名称（简洁描述）
-   - eventStartTime：开始时间，格式"YYYY-MM-DD HH:mm"
-   - eventEndTime：结束时间，格式"YYYY-MM-DD HH:mm"（如果无法确定结束时间，默认为开始时间后1小时）
+   - eventStartTime：开始时间，格式"YYYY-MM-DD HH:mm"。如果图片中没有显示年份，使用当前年份${DateTime.now().year}。
+   - eventEndTime：结束时间，格式"YYYY-MM-DD HH:mm"（如果无法确定结束时间，默认为开始时间后1小时）。如果图片中没有显示年份，使用当前年份${DateTime.now().year}。
    注意：日程信息是附加提取的，不影响主分类判断。
 
 请严格按以下JSON格式返回：
@@ -459,6 +459,16 @@ class AiService {
           if (parts.length == 2) {
             final dateParts = parts[0].split('-');
             final timeParts = parts[1].split(':');
+            // "MM-DD HH:mm" 格式（缺少年份），自动补充当前年份
+            if (dateParts.length == 2 && timeParts.length >= 2) {
+              return DateTime(
+                DateTime.now().year,
+                int.parse(dateParts[0]),
+                int.parse(dateParts[1]),
+                int.parse(timeParts[0]),
+                int.parse(timeParts[1]),
+              );
+            }
             if (dateParts.length == 3 && timeParts.length >= 2) {
               return DateTime(
                 int.parse(dateParts[0]),

@@ -211,6 +211,8 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     if (newAbsDrag > halfScreen && !_hasTriggeredStage2Haptic) {
       HapticFeedback.lightImpact();
       _hasTriggeredStage2Haptic = true;
+    } else if (newAbsDrag <= halfScreen && _hasTriggeredStage2Haptic) {
+      _hasTriggeredStage2Haptic = false;
     }
   }
 
