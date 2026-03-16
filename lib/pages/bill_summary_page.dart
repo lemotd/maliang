@@ -71,9 +71,11 @@ class _BillSummaryPageState extends State<BillSummaryPage>
       final Map<String, int> merchantCount = {};
 
       for (final bill in allBills) {
-        final v = double.tryParse(
+        final v =
+            double.tryParse(
               (bill.amount ?? '0').replaceAll(RegExp(r'[^\d.]'), ''),
-            ) ?? 0;
+            ) ??
+            0;
         if (bill.isExpense ?? true) {
           totalExpense += v;
           final catName = bill.billCategory ?? '其他';
@@ -88,19 +90,22 @@ class _BillSummaryPageState extends State<BillSummaryPage>
         }
       }
 
-      final topCategories = (categoryExpense.entries.toList()
-            ..sort((a, b) => b.value.compareTo(a.value)))
-          .take(3)
-          .map((e) => '${e.key}(¥${e.value.toStringAsFixed(0)})')
-          .join('、');
+      final topCategories =
+          (categoryExpense.entries.toList()
+                ..sort((a, b) => b.value.compareTo(a.value)))
+              .take(3)
+              .map((e) => '${e.key}(¥${e.value.toStringAsFixed(0)})')
+              .join('、');
 
-      final topMerchants = (merchantCount.entries.toList()
-            ..sort((a, b) => b.value.compareTo(a.value)))
-          .take(3)
-          .map((e) => '${e.key}(${e.value}次)')
-          .join('、');
+      final topMerchants =
+          (merchantCount.entries.toList()
+                ..sort((a, b) => b.value.compareTo(a.value)))
+              .take(3)
+              .map((e) => '${e.key}(${e.value}次)')
+              .join('、');
 
-      final prompt = '''你是一个贴心的个人财务助理。请根据以下账单数据，用一段简短亲和的话（50-80字）给出个性化分析。
+      final prompt =
+          '''你是一个贴心的个人财务助理。请根据以下账单数据，用一段简短亲和的话（50-80字）给出个性化分析。
 每次分析角度要不同，可以从以下角度随机选一个：
 - 消费偏好和习惯
 - 最大花销提醒
@@ -197,7 +202,9 @@ class _BillSummaryPageState extends State<BillSummaryPage>
     final imageAndAiHeight = 232 + _aiCardHeight;
     if (_activeMonthIndex == 0) {
       // 第一个月：从图片下方自然位置过渡到 0
-      return (imageAndAiHeight - _scrollOffset).clamp(0, double.infinity).toDouble();
+      return (imageAndAiHeight - _scrollOffset)
+          .clamp(0, double.infinity)
+          .toDouble();
     }
     // 其他月份：跟踪列表中对应月卡片的位置
     final key = _monthKeys[_activeMonthIndex];
@@ -375,253 +382,285 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                 Expanded(
                   child: ScrollEdgeHaptic(
                     child: NotificationListener<ScrollNotification>(
-                    onNotification: (notification) {
-                      if (notification is ScrollEndNotification) {
-                        _onScrollEnd();
-                      }
-                      return false;
-                    },
-                    child: Stack(
-                      key: _stackKey,
-                      clipBehavior: Clip.none,
-                      children: [
-                        CustomScrollView(
-                          controller: _scrollController,
-                          physics: const BouncingScrollPhysics(
-                            parent: AlwaysScrollableScrollPhysics(),
-                          ),
-                          slivers: [
-                            // 装饰图区域
-                            SliverToBoxAdapter(
-                              child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 150),
-                                curve: Curves.easeOut,
-                                opacity: isCollapsed ? 0 : 1,
-                                child: Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    16,
-                                    16,
-                                    16,
-                                    16,
-                                  ),
-                                  child: Center(
-                                    child: Image.asset(
-                                      'assets/bill_top_picture.png',
-                                      width: 200,
-                                      height: 200,
-                                      fit: BoxFit.contain,
-                                      gaplessPlayback: true,
-                                      filterQuality: FilterQuality.medium,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                      onNotification: (notification) {
+                        if (notification is ScrollEndNotification) {
+                          _onScrollEnd();
+                        }
+                        return false;
+                      },
+                      child: Stack(
+                        key: _stackKey,
+                        clipBehavior: Clip.none,
+                        children: [
+                          CustomScrollView(
+                            controller: _scrollController,
+                            physics: const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
                             ),
-                            // AI 智能总结卡片
-                            if (_isLoadingSummary || (_aiSummary != null && _aiSummary!.isNotEmpty))
+                            slivers: [
+                              // 装饰图区域
                               SliverToBoxAdapter(
-                                child: Padding(
-                                  key: _aiCardKey,
-                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                                  child: (_isLoadingSummary && (_aiSummary == null || _aiSummary!.isEmpty))
-                                      ? AIGlowBorder(
-                                          borderRadius: BorderRadius.circular(20),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(16),
-                                            height: 80,
-                                            decoration: BoxDecoration(
-                                              color: AppColors.surfaceHigh(isDark),
-                                              borderRadius: BorderRadius.circular(20),
-                                            ),
-                                            child: _AiSummaryShimmer(isDark: isDark),
-                                          ),
-                                        )
-                                      : Container(
-                                          padding: const EdgeInsets.all(16),
-                                          constraints: const BoxConstraints(minHeight: 80),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.surfaceHigh(isDark),
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                _aiSummary ?? '',
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  color: AppColors.onSurface(isDark),
-                                                  height: 1.5,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 12),
-                                              _buildAskAiButton(isDark),
-                                            ],
-                                          ),
-                                        ),
-                                ),
-                              ),
-                            if (monthlyData.isEmpty)
-                              SliverToBoxAdapter(
-                                child: Center(
+                                child: AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 150),
+                                  curve: Curves.easeOut,
+                                  opacity: isCollapsed ? 0 : 1,
                                   child: Padding(
-                                    padding: const EdgeInsets.only(top: 32),
-                                    child: Text(
-                                      '暂无账单',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: AppColors.onSurfaceQuaternary(isDark),
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      16,
+                                      16,
+                                      16,
+                                    ),
+                                    child: Center(
+                                      child: Image.asset(
+                                        'assets/bill_top_picture.png',
+                                        width: 200,
+                                        height: 200,
+                                        fit: BoxFit.contain,
+                                        gaplessPlayback: true,
+                                        filterQuality: FilterQuality.medium,
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
-                            if (monthlyData.isNotEmpty) ...[
-                            // 第一个月卡片占位
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                key: _monthKeys[0],
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                child: const SizedBox(height: 80),
-                              ),
-                            ),
-                            // 第一个月的日卡片
-                            if (firstMonth != null)
-                              SliverPadding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  16,
-                                  16,
-                                  0,
-                                ),
-                                sliver: SliverList(
-                                  delegate: SliverChildListDelegate([
-                                    ...firstMonth.billsByDate.entries.map((
-                                      entry,
-                                    ) {
-                                      return Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 12,
-                                        ),
-                                        child: _buildDayCard(
-                                          entry.key,
-                                          entry.value,
-                                          isDark,
-                                        ),
-                                      );
-                                    }),
-                                  ]),
-                                ),
-                              ),
-                            // 其余月份：月卡片 + 日卡片
-                            ...restMonths.asMap().entries.expand((monthEntry) {
-                              final monthIdx =
-                                  monthEntry.key +
-                                  1; // +1 because first month is index 0
-                              final monthData = monthEntry.value;
-                              return [
+                              // AI 智能总结卡片
+                              if (_isLoadingSummary ||
+                                  (_aiSummary != null &&
+                                      _aiSummary!.isNotEmpty))
                                 SliverToBoxAdapter(
                                   child: Padding(
-                                    key: _monthKeys[monthIdx],
+                                    key: _aiCardKey,
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      0,
+                                      16,
+                                      16,
+                                    ),
+                                    child:
+                                        (_isLoadingSummary &&
+                                            (_aiSummary == null ||
+                                                _aiSummary!.isEmpty))
+                                        ? AIGlowBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(16),
+                                              height: 80,
+                                              decoration: BoxDecoration(
+                                                color: AppColors.surfaceHigh(
+                                                  isDark,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                              ),
+                                              child: _AiSummaryShimmer(
+                                                isDark: isDark,
+                                              ),
+                                            ),
+                                          )
+                                        : Container(
+                                            padding: const EdgeInsets.all(16),
+                                            constraints: const BoxConstraints(
+                                              minHeight: 80,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.surfaceHigh(
+                                                isDark,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  _aiSummary ?? '',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    color: AppColors.onSurface(
+                                                      isDark,
+                                                    ),
+                                                    height: 1.5,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 12),
+                                                _buildAskAiButton(isDark),
+                                              ],
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              if (monthlyData.isEmpty)
+                                SliverToBoxAdapter(
+                                  child: Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(top: 32),
+                                      child: Text(
+                                        '暂无账单',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: AppColors.onSurfaceQuaternary(
+                                            isDark,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              if (monthlyData.isNotEmpty) ...[
+                                // 第一个月卡片占位
+                                SliverToBoxAdapter(
+                                  child: Padding(
+                                    key: _monthKeys[0],
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    child: const SizedBox(height: 80),
+                                  ),
+                                ),
+                                // 第一个月的日卡片
+                                if (firstMonth != null)
+                                  SliverPadding(
                                     padding: const EdgeInsets.fromLTRB(
                                       16,
                                       16,
                                       16,
                                       0,
                                     ),
-                                    child: Opacity(
-                                      opacity: _activeMonthIndex == monthIdx
-                                          ? 0
-                                          : 1,
-                                      child: _buildMonthCard(
-                                        isDark,
-                                        year: monthData.year,
-                                        month: monthData.month,
-                                        expense: monthData.expense,
-                                        income: monthData.income,
-                                      ),
+                                    sliver: SliverList(
+                                      delegate: SliverChildListDelegate([
+                                        ...firstMonth.billsByDate.entries.map((
+                                          entry,
+                                        ) {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 12,
+                                            ),
+                                            child: _buildDayCard(
+                                              entry.key,
+                                              entry.value,
+                                              isDark,
+                                            ),
+                                          );
+                                        }),
+                                      ]),
                                     ),
                                   ),
-                                ),
-                                SliverPadding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    16,
-                                    16,
-                                    16,
-                                    0,
-                                  ),
-                                  sliver: SliverList(
-                                    delegate: SliverChildListDelegate([
-                                      ...monthData.billsByDate.entries.map((
-                                        entry,
-                                      ) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(
-                                            bottom: 12,
-                                          ),
-                                          child: _buildDayCard(
-                                            entry.key,
-                                            entry.value,
-                                            isDark,
-                                          ),
-                                        );
-                                      }),
-                                    ]),
-                                  ),
-                                ),
-                              ];
-                            }),
-                            ],
-                            // 底部留白（含安全区）
-                            SliverToBoxAdapter(
-                              child: SizedBox(
-                                height:
-                                    16 + MediaQuery.of(context).padding.bottom,
-                              ),
-                            ),
-                          ],
-                        ),
-                        // 吸顶月卡片 - 显示当前活跃月份，连贯过渡
-                        if (activeMonth != null && monthlyData.isNotEmpty)
-                          Positioned(
-                            top: _getStickyTop(),
-                            left: 16,
-                            right: 16,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: _isStickyPinned
-                                    ? const BorderRadius.only(
-                                        bottomLeft: Radius.circular(20),
-                                        bottomRight: Radius.circular(20),
-                                      )
-                                    : BorderRadius.circular(20),
-                                boxShadow: _isStickyPinned
-                                    ? [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.06,
-                                          ),
-                                          blurRadius: 12,
-                                          offset: const Offset(0, 4),
+                                // 其余月份：月卡片 + 日卡片
+                                ...restMonths.asMap().entries.expand((
+                                  monthEntry,
+                                ) {
+                                  final monthIdx =
+                                      monthEntry.key +
+                                      1; // +1 because first month is index 0
+                                  final monthData = monthEntry.value;
+                                  return [
+                                    SliverToBoxAdapter(
+                                      child: Padding(
+                                        key: _monthKeys[monthIdx],
+                                        padding: const EdgeInsets.fromLTRB(
+                                          16,
+                                          16,
+                                          16,
+                                          0,
                                         ),
-                                      ]
-                                    : [],
+                                        child: Opacity(
+                                          opacity: _activeMonthIndex == monthIdx
+                                              ? 0
+                                              : 1,
+                                          child: _buildMonthCard(
+                                            isDark,
+                                            year: monthData.year,
+                                            month: monthData.month,
+                                            expense: monthData.expense,
+                                            income: monthData.income,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SliverPadding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        16,
+                                        16,
+                                        0,
+                                      ),
+                                      sliver: SliverList(
+                                        delegate: SliverChildListDelegate([
+                                          ...monthData.billsByDate.entries.map((
+                                            entry,
+                                          ) {
+                                            return Padding(
+                                              padding: const EdgeInsets.only(
+                                                bottom: 12,
+                                              ),
+                                              child: _buildDayCard(
+                                                entry.key,
+                                                entry.value,
+                                                isDark,
+                                              ),
+                                            );
+                                          }),
+                                        ]),
+                                      ),
+                                    ),
+                                  ];
+                                }),
+                              ],
+                              // 底部留白（含安全区）
+                              SliverToBoxAdapter(
+                                child: SizedBox(
+                                  height:
+                                      16 +
+                                      MediaQuery.of(context).padding.bottom,
+                                ),
                               ),
-                              child: _buildMonthCard(
-                                isDark,
-                                year: activeMonth.year,
-                                month: activeMonth.month,
-                                expense: activeMonth.expense,
-                                income: activeMonth.income,
-                                pinned: _isStickyPinned,
+                            ],
+                          ),
+                          // 吸顶月卡片 - 显示当前活跃月份，连贯过渡
+                          if (activeMonth != null && monthlyData.isNotEmpty)
+                            Positioned(
+                              top: _getStickyTop(),
+                              left: 16,
+                              right: 16,
+                              child: IgnorePointer(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: _isStickyPinned
+                                        ? const BorderRadius.only(
+                                            bottomLeft: Radius.circular(20),
+                                            bottomRight: Radius.circular(20),
+                                          )
+                                        : BorderRadius.circular(20),
+                                    boxShadow: _isStickyPinned
+                                        ? [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(
+                                                alpha: 0.06,
+                                              ),
+                                              blurRadius: 12,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ]
+                                        : [],
+                                  ),
+                                  child: _buildMonthCard(
+                                    isDark,
+                                    year: activeMonth.year,
+                                    month: activeMonth.month,
+                                    expense: activeMonth.expense,
+                                    income: activeMonth.income,
+                                    pinned: _isStickyPinned,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
                   ),
                 ),
               ],

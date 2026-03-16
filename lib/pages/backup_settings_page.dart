@@ -1,20 +1,133 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:file_picker/file_picker.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
 import '../utils/scroll_edge_haptic.dart';
-import 'ai_model_settings_page.dart';
-import 'backup_settings_page.dart';
+import '../services/memory_service.dart';
+import 'backup_import_page.dart';
 
-class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+class BackupSettingsPage extends StatefulWidget {
+  const BackupSettingsPage({super.key});
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  State<BackupSettingsPage> createState() => _BackupSettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
+class _BackupSettingsPageState extends State<BackupSettingsPage> {
+  final _memoryService = MemoryService();
+  bool _isExporting = false;
   double _scrollOffset = 0;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  Future<Directory> _getExportDir() async {
+    if (Platform.isAndroid) {
+      final dir = Directory('/storage/emulated/0/Download/maliang');
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      return dir;
+    }
+    return await getApplicationDocumentsDirectory();
+  }
+
+  Future<String> _getDeviceName() async {
+    final deviceInfo = DeviceInfoPlugin();
+    if (Platform.isAndroid) {
+      final info = await deviceInfo.androidInfo;
+      return '${info.brand} ${info.model}';
+    } else if (Platform.isIOS) {
+      final info = await deviceInfo.iosInfo;
+      return info.utsname.machine;
+    }
+    return 'Unknown';
+  }
+
+  Future<void> _exportBackup() async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+
+    try {
+      final memories = await _memoryService.getAllMemories();
+      final deviceName = await _getDeviceName();
+      final now = DateTime.now();
+
+      final backupData = {
+        'version': 1,
+        'deviceName': deviceName,
+        'exportTime': now.toIso8601String(),
+        'memoryCount': memories.length,
+        'memories': memories.map((m) => m.toJson()).toList(),
+      };
+
+      final dir = await _getExportDir();
+      final fileName = 'maliang_backup_${now.millisecondsSinceEpoch}.maliang';
+      final file = File('${dir.path}/$fileName');
+      await file.writeAsString(jsonEncode(backupData));
+
+      if (mounted) {
+        _showToast('导出成功：${file.path}');
+      }
+    } catch (e) {
+      if (mounted) _showToast('导出失败：$e');
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  Future<void> _pickAndImport() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.any);
+    if (result == null || result.files.isEmpty) return;
+
+    final filePath = result.files.single.path;
+    if (filePath == null) return;
+
+    if (!filePath.endsWith('.maliang')) {
+      _showToast('请选择 .maliang 格式的备份文件');
+      return;
+    }
+
+    try {
+      final file = File(filePath);
+      final content = await file.readAsString();
+      final data = jsonDecode(content) as Map<String, dynamic>;
+
+      if (!data.containsKey('memories') || !data.containsKey('version')) {
+        _showToast('无效的备份文件');
+        return;
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          CupertinoPageRoute(
+            builder: (context) => BackupImportPage(backupData: data),
+          ),
+        );
+      }
+    } catch (e) {
+      _showToast('读取备份文件失败');
+    }
+  }
+
+  void _showToast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,33 +157,20 @@ class _SettingsPageState extends State<SettingsPage> {
                       parent: AlwaysScrollableScrollPhysics(),
                     ),
                     children: [
-                      _buildSettingsItem(
+                      _buildItem(
                         context,
-                        title: 'AI 大模型设置',
-                        subtitle: '配置 API 地址或模型',
-                        icon: CupertinoIcons.cube,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            CupertinoPageRoute(
-                              builder: (context) => const AiModelSettingsPage(),
-                            ),
-                          );
-                        },
+                        title: '导出备份',
+                        subtitle: '导出到 Download/maliang 目录内',
+                        icon: CupertinoIcons.arrow_up_doc,
+                        isLoading: _isExporting,
+                        onTap: _exportBackup,
                       ),
-                      _buildSettingsItem(
+                      _buildItem(
                         context,
-                        title: '备份与恢复',
-                        subtitle: '导入、导出记忆数据',
-                        icon: CupertinoIcons.arrow_2_circlepath,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            CupertinoPageRoute(
-                              builder: (context) => const BackupSettingsPage(),
-                            ),
-                          );
-                        },
+                        title: '从文件导入数据',
+                        subtitle: '从备份文件恢复数据',
+                        icon: CupertinoIcons.arrow_down_doc,
+                        onTap: _pickAndImport,
                       ),
                     ],
                   ),
@@ -106,7 +206,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   curve: Curves.easeOut,
                   opacity: isCollapsed ? 0 : 1,
                   child: Text(
-                    '设置',
+                    '备份与恢复',
                     style: TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.w700,
@@ -131,7 +231,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     height: 56,
                     alignment: Alignment.center,
                     child: Text(
-                      '设置',
+                      '备份与恢复',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
@@ -166,17 +266,18 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildSettingsItem(
+  Widget _buildItem(
     BuildContext context, {
     required String title,
     required String subtitle,
     required IconData icon,
     required VoidCallback onTap,
+    bool isLoading = false,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return _PressableItem(
-      onTap: onTap,
+      onTap: isLoading ? () {} : onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -193,7 +294,18 @@ class _SettingsPageState extends State<SettingsPage> {
                 color: AppColors.primary(isDark).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, size: 20, color: AppColors.primary(isDark)),
+              child: isLoading
+                  ? Center(
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primary(isDark),
+                        ),
+                      ),
+                    )
+                  : Icon(icon, size: 20, color: AppColors.primary(isDark)),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -215,6 +327,8 @@ class _SettingsPageState extends State<SettingsPage> {
                       fontSize: 14,
                       color: AppColors.onSurfaceQuaternary(isDark),
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

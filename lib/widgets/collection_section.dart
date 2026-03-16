@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../theme/app_colors.dart';
 import '../models/memory_item.dart';
+import '../utils/scroll_edge_haptic.dart';
 import 'bill_card.dart';
 import 'clothing_card.dart';
 import 'add_collection_card.dart';
@@ -43,92 +44,95 @@ class _CollectionSectionState extends State<CollectionSection> {
         const SizedBox(height: 12),
         SizedBox(
           height: 160,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            physics: const BouncingScrollPhysics(),
-            children: [
-              GestureDetector(
-                onTapDown: (_) {
-                  setState(() => _isBillCardPressed = true);
-                },
-                onTapUp: (_) async {
-                  await Future.delayed(const Duration(milliseconds: 150));
-                  if (mounted) {
+          child: ScrollEdgeHaptic(
+            axis: Axis.horizontal,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              physics: const BouncingScrollPhysics(),
+              children: [
+                GestureDetector(
+                  onTapDown: (_) {
+                    setState(() => _isBillCardPressed = true);
+                  },
+                  onTapUp: (_) async {
+                    await Future.delayed(const Duration(milliseconds: 150));
+                    if (mounted) {
+                      setState(() => _isBillCardPressed = false);
+                    }
+                  },
+                  onTapCancel: () {
                     setState(() => _isBillCardPressed = false);
-                  }
-                },
-                onTapCancel: () {
-                  setState(() => _isBillCardPressed = false);
-                },
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    CupertinoPageRoute(
-                      builder: (context) =>
-                          BillSummaryPage(bills: widget.memories),
-                    ),
-                  );
-                },
-                child: AnimatedScale(
-                  scale: _isBillCardPressed ? 0.95 : 1.0,
-                  duration: const Duration(milliseconds: 150),
-                  curve: Curves.easeOut,
-                  child: BillCard(bills: widget.memories),
+                  },
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      CupertinoPageRoute(
+                        builder: (context) =>
+                            BillSummaryPage(bills: widget.memories),
+                      ),
+                    );
+                  },
+                  child: AnimatedScale(
+                    scale: _isBillCardPressed ? 0.95 : 1.0,
+                    duration: const Duration(milliseconds: 150),
+                    curve: Curves.easeOut,
+                    child: BillCard(bills: widget.memories),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              GestureDetector(
-                onTapDown: (_) {
-                  setState(() => _isClothingCardPressed = true);
-                },
-                onTapUp: (_) async {
-                  await Future.delayed(const Duration(milliseconds: 150));
-                  if (mounted) {
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTapDown: (_) {
+                    setState(() => _isClothingCardPressed = true);
+                  },
+                  onTapUp: (_) async {
+                    await Future.delayed(const Duration(milliseconds: 150));
+                    if (mounted) {
+                      setState(() => _isClothingCardPressed = false);
+                    }
+                  },
+                  onTapCancel: () {
                     setState(() => _isClothingCardPressed = false);
-                  }
-                },
-                onTapCancel: () {
-                  setState(() => _isClothingCardPressed = false);
-                },
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    CupertinoPageRoute(
-                      builder: (context) =>
-                          WardrobePage(clothes: widget.memories),
-                    ),
-                  );
-                },
-                child: AnimatedScale(
-                  scale: _isClothingCardPressed ? 0.95 : 1.0,
-                  duration: const Duration(milliseconds: 150),
-                  curve: Curves.easeOut,
-                  child: ClothingCard(clothes: widget.memories),
+                  },
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      CupertinoPageRoute(
+                        builder: (context) =>
+                            WardrobePage(clothes: widget.memories),
+                      ),
+                    );
+                  },
+                  child: AnimatedScale(
+                    scale: _isClothingCardPressed ? 0.95 : 1.0,
+                    duration: const Duration(milliseconds: 150),
+                    curve: Curves.easeOut,
+                    child: ClothingCard(clothes: widget.memories),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              GestureDetector(
-                onTapUp: (_) async {
-                  await Future.delayed(const Duration(milliseconds: 150));
-                  if (mounted) {
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTapUp: (_) async {
+                    await Future.delayed(const Duration(milliseconds: 150));
+                    if (mounted) {
+                      setState(() => _isAddCardPressed = false);
+                    }
+                  },
+                  onTapCancel: () {
                     setState(() => _isAddCardPressed = false);
-                  }
-                },
-                onTapCancel: () {
-                  setState(() => _isAddCardPressed = false);
-                },
-                onTap: () {
-                  // TODO: 新建合集功能
-                },
-                child: AnimatedScale(
-                  scale: _isAddCardPressed ? 0.95 : 1.0,
-                  duration: const Duration(milliseconds: 150),
-                  curve: Curves.easeOut,
-                  child: const AddCollectionCard(),
+                  },
+                  onTap: () {
+                    // TODO: 新建合集功能
+                  },
+                  child: AnimatedScale(
+                    scale: _isAddCardPressed ? 0.95 : 1.0,
+                    duration: const Duration(milliseconds: 150),
+                    curve: Curves.easeOut,
+                    child: const AddCollectionCard(),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],

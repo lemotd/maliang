@@ -8,7 +8,12 @@ import 'package:flutter/widgets.dart';
 /// 用法：在 Widget 树中包裹 ScrollEdgeHaptic(child: ...)
 class ScrollEdgeHaptic extends StatefulWidget {
   final Widget child;
-  const ScrollEdgeHaptic({super.key, required this.child});
+  final Axis axis;
+  const ScrollEdgeHaptic({
+    super.key,
+    required this.child,
+    this.axis = Axis.vertical,
+  });
 
   @override
   State<ScrollEdgeHaptic> createState() => _ScrollEdgeHapticState();
@@ -29,6 +34,9 @@ class _ScrollEdgeHapticState extends State<ScrollEdgeHaptic> {
 
   bool _onScroll(ScrollNotification notification) {
     final metrics = notification.metrics;
+
+    // 只响应指定轴向的滚动
+    if (metrics.axis != widget.axis) return false;
 
     // 内容不足一屏，不触发
     if (metrics.maxScrollExtent <= 0) return false;
