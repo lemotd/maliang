@@ -152,9 +152,7 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Container(
-                  color: Colors.black.withValues(alpha: bgOpacity),
-                ),
+                Container(color: Colors.black.withValues(alpha: bgOpacity)),
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
                   child: AnimatedContainer(
@@ -171,24 +169,31 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
                         child: Center(
                           child: Hero(
                             tag: widget.heroTag,
-                            flightShuttleBuilder: (flightContext, anim,
-                                direction, fromHeroContext, toHeroContext) {
-                              return AnimatedBuilder(
-                                animation: anim,
-                                builder: (context, child) {
-                                  final radius = 16.0 * (1.0 - anim.value);
-                                  return ClipRRect(
-                                    borderRadius:
-                                        BorderRadius.circular(radius),
-                                    child: child,
+                            flightShuttleBuilder:
+                                (
+                                  flightContext,
+                                  anim,
+                                  direction,
+                                  fromHeroContext,
+                                  toHeroContext,
+                                ) {
+                                  return AnimatedBuilder(
+                                    animation: anim,
+                                    builder: (context, child) {
+                                      final radius = 16.0 * (1.0 - anim.value);
+                                      return ClipRRect(
+                                        borderRadius: BorderRadius.circular(
+                                          radius,
+                                        ),
+                                        child: child,
+                                      );
+                                    },
+                                    child: Image.file(
+                                      File(widget.imagePath),
+                                      fit: BoxFit.cover,
+                                    ),
                                   );
                                 },
-                                child: Image.file(
-                                  File(widget.imagePath),
-                                  fit: BoxFit.cover,
-                                ),
-                              );
-                            },
                             child: Image.file(
                               File(widget.imagePath),
                               fit: BoxFit.contain,
@@ -235,15 +240,20 @@ class _SaveButton extends StatefulWidget {
 class _SaveButtonState extends State<_SaveButton> {
   bool _pressed = false;
 
+  void _handleTap() async {
+    setState(() => _pressed = true);
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (mounted) setState(() => _pressed = false);
+    widget.onTap();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onTap();
-      },
+      onTapUp: (_) {},
       onTapCancel: () => setState(() => _pressed = false),
+      onTap: _handleTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
         scale: _pressed ? 0.95 : 1.0,

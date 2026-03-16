@@ -33,15 +33,21 @@ class _Pressable extends StatefulWidget {
 
 class _PressableState extends State<_Pressable> {
   bool _pressed = false;
+
+  void _handleTap() async {
+    setState(() => _pressed = true);
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (mounted) setState(() => _pressed = false);
+    widget.onTap();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onTap();
-      },
+      onTapUp: (_) {},
       onTapCancel: () => setState(() => _pressed = false),
+      onTap: _handleTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
         scale: _pressed ? 0.95 : 1.0,
@@ -194,7 +200,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                         '取消',
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: FontWeight.w500,
                           color: AppColors.onSurfaceQuaternary(isDark),
                         ),
                       ),
@@ -212,7 +218,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                             '支出',
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w400,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
@@ -222,7 +228,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                             '收入',
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w400,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
@@ -295,7 +301,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                         '完成',
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: FontWeight.w500,
                           color: AppColors.primary(isDark),
                         ),
                       ),
@@ -445,89 +451,102 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
             ),
             const SizedBox(height: 16),
             // 分类选择器
-            SizedBox(
-              height: 180,
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: _isExpense
-                    ? (BillExpenseCategory.allMaps.length / 8).ceil()
-                    : (BillIncomeCategory.allMaps.length / 8).ceil(),
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentPage = index;
-                  });
-                },
-                itemBuilder: (context, pageIndex) {
-                  final categories = _isExpense
-                      ? BillExpenseCategory.allMaps
-                      : BillIncomeCategory.allMaps;
-                  final startIndex = pageIndex * 8;
-                  final endIndex = (startIndex + 8).clamp(0, categories.length);
-                  final pageCategories = categories.sublist(
-                    startIndex,
-                    endIndex,
-                  );
-
-                  return GridView.count(
-                    crossAxisCount: 4,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 1.0,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    children: pageCategories.map((category) {
-                      final isSelected =
-                          _selectedCategory == category['name'] ||
-                          _selectedCategory == category['label'];
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedCategory = category['name'];
-                          });
-                        },
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? AppColors.primary(isDark)
-                                    : Colors.transparent,
-                                shape: BoxShape.circle,
-                                border: isSelected
-                                    ? null
-                                    : Border.all(
-                                        color: AppColors.outline(isDark),
-                                        width: 1,
-                                      ),
-                              ),
-                              child: Icon(
-                                category['icon'],
-                                size: 22,
-                                color: isSelected
-                                    ? Colors.white
-                                    : AppColors.onSurface(isDark),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              category['label'],
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isSelected
-                                    ? AppColors.primary(isDark)
-                                    : AppColors.onSurfaceQuaternary(isDark),
-                              ),
-                            ),
-                          ],
-                        ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // 计算实际需要的高度：2行 item + 间距
+                final availableWidth =
+                    constraints.maxWidth - 40; // 减去 horizontal padding
+                final itemWidth = (availableWidth - 16 * 3) / 4; // 4列3间距
+                final itemHeight = itemWidth; // aspectRatio 1.0
+                final gridHeight = itemHeight * 2 + 16; // 2行1间距
+                return SizedBox(
+                  height: gridHeight,
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: _isExpense
+                        ? (BillExpenseCategory.allMaps.length / 8).ceil()
+                        : (BillIncomeCategory.allMaps.length / 8).ceil(),
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentPage = index;
+                      });
+                    },
+                    itemBuilder: (context, pageIndex) {
+                      final categories = _isExpense
+                          ? BillExpenseCategory.allMaps
+                          : BillIncomeCategory.allMaps;
+                      final startIndex = pageIndex * 8;
+                      final endIndex = (startIndex + 8).clamp(
+                        0,
+                        categories.length,
                       );
-                    }).toList(),
-                  );
-                },
-              ),
+                      final pageCategories = categories.sublist(
+                        startIndex,
+                        endIndex,
+                      );
+
+                      return GridView.count(
+                        crossAxisCount: 4,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: 1.0,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        children: pageCategories.map((category) {
+                          final isSelected =
+                              _selectedCategory == category['name'] ||
+                              _selectedCategory == category['label'];
+                          return _Pressable(
+                            onTap: () {
+                              setState(() {
+                                _selectedCategory = category['name'];
+                              });
+                            },
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? AppColors.primary(isDark)
+                                        : Colors.transparent,
+                                    shape: BoxShape.circle,
+                                    border: isSelected
+                                        ? null
+                                        : Border.all(
+                                            color: AppColors.outline(isDark),
+                                            width: 1,
+                                          ),
+                                  ),
+                                  child: Icon(
+                                    category['icon'],
+                                    size: 22,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : AppColors.onSurface(isDark),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  category['label'],
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isSelected
+                                        ? AppColors.primary(isDark)
+                                        : AppColors.onSurfaceQuaternary(isDark),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
             // 页面指示器 - 始终保持空间
             Padding(
@@ -593,11 +612,31 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet> {
   late List<String> _selected;
 
   static const _presetColors = [
-    '#000000', '#FFFFFF', '#FF0000', '#FF4500', '#FF6347',
-    '#FF69B4', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5',
-    '#2196F3', '#03A9F4', '#00BCD4', '#009688', '#4CAF50',
-    '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC107', '#FF9800',
-    '#795548', '#9E9E9E', '#607D8B', '#F5F5DC', '#C0C0C0',
+    '#000000',
+    '#FFFFFF',
+    '#FF0000',
+    '#FF4500',
+    '#FF6347',
+    '#FF69B4',
+    '#E91E63',
+    '#9C27B0',
+    '#673AB7',
+    '#3F51B5',
+    '#2196F3',
+    '#03A9F4',
+    '#00BCD4',
+    '#009688',
+    '#4CAF50',
+    '#8BC34A',
+    '#CDDC39',
+    '#FFEB3B',
+    '#FFC107',
+    '#FF9800',
+    '#795548',
+    '#9E9E9E',
+    '#607D8B',
+    '#F5F5DC',
+    '#C0C0C0',
   ];
 
   @override
@@ -645,10 +684,9 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet> {
               spacing: 12,
               runSpacing: 12,
               children: _presetColors.map((hex) {
-                final colorValue = int.tryParse(
-                  hex.replaceAll('#', 'FF'),
-                  radix: 16,
-                ) ?? 0xFF888888;
+                final colorValue =
+                    int.tryParse(hex.replaceAll('#', 'FF'), radix: 16) ??
+                    0xFF888888;
                 final isSelected = _selected.contains(hex);
                 return GestureDetector(
                   onTap: () {
@@ -712,7 +750,8 @@ class _SizePickerSheet extends StatefulWidget {
   final VoidCallback onSizeCleared;
   final List<String> customClothingSizes;
   final List<String> customShoeSizes;
-  final void Function(List<String> clothingSizes, List<String> shoeSizes) onCustomSizesChanged;
+  final void Function(List<String> clothingSizes, List<String> shoeSizes)
+  onCustomSizesChanged;
 
   const _SizePickerSheet({
     required this.isDark,
@@ -736,9 +775,27 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
 
   static const _clothingSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
   static const _shoeSizes = [
-    '35', '35.5', '36', '36.5', '37', '37.5', '38', '38.5',
-    '39', '39.5', '40', '40.5', '41', '41.5', '42', '42.5',
-    '43', '43.5', '44', '44.5', '45',
+    '35',
+    '35.5',
+    '36',
+    '36.5',
+    '37',
+    '37.5',
+    '38',
+    '38.5',
+    '39',
+    '39.5',
+    '40',
+    '40.5',
+    '41',
+    '41.5',
+    '42',
+    '42.5',
+    '43',
+    '43.5',
+    '44',
+    '44.5',
+    '45',
   ];
 
   @override
@@ -855,9 +912,13 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
                   runSpacing: 10,
                   children: [
                     // 内置尺码
-                    ...builtInSizes.map((size) => _buildSizeChip(size, isDark, isCustom: false)),
+                    ...builtInSizes.map(
+                      (size) => _buildSizeChip(size, isDark, isCustom: false),
+                    ),
                     // 自定义尺码
-                    ...customSizes.map((size) => _buildSizeChip(size, isDark, isCustom: true)),
+                    ...customSizes.map(
+                      (size) => _buildSizeChip(size, isDark, isCustom: true),
+                    ),
                   ],
                 ),
               ),
@@ -881,7 +942,10 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
                       ),
                       decoration: InputDecoration(
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         hintText: '输入尺码',
                         hintStyle: TextStyle(
                           fontSize: 14,
@@ -889,15 +953,21 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(color: AppColors.outline(isDark)),
+                          borderSide: BorderSide(
+                            color: AppColors.outline(isDark),
+                          ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(color: AppColors.outline(isDark)),
+                          borderSide: BorderSide(
+                            color: AppColors.outline(isDark),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(color: AppColors.primary(isDark)),
+                          borderSide: BorderSide(
+                            color: AppColors.primary(isDark),
+                          ),
                         ),
                       ),
                       onSubmitted: (_) => _addCustomSize(),
@@ -997,6 +1067,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   bool _isTextSelecting = false;
   double _imageDisplayHeight = 0;
   double _requiredOffset = 1.0;
+  bool _eventPressed = false;
 
   // 服饰编辑状态
   bool _isEditingClothing = false;
@@ -1261,30 +1332,26 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     final safeAreaTop = MediaQuery.of(context).padding.top;
     final safeAreaBottom = MediaQuery.of(context).padding.bottom;
 
+    // 大屏检测：全屏宽度 >= 600
+    final isWide = screenWidth >= 600;
+
+    if (isWide) {
+      return _buildWideLayout(context, isDark, safeAreaTop, safeAreaBottom);
+    }
+
     final imageAreaHeight = screenHeight * 0.3;
-    final appBarHeight = 44.0 + safeAreaTop;
+    final appBarHeight = 56.0 + safeAreaTop;
 
     // 计算显示完整图片所需的offset
-    // _imageDisplayHeight 是图片实际显示高度（已包含上下边距）
-    // 如果图片实际高度小于等于图片区域高度，则图片完全显示，不需要下滑吸附
     if (_imageDisplayHeight > 0 && _imageDisplayHeight > imageAreaHeight) {
-      // 图片被遮挡，计算需要的offset
       _requiredOffset = _imageDisplayHeight / imageAreaHeight;
     } else {
       _requiredOffset = 1.0;
     }
 
-    // 计算内容区位置：offset=1时在图片下方，offset=0时在顶栏下方
     final contentTop = appBarHeight + imageAreaHeight * _offset;
-
-    // 计算圆角：offset=1时为20，offset=0时为0
     final borderRadius = 20.0 * _offset;
-
-    // 计算图片透明度
     final imageOpacity = _offset.clamp(0.0, 1.0);
-
-    // 计算图片向上位移：从默认态上滑时，图片略微向上移动
-    // offset 从 1.0 到 0.5 时，图片向上移动
     final imageSlideUp = _offset < 1.0 ? (1.0 - _offset) * 30 : 0.0;
 
     return PopScope(
@@ -1351,39 +1418,48 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                   ),
                   child: ScrollEdgeHaptic(
                     child: SingleChildScrollView(
-                    controller: _scrollController,
-                    physics: _offset < 0.5 && !_isDragging
-                        ? const BouncingScrollPhysics(
-                            parent: AlwaysScrollableScrollPhysics(),
-                          )
-                        : const NeverScrollableScrollPhysics(),
-                    padding: EdgeInsets.only(bottom: safeAreaBottom + 20),
-                    child: SelectionArea(
-                      focusNode: _selectionFocusNode,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 20),
-                          if (_memory.category == MemoryCategory.bill) ...[
-                            // 账单标题和创建时间
-                            _buildBillSummaryCard(isDark),
+                      controller: _scrollController,
+                      physics: _offset < 0.5 && !_isDragging
+                          ? const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            )
+                          : const NeverScrollableScrollPhysics(),
+                      padding: EdgeInsets.only(bottom: safeAreaBottom + 20),
+                      child: SelectionArea(
+                        focusNode: _selectionFocusNode,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             const SizedBox(height: 20),
-                            _buildBillDetailInfo(isDark),
-                            // 一段话总结（账单类型显示在账单详情下方）
-                            if (_memory.summary != null &&
-                                _memory.summary!.isNotEmpty) ...[
+                            if (_memory.category == MemoryCategory.bill) ...[
+                              _buildBillSummaryCard(isDark),
                               const SizedBox(height: 20),
-                              _buildSummarySection(isDark),
+                              _buildBillDetailInfo(isDark),
+                              if (_memory.summary != null &&
+                                  _memory.summary!.isNotEmpty) ...[
+                                const SizedBox(height: 20),
+                                _buildSummarySection(isDark),
+                              ],
+                              if (_memory.eventName != null &&
+                                  _memory.eventStartTime != null) ...[
+                                const SizedBox(height: 20),
+                                _buildEventSection(isDark),
+                              ],
+                            ] else if (_memory.category ==
+                                MemoryCategory.clothing) ...[
+                              _buildClothingDetailInfo(isDark),
+                              if (_memory.eventName != null &&
+                                  _memory.eventStartTime != null) ...[
+                                const SizedBox(height: 20),
+                                _buildEventSection(isDark),
+                              ],
+                            ] else ...[
+                              _buildDetailInfo(isDark),
                             ],
-                          ] else if (_memory.category == MemoryCategory.clothing) ...[
-                            _buildClothingDetailInfo(isDark),
-                          ] else ...[
-                            _buildDetailInfo(isDark),
                           ],
-                        ],
+                        ),
                       ),
                     ),
-                  ),
                   ),
                 ),
               ),
@@ -1396,12 +1472,11 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
               child: Container(
                 height: appBarHeight,
                 padding: EdgeInsets.only(top: safeAreaTop),
-                color: _offset < 0.5
-                    ? AppColors.surfaceHigh(isDark)
-                    : Colors.transparent,
+                color: AppColors.surfaceHigh(
+                  isDark,
+                ).withOpacity((1.0 - (_offset / 0.5).clamp(0.0, 1.0))),
                 child: Stack(
                   children: [
-                    // 返回按钮 - 编辑时淡出
                     Positioned(
                       left: 8,
                       top: 0,
@@ -1424,7 +1499,6 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                         ),
                       ),
                     ),
-                    // 编辑中标题 - 编辑时淡入
                     if (_memory.category == MemoryCategory.clothing)
                       Center(
                         child: AnimatedBuilder(
@@ -1432,7 +1506,10 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                           builder: (context, child) => Opacity(
                             opacity: _editAnimation.value,
                             child: Transform.translate(
-                              offset: Offset(0, 6 * (1.0 - _editAnimation.value)),
+                              offset: Offset(
+                                0,
+                                6 * (1.0 - _editAnimation.value),
+                              ),
                               child: child,
                             ),
                           ),
@@ -1478,6 +1555,269 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     );
   }
 
+  /// 大屏横向布局：左侧图片(40%) + 右侧内容(60%)
+  Widget _buildWideLayout(
+    BuildContext context,
+    bool isDark,
+    double safeAreaTop,
+    double safeAreaBottom,
+  ) {
+    final appBarHeight = 56.0 + safeAreaTop;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          if (_isEditingClothing) {
+            _saveClothingEdits();
+            return;
+          }
+          Navigator.pop(context, _memory);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.surfaceHigh(isDark),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final paneWidth = constraints.maxWidth;
+            final imageWidth = paneWidth * 0.4;
+            return Row(
+              children: [
+                // 左侧：图片区域 + 顶栏（无背景）
+                SizedBox(
+                  width: imageWidth,
+                  child: Container(
+                    color: AppColors.surfaceLow(isDark),
+                    child: Stack(
+                      children: [
+                        // 图片（顶栏下方区域）
+                        Positioned(
+                          top: appBarHeight,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: _buildWideImageArea(isDark),
+                        ),
+                        // 左侧顶栏：返回按钮，浮在图片上方，无背景
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: appBarHeight,
+                            padding: EdgeInsets.only(top: safeAreaTop),
+                            child: Stack(
+                              children: [
+                                Positioned(
+                                  left: 8,
+                                  top: 0,
+                                  bottom: 0,
+                                  child: AnimatedBuilder(
+                                    animation: _editAnimation,
+                                    builder: (context, child) => Opacity(
+                                      opacity: 1.0 - _editAnimation.value,
+                                      child: IgnorePointer(
+                                        ignoring: _isEditingClothing,
+                                        child: child,
+                                      ),
+                                    ),
+                                    child: GlassButton(
+                                      icon: CupertinoIcons.back,
+                                      onTap: () =>
+                                          Navigator.pop(context, _memory),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // 右侧：内容区 + 顶栏（有背景）
+                Expanded(
+                  child: Column(
+                    children: [
+                      // 右侧顶栏
+                      Container(
+                        height: appBarHeight,
+                        padding: EdgeInsets.only(top: safeAreaTop),
+                        color: AppColors.surfaceHigh(isDark),
+                        child: Stack(
+                          children: [
+                            if (_memory.category == MemoryCategory.clothing)
+                              Center(
+                                child: AnimatedBuilder(
+                                  animation: _editAnimation,
+                                  builder: (context, child) => Opacity(
+                                    opacity: _editAnimation.value,
+                                    child: Transform.translate(
+                                      offset: Offset(
+                                        0,
+                                        6 * (1.0 - _editAnimation.value),
+                                      ),
+                                      child: child,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '编辑中',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.onSurface(isDark),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (_memory.category == MemoryCategory.clothing)
+                              Positioned(
+                                right: 8,
+                                top: 0,
+                                bottom: 0,
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 250),
+                                  transitionBuilder: (child, anim) =>
+                                      FadeTransition(
+                                        opacity: anim,
+                                        child: ScaleTransition(
+                                          scale: anim,
+                                          child: child,
+                                        ),
+                                      ),
+                                  child: GlassButton(
+                                    key: ValueKey(_isEditingClothing),
+                                    icon: _isEditingClothing
+                                        ? CupertinoIcons.checkmark_alt
+                                        : CupertinoIcons.pencil,
+                                    onTap: _isEditingClothing
+                                        ? _saveClothingEdits
+                                        : _enterClothingEditMode,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Divider(
+                        height: 0.6,
+                        thickness: 0.6,
+                        color: isDark
+                            ? const Color(0xFF3A3A3C)
+                            : const Color(0xFFE5E5EA),
+                      ),
+                      // 内容
+                      Expanded(
+                        child: ScrollEdgeHaptic(
+                          child: SingleChildScrollView(
+                            controller: _scrollController,
+                            physics: const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            ),
+                            padding: EdgeInsets.only(
+                              bottom: safeAreaBottom + 20,
+                            ),
+                            child: SelectionArea(
+                              focusNode: _selectionFocusNode,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 20),
+                                  if (_memory.category ==
+                                      MemoryCategory.bill) ...[
+                                    _buildBillSummaryCard(isDark),
+                                    const SizedBox(height: 20),
+                                    _buildBillDetailInfo(isDark),
+                                    if (_memory.summary != null &&
+                                        _memory.summary!.isNotEmpty) ...[
+                                      const SizedBox(height: 20),
+                                      _buildSummarySection(isDark),
+                                    ],
+                                    if (_memory.eventName != null &&
+                                        _memory.eventStartTime != null) ...[
+                                      const SizedBox(height: 20),
+                                      _buildEventSection(isDark),
+                                    ],
+                                  ] else if (_memory.category ==
+                                      MemoryCategory.clothing) ...[
+                                    _buildClothingDetailInfo(isDark),
+                                    if (_memory.eventName != null &&
+                                        _memory.eventStartTime != null) ...[
+                                      const SizedBox(height: 20),
+                                      _buildEventSection(isDark),
+                                    ],
+                                  ] else ...[
+                                    _buildDetailInfo(isDark),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// 大屏左侧图片区域：居中显示，可点击查看大图
+  Widget _buildWideImageArea(bool isDark) {
+    if (_isLoading) {
+      return Center(
+        child: CupertinoActivityIndicator(color: AppColors.onSurface(isDark)),
+      );
+    }
+
+    if (_memory.imagePath == null) {
+      return Center(
+        child: Icon(
+          _getCategoryIcon(_memory.category),
+          size: 60,
+          color: _memory.category.color.withOpacity(0.5),
+        ),
+      );
+    }
+
+    return _Pressable(
+      onTap: () => _openImageViewer(),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 20,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Hero(
+                tag: 'memory_image_${_memory.id}',
+                child: Image.file(
+                  File(_memory.imagePath!),
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildImageArea(
     double screenWidth,
     double imageAreaHeight,
@@ -1503,9 +1843,10 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       );
     }
 
-    // 图片宽度限制：最小50%，最大70%
-    final minImageWidth = screenWidth * 0.5;
-    final maxImageWidth = screenWidth * 0.7;
+    // 图片宽度限制：最小50%，最大70%，大屏下额外限制最大400px
+    final paneWidth = screenWidth > 600 ? screenWidth * 2 / 3 : screenWidth;
+    final minImageWidth = paneWidth * 0.5;
+    var maxImageWidth = paneWidth * 0.7;
 
     // 上下边距
     const verticalMargin = 16.0;
@@ -1600,6 +1941,12 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       children.add(_buildLegacyDetailInfo(isDark));
     }
 
+    // 日程信息区域
+    if (_memory.eventName != null && _memory.eventStartTime != null) {
+      children.add(const SizedBox(height: 20));
+      children.add(_buildEventSection(isDark));
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: children,
@@ -1671,6 +2018,128 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         ],
       ),
     );
+  }
+
+  Widget _buildEventSection(bool isDark) {
+    final eventName = _memory.eventName!;
+    final startTime = _memory.eventStartTime!;
+    final endTime =
+        _memory.eventEndTime ?? startTime.add(const Duration(hours: 1));
+
+    String formatEventTime(DateTime dt) {
+      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
+          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Divider(color: AppColors.outline(isDark), height: 1),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTapDown: (_) => setState(() => _eventPressed = true),
+            onTapUp: (_) {},
+            onTapCancel: () => setState(() => _eventPressed = false),
+            onTap: () async {
+              setState(() => _eventPressed = true);
+              await Future.delayed(const Duration(milliseconds: 80));
+              if (mounted) setState(() => _eventPressed = false);
+              _addToCalendar(eventName, startTime, endTime);
+            },
+            child: AnimatedScale(
+              scale: _eventPressed ? 0.95 : 1.0,
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.containerList(isDark),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary(isDark).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        CupertinoIcons.calendar,
+                        size: 20,
+                        color: AppColors.primary(isDark),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            eventName,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.onSurface(isDark),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            formatEventTime(startTime),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.onSurfaceQuaternary(isDark),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      CupertinoIcons.plus_circle,
+                      size: 26,
+                      color: AppColors.primary(isDark),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _addToCalendar(
+    String title,
+    DateTime start,
+    DateTime end,
+  ) async {
+    final startMillis = start.millisecondsSinceEpoch;
+    final endMillis = end.millisecondsSinceEpoch;
+
+    try {
+      const platform = MethodChannel('com.maliang.notes/calendar');
+      await platform.invokeMethod('addEvent', {
+        'title': title,
+        'startTime': startMillis,
+        'endTime': endMillis,
+      });
+    } catch (e) {
+      debugPrint('添加日历事件失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('无法添加到日历')));
+      }
+    }
   }
 
   Widget _buildInfoSection(InfoSection section, bool isDark) {
@@ -1790,10 +2259,12 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         if (_memory.clothingType != null && _memory.clothingType!.isNotEmpty) {
           details.add(_buildInfoRow('分类', _memory.clothingType!, isDark));
         }
-        if (_memory.clothingBrand != null && _memory.clothingBrand!.isNotEmpty) {
+        if (_memory.clothingBrand != null &&
+            _memory.clothingBrand!.isNotEmpty) {
           details.add(_buildInfoRow('品牌', _memory.clothingBrand!, isDark));
         }
-        if (_memory.clothingPrice != null && _memory.clothingPrice!.isNotEmpty) {
+        if (_memory.clothingPrice != null &&
+            _memory.clothingPrice!.isNotEmpty) {
           details.add(_buildInfoRow('价格', _memory.clothingPrice!, isDark));
         }
         break;
@@ -2039,11 +2510,21 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      sheetAnimationStyle: AnimationStyle(
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      ),
       builder: (context) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: _EditBillBottomSheet(memory: _memory),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: _EditBillBottomSheet(memory: _memory),
+          ),
+        ),
       ),
     );
 
@@ -2259,78 +2740,118 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
 
     // 模块一：服饰属性
     children.add(const SizedBox(height: 24));
-    children.add(Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '服饰属性',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: AppColors.onSurface(isDark),
+    children.add(
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '服饰属性',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.onSurface(isDark),
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
-          _buildAnimatedRow('名称', isDark,
-            viewingValue: _valueText(m.clothingName ?? '', isDark),
-            editingValue: _valueTextField(_clothingNameCtrl, isDark, focusNode: _clothingNameFocus),
-          ),
-          const SizedBox(height: 14),
-          _buildAnimatedRow('分类', isDark,
-            viewingValue: _valueText(m.clothingType ?? '', isDark),
-            editingValue: _valueTextField(_clothingTypeCtrl, isDark, focusNode: _clothingTypeFocus),
-          ),
-          const SizedBox(height: 14),
-          // 色系
-          _buildColorRow(isDark),
-          const SizedBox(height: 14),
-          // 适用季节
-          _buildSeasonRow(isDark),
-          const SizedBox(height: 14),
-          // 尺码
-          _buildAnimatedRow('尺码', isDark,
-            viewingValue: _valueText(m.clothingSize ?? '', isDark),
-            editingValue: _valueTappable(_editingSize, isDark, onTap: () => _showSizePicker(isDark)),
-          ),
-          const SizedBox(height: 14),
-          _buildAnimatedRow('品牌', isDark,
-            viewingValue: _valueText(m.clothingBrand ?? '', isDark),
-            editingValue: _valueTextField(_clothingBrandCtrl, isDark, focusNode: _clothingBrandFocus),
-          ),
-        ],
+            const SizedBox(height: 14),
+            _buildAnimatedRow(
+              '名称',
+              isDark,
+              viewingValue: _valueText(m.clothingName ?? '', isDark),
+              editingValue: _valueTextField(
+                _clothingNameCtrl,
+                isDark,
+                focusNode: _clothingNameFocus,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _buildAnimatedRow(
+              '分类',
+              isDark,
+              viewingValue: _valueText(m.clothingType ?? '', isDark),
+              editingValue: _valueTextField(
+                _clothingTypeCtrl,
+                isDark,
+                focusNode: _clothingTypeFocus,
+              ),
+            ),
+            const SizedBox(height: 14),
+            // 色系
+            _buildColorRow(isDark),
+            const SizedBox(height: 14),
+            // 适用季节
+            _buildSeasonRow(isDark),
+            const SizedBox(height: 14),
+            // 尺码
+            _buildAnimatedRow(
+              '尺码',
+              isDark,
+              viewingValue: _valueText(m.clothingSize ?? '', isDark),
+              editingValue: _valueTappable(
+                _editingSize,
+                isDark,
+                onTap: () => _showSizePicker(isDark),
+              ),
+            ),
+            const SizedBox(height: 14),
+            _buildAnimatedRow(
+              '品牌',
+              isDark,
+              viewingValue: _valueText(m.clothingBrand ?? '', isDark),
+              editingValue: _valueTextField(
+                _clothingBrandCtrl,
+                isDark,
+                focusNode: _clothingBrandFocus,
+              ),
+            ),
+          ],
+        ),
       ),
-    ));
+    );
 
     // 模块二：交易信息
     children.add(const SizedBox(height: 24));
-    children.add(Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '交易信息',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: AppColors.onSurface(isDark),
+    children.add(
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '交易信息',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.onSurface(isDark),
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
-          _buildAnimatedRow('价格', isDark,
-            viewingValue: _valueText(m.clothingPrice ?? '', isDark),
-            editingValue: _valueTextField(_clothingPriceCtrl, isDark, focusNode: _clothingPriceFocus),
-          ),
-          const SizedBox(height: 14),
-          _buildAnimatedRow('购买日期', isDark,
-            viewingValue: _valueText(m.clothingPurchaseDate ?? '', isDark),
-            editingValue: _valueTappable(_editingPurchaseDate, isDark, onTap: _showPurchaseDatePicker),
-          ),
-        ],
+            const SizedBox(height: 14),
+            _buildAnimatedRow(
+              '价格',
+              isDark,
+              viewingValue: _valueText(m.clothingPrice ?? '', isDark),
+              editingValue: _valueTextField(
+                _clothingPriceCtrl,
+                isDark,
+                focusNode: _clothingPriceFocus,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _buildAnimatedRow(
+              '购买日期',
+              isDark,
+              viewingValue: _valueText(m.clothingPurchaseDate ?? '', isDark),
+              editingValue: _valueTappable(
+                _editingPurchaseDate,
+                isDark,
+                onTap: _showPurchaseDatePicker,
+              ),
+            ),
+          ],
+        ),
       ),
-    ));
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2344,69 +2865,80 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-        Text(
-          '色系',
-          style: TextStyle(
-            fontSize: 16,
-            color: AppColors.onSurfaceQuaternary(isDark),
+          Text(
+            '色系',
+            style: TextStyle(
+              fontSize: 16,
+              color: AppColors.onSurfaceQuaternary(isDark),
+            ),
           ),
-        ),
-        const SizedBox(width: 24),
-        Expanded(
-          child: AnimatedBuilder(
-            animation: _editAnimation,
-            builder: (context, _) {
-              final t = _editAnimation.value;
-              return ClipRect(
-                child: Stack(
-                  children: [
-                    // 查看态
-                    Positioned.fill(
-                      child: Transform.translate(
-                        offset: Offset(-20 * t, 0),
-                        child: Opacity(
-                          opacity: 1.0 - t,
-                          child: IgnorePointer(
-                            ignoring: _isEditingClothing,
-                            child: _buildColorChips(_memory.clothingColors, isDark, editing: false),
+          const SizedBox(width: 24),
+          Expanded(
+            child: AnimatedBuilder(
+              animation: _editAnimation,
+              builder: (context, _) {
+                final t = _editAnimation.value;
+                return ClipRect(
+                  child: Stack(
+                    children: [
+                      // 查看态
+                      Positioned.fill(
+                        child: Transform.translate(
+                          offset: Offset(-20 * t, 0),
+                          child: Opacity(
+                            opacity: 1.0 - t,
+                            child: IgnorePointer(
+                              ignoring: _isEditingClothing,
+                              child: _buildColorChips(
+                                _memory.clothingColors,
+                                isDark,
+                                editing: false,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    // 编辑态
-                    Positioned.fill(
-                      child: Transform.translate(
-                        offset: Offset(20 * (1.0 - t), 0),
-                        child: Opacity(
-                          opacity: t,
-                          child: IgnorePointer(
-                            ignoring: !_isEditingClothing,
-                            child: _buildColorChips(_editingColors, isDark, editing: true),
+                      // 编辑态
+                      Positioned.fill(
+                        child: Transform.translate(
+                          offset: Offset(20 * (1.0 - t), 0),
+                          child: Opacity(
+                            opacity: t,
+                            child: IgnorePointer(
+                              ignoring: !_isEditingClothing,
+                              child: _buildColorChips(
+                                _editingColors,
+                                isDark,
+                                editing: true,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            },
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
-        ),
-      ],
+        ],
       ),
     );
   }
 
-  Widget _buildColorChips(List<String> colors, bool isDark, {required bool editing}) {
+  Widget _buildColorChips(
+    List<String> colors,
+    bool isDark, {
+    required bool editing,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         if (colors.isNotEmpty)
           ...colors.take(5).map((hex) {
-            final colorValue = int.tryParse(
-              hex.replaceAll('#', 'FF'),
-              radix: 16,
-            ) ?? 0xFF888888;
+            final colorValue =
+                int.tryParse(hex.replaceAll('#', 'FF'), radix: 16) ??
+                0xFF888888;
             return Padding(
               padding: const EdgeInsets.only(left: 8),
               child: editing
@@ -2426,7 +2958,11 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                             width: 1.5,
                           ),
                         ),
-                        child: Icon(CupertinoIcons.xmark, size: 12, color: Colors.white.withOpacity(0.8)),
+                        child: Icon(
+                          CupertinoIcons.xmark,
+                          size: 12,
+                          color: Colors.white.withOpacity(0.8),
+                        ),
                       ),
                     )
                   : Container(
@@ -2472,11 +3008,16 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
 
   Color _seasonColor(String season) {
     switch (season) {
-      case '春季': return const Color(0xFF4CAF50);
-      case '夏季': return const Color(0xFFFF9800);
-      case '秋季': return const Color(0xFFFF5722);
-      case '冬季': return const Color(0xFF2196F3);
-      default: return const Color(0xFF9E9E9E);
+      case '春季':
+        return const Color(0xFF4CAF50);
+      case '夏季':
+        return const Color(0xFFFF9800);
+      case '秋季':
+        return const Color(0xFFFF5722);
+      case '冬季':
+        return const Color(0xFF2196F3);
+      default:
+        return const Color(0xFF9E9E9E);
     }
   }
 
@@ -2489,58 +3030,73 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         children: [
           Text(
             '季节',
-          style: TextStyle(
-            fontSize: 16,
-            color: AppColors.onSurfaceQuaternary(isDark),
+            style: TextStyle(
+              fontSize: 16,
+              color: AppColors.onSurfaceQuaternary(isDark),
+            ),
           ),
-        ),
-        const SizedBox(width: 24),
-        Expanded(
-          child: AnimatedBuilder(
-            animation: _editAnimation,
-            builder: (context, _) {
-              final t = _editAnimation.value;
-              return ClipRect(
-                child: Stack(
-                  children: [
-                    // 查看态
-                    Positioned.fill(
-                      child: Transform.translate(
-                        offset: Offset(-20 * t, 0),
-                        child: Opacity(
-                          opacity: 1.0 - t,
-                          child: IgnorePointer(
-                            ignoring: _isEditingClothing,
-                            child: _buildSeasonChips(_memory.clothingSeasons, isDark, allSeasons: allSeasons, editing: false),
+          const SizedBox(width: 24),
+          Expanded(
+            child: AnimatedBuilder(
+              animation: _editAnimation,
+              builder: (context, _) {
+                final t = _editAnimation.value;
+                return ClipRect(
+                  child: Stack(
+                    children: [
+                      // 查看态
+                      Positioned.fill(
+                        child: Transform.translate(
+                          offset: Offset(-20 * t, 0),
+                          child: Opacity(
+                            opacity: 1.0 - t,
+                            child: IgnorePointer(
+                              ignoring: _isEditingClothing,
+                              child: _buildSeasonChips(
+                                _memory.clothingSeasons,
+                                isDark,
+                                allSeasons: allSeasons,
+                                editing: false,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    // 编辑态
-                    Positioned.fill(
-                      child: Transform.translate(
-                        offset: Offset(20 * (1.0 - t), 0),
-                        child: Opacity(
-                          opacity: t,
-                          child: IgnorePointer(
-                            ignoring: !_isEditingClothing,
-                            child: _buildSeasonChips(_editingSeasons, isDark, allSeasons: allSeasons, editing: true),
+                      // 编辑态
+                      Positioned.fill(
+                        child: Transform.translate(
+                          offset: Offset(20 * (1.0 - t), 0),
+                          child: Opacity(
+                            opacity: t,
+                            child: IgnorePointer(
+                              ignoring: !_isEditingClothing,
+                              child: _buildSeasonChips(
+                                _editingSeasons,
+                                isDark,
+                                allSeasons: allSeasons,
+                                editing: true,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            },
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
-        ),
-      ],
+        ],
       ),
     );
   }
 
-  Widget _buildSeasonChips(List<String> seasons, bool isDark, {required List<String> allSeasons, required bool editing}) {
+  Widget _buildSeasonChips(
+    List<String> seasons,
+    bool isDark, {
+    required List<String> allSeasons,
+    required bool editing,
+  }) {
     if (editing) {
       return Wrap(
         alignment: WrapAlignment.end,
@@ -2563,9 +3119,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: selected
-                    ? color.withOpacity(0.1)
-                    : Colors.transparent,
+                color: selected ? color.withOpacity(0.1) : Colors.transparent,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: selected
@@ -2600,9 +3154,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: color.withOpacity(0.4),
-              ),
+              border: Border.all(color: color.withOpacity(0.4)),
             ),
             child: Text(
               season,
@@ -2620,7 +3172,12 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   /// 编辑/查看模式切换 — 标签不动，只对值部分做位移动画
-  Widget _buildAnimatedRow(String label, bool isDark, {required Widget editingValue, required Widget viewingValue}) {
+  Widget _buildAnimatedRow(
+    String label,
+    bool isDark, {
+    required Widget editingValue,
+    required Widget viewingValue,
+  }) {
     return SizedBox(
       height: 36,
       child: Row(
@@ -2680,24 +3237,22 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       child: Text(
         value,
         textAlign: TextAlign.right,
-        style: TextStyle(
-          fontSize: 16,
-          color: AppColors.onSurface(isDark),
-        ),
+        style: TextStyle(fontSize: 16, color: AppColors.onSurface(isDark)),
       ),
     );
   }
 
   /// 输入框值（编辑态）
-  Widget _valueTextField(TextEditingController ctrl, bool isDark, {FocusNode? focusNode}) {
+  Widget _valueTextField(
+    TextEditingController ctrl,
+    bool isDark, {
+    FocusNode? focusNode,
+  }) {
     return TextField(
       controller: ctrl,
       focusNode: focusNode,
       textAlign: TextAlign.right,
-      style: TextStyle(
-        fontSize: 16,
-        color: AppColors.onSurface(isDark),
-      ),
+      style: TextStyle(fontSize: 16, color: AppColors.onSurface(isDark)),
       decoration: InputDecoration(
         isDense: true,
         contentPadding: const EdgeInsets.only(bottom: 4),
@@ -2717,7 +3272,11 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   }
 
   /// 胶囊选择器值（编辑态）
-  Widget _valueTappable(String value, bool isDark, {required VoidCallback onTap}) {
+  Widget _valueTappable(
+    String value,
+    bool isDark, {
+    required VoidCallback onTap,
+  }) {
     return Align(
       alignment: Alignment.centerRight,
       child: _Pressable(

@@ -106,7 +106,8 @@ class AiService {
         final body = await streamedResponse.stream.bytesToString();
         final errorData = jsonDecode(body);
         final errorMessage =
-            errorData['error']?['message'] ?? '请求失败: ${streamedResponse.statusCode}';
+            errorData['error']?['message'] ??
+            '请求失败: ${streamedResponse.statusCode}';
         if (isUsingDefault) {
           throw ApiKeyInvalidException('默认API密钥无效，请在设置中配置您自己的API密钥');
         }
@@ -114,7 +115,9 @@ class AiService {
       }
 
       String buffer = '';
-      await for (final chunk in streamedResponse.stream.transform(utf8.decoder)) {
+      await for (final chunk in streamedResponse.stream.transform(
+        utf8.decoder,
+      )) {
         buffer += chunk;
         final lines = buffer.split('\n');
         // 保留最后一个可能不完整的行
@@ -202,6 +205,7 @@ class AiService {
   a) 服饰实物照片（穿搭照、平铺展示、挂在衣架上等）
   b) 服饰商品图或电商商品详情页截图
   c) 服饰订单截图中主要展示商品信息的
+注意：社交媒体截图（微博、朋友圈等）即使图中有人穿着衣服，也不应归为"服饰"，应归为"随手记"。只有图片主题明确是展示服饰本身时才归为"服饰"。
 
 第五步：以上都不是，归类为"随手记"。
 
@@ -218,16 +222,24 @@ class AiService {
    - 随手记：将识别出的信息组织成结构化格式
 
 4. 对于账单类型，提取：amount、isExpense、billCategory、billTime、paymentMethod、merchantName、summary
-   账单分类列表（使用英文名）：
-   支出：${BillExpenseCategory.aiPromptList}
-   收入：${BillIncomeCategory.aiPromptList}
+   billCategory必须且只能从以下列表中选择一个英文名称，禁止使用列表以外的任何值：
+   支出类型：${BillExpenseCategory.aiPromptList}
+   收入类型：${BillIncomeCategory.aiPromptList}
+   如果无法匹配，支出用"other_expense"，收入用"other_income"。
 
-5. 对于服饰类型，提取（只填能识别到的）：clothingName、clothingType、clothingColors(hex数组)、clothingSeasons(从春季/夏季/秋季/冬季选)、clothingBrand、clothingPrice、clothingSize、clothingPurchaseDate
+5. 对于服饰类型，提取（只填能识别到的）：clothingName、clothingType、clothingColors(hex数组)、clothingSeasons、clothingBrand、clothingPrice、clothingSize、clothingPurchaseDate
+   clothingSeasons必须且只能从以下四个值中选择（可多选）：["春季", "夏季", "秋季", "冬季"]，禁止使用其他任何季节名称。
+
+6. 日程识别（适用于所有分类）：如果图片中包含日程、活动、会议、截止日期、预约、航班、火车票、演出、考试等时间相关信息，额外提取：
+   - eventName：日程名称（简洁描述）
+   - eventStartTime：开始时间，格式"YYYY-MM-DD HH:mm"
+   - eventEndTime：结束时间，格式"YYYY-MM-DD HH:mm"（如果无法确定结束时间，默认为开始时间后1小时）
+   注意：日程信息是附加提取的，不影响主分类判断。
 
 请严格按以下JSON格式返回：
-{"category":"分类名称","title":"标题","summary":"一段话总结","infoSections":[{"title":"小标题","items":[{"label":"标签","value":"值"}]}],"amount":"金额","isExpense":true/false,"billCategory":"分类","paymentMethod":"支付方式","merchantName":"商户","billTime":"YYYY-MM-DD HH:mm","clothingName":"名称","clothingType":"分类","clothingColors":["#hex"],"clothingSeasons":["季节"],"clothingBrand":"品牌","clothingPrice":"价格","clothingSize":"尺码","clothingPurchaseDate":"YYYY-MM-DD"}
+{"category":"分类名称","title":"标题","summary":"一段话总结","infoSections":[{"title":"小标题","items":[{"label":"标签","value":"值"}]}],"amount":"金额","isExpense":true/false,"billCategory":"分类","paymentMethod":"支付方式","merchantName":"商户","billTime":"YYYY-MM-DD HH:mm","clothingName":"名称","clothingType":"分类","clothingColors":["#hex"],"clothingSeasons":["季节"],"clothingBrand":"品牌","clothingPrice":"价格","clothingSize":"尺码","clothingPurchaseDate":"YYYY-MM-DD","eventName":"日程名称","eventStartTime":"YYYY-MM-DD HH:mm","eventEndTime":"YYYY-MM-DD HH:mm"}
 
-注意：所有类型都必须填summary。只填图片中实际存在的字段，不存在的省略。billCategory必须用英文名。''';
+注意：所有类型都必须填summary。只填图片中实际存在的字段，不存在的省略。billCategory必须从上方列表选择英文名，不要自创分类。clothingSeasons只能从["春季","夏季","秋季","冬季"]中选择。''';
 
     final url = Uri.parse('$apiAddress/chat/completions');
     debugPrint('请求URL: $url');
@@ -250,7 +262,11 @@ class AiService {
                     'type': 'image_url',
                     'image_url': {'url': 'data:image/jpeg;base64,$base64Image'},
                   },
-                  {'type': 'text', 'text': '请分析这张图片并按要求分类。注意按顺序判断：先看是否是取餐码/取件码/账单，再看是否是服饰，最后才归为随手记。'},
+                  {
+                    'type': 'text',
+                    'text':
+                        '请分析这张图片并按要求分类。注意按顺序判断：先看是否是取餐码/取件码/账单，再看是否是服饰，最后才归为随手记。',
+                  },
                 ],
               },
             ],
@@ -283,6 +299,16 @@ class AiService {
     }
   }
 
+  String? _validateBillCategory(String? category, bool? isExpense) {
+    if (category == null) return null;
+    final expense = BillExpenseCategory.fromName(category);
+    if (expense != null) return expense.name;
+    final income = BillIncomeCategory.fromName(category);
+    if (income != null) return income.name;
+    // 无法匹配，回退到"其他"
+    return (isExpense ?? true) ? 'other_expense' : 'other_income';
+  }
+
   MemoryItem? parseAnalysisResult(
     String? result,
     String imagePath,
@@ -295,19 +321,23 @@ class AiService {
           .replaceAll(RegExp(r'```json\n?'), '')
           .replaceAll(RegExp(r'\n?```'), '')
           .trim();
-      
+
       // 尝试提取 JSON 对象（处理 AI 返回额外文本的情况）
       String cleanJson = jsonStr;
       final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(jsonStr);
       if (jsonMatch != null) {
         cleanJson = jsonMatch.group(0)!;
       }
-      
-      debugPrint('解析JSON: ${cleanJson.substring(0, cleanJson.length.clamp(0, 200))}...');
+
+      debugPrint(
+        '解析JSON: ${cleanJson.substring(0, cleanJson.length.clamp(0, 200))}...',
+      );
       final decoded = jsonDecode(cleanJson);
       if (decoded is! Map<String, dynamic>) {
         debugPrint('JSON解析结果不是Map: ${decoded.runtimeType}');
-        throw FormatException('Expected JSON object, got ${decoded.runtimeType}');
+        throw FormatException(
+          'Expected JSON object, got ${decoded.runtimeType}',
+        );
       }
       final json = decoded;
 
@@ -340,9 +370,50 @@ class AiService {
         return null;
       }
 
-      // 二次校验：如果 AI 分类为随手记，但内容中包含服饰关键词，强制改为服饰
+      // 二次校验：如果 AI 分类为随手记，但内容中包含账单关键词或有 amount 字段，强制改为账单
+      // 注意：账单校验优先于服饰校验
       if (category == MemoryCategory.note) {
-        final fullText = '$title ${json['summary'] ?? ''} $cleanJson'.toLowerCase();
+        final hasAmount = getNonEmptyString(json, 'amount') != null;
+        final hasBillCategory = getNonEmptyString(json, 'billCategory') != null;
+        if (hasAmount || hasBillCategory) {
+          category = MemoryCategory.bill;
+          debugPrint('二次校验：检测到amount/billCategory字段，强制改为账单分类');
+        } else {
+          final fullText = '$title ${json['summary'] ?? ''}'.toLowerCase();
+          const billKeywords = [
+            '支付',
+            '付款',
+            '收款',
+            '转账',
+            '消费',
+            '充值',
+            '缴费',
+            '退款',
+            '红包',
+            '账单',
+            '小票',
+            '发票',
+            '收据',
+            '¥',
+            '元',
+            '订单金额',
+            '实付',
+            '应付',
+          ];
+          for (final keyword in billKeywords) {
+            if (fullText.contains(keyword)) {
+              category = MemoryCategory.bill;
+              debugPrint('二次校验命中账单关键词: $keyword，强制改为账单分类');
+              break;
+            }
+          }
+        }
+      }
+
+      // 二次校验：如果 AI 分类为随手记，但内容中包含服饰关键词，强制改为服饰
+      // 只检查标题和摘要，不检查整个 JSON（避免字段名误触发）
+      if (category == MemoryCategory.note) {
+        final fullText = '$title ${json['summary'] ?? ''}'.toLowerCase();
         const clothingKeywords = [
           // 上衣
           't恤', '衬衫', '卫衣', '毛衣', '夹克', '外套', '大衣', '羽绒服',
@@ -357,37 +428,13 @@ class AiService {
           // 配饰
           '帽子', '围巾', '手套', '腰带', '领带', '袜子',
           // 通用
-          '服装', '服饰', '穿搭', '尺码', '码数', 'clothingname', 'clothingtype',
+          '服装', '服饰', '穿搭', '尺码', '码数',
         ];
         for (final keyword in clothingKeywords) {
           if (fullText.contains(keyword)) {
             category = MemoryCategory.clothing;
             debugPrint('二次校验命中服饰关键词: $keyword，强制改为服饰分类');
             break;
-          }
-        }
-      }
-
-      // 二次校验：如果 AI 分类为随手记，但内容中包含账单关键词或有 amount 字段，强制改为账单
-      if (category == MemoryCategory.note) {
-        final hasAmount = getNonEmptyString(json, 'amount') != null;
-        final hasBillCategory = getNonEmptyString(json, 'billCategory') != null;
-        if (hasAmount || hasBillCategory) {
-          category = MemoryCategory.bill;
-          debugPrint('二次校验：检测到amount/billCategory字段，强制改为账单分类');
-        } else {
-          final fullText = '$title ${json['summary'] ?? ''}'.toLowerCase();
-          const billKeywords = [
-            '支付', '付款', '收款', '转账', '消费', '充值', '缴费',
-            '退款', '红包', '账单', '小票', '发票', '收据',
-            '¥', '元', '订单金额', '实付', '应付',
-          ];
-          for (final keyword in billKeywords) {
-            if (fullText.contains(keyword)) {
-              category = MemoryCategory.bill;
-              debugPrint('二次校验命中账单关键词: $keyword，强制改为账单分类');
-              break;
-            }
           }
         }
       }
@@ -466,7 +513,10 @@ class AiService {
         trackingNumber: getNonEmptyString(json, 'trackingNumber'),
         amount: getNonEmptyString(json, 'amount'),
         isExpense: getBoolValue(json, 'isExpense'),
-        billCategory: getNonEmptyString(json, 'billCategory'),
+        billCategory: _validateBillCategory(
+          getNonEmptyString(json, 'billCategory'),
+          getBoolValue(json, 'isExpense'),
+        ),
         paymentMethod: getNonEmptyString(json, 'paymentMethod'),
         merchantName: getNonEmptyString(json, 'merchantName'),
         billTime: parseBillTime(getNonEmptyString(json, 'billTime')),
@@ -474,18 +524,26 @@ class AiService {
         infoSections: parseInfoSections(json['infoSections'] as List<dynamic>?),
         clothingName: getNonEmptyString(json, 'clothingName'),
         clothingType: getNonEmptyString(json, 'clothingType'),
-        clothingColors: (json['clothingColors'] as List<dynamic>?)
+        clothingColors:
+            (json['clothingColors'] as List<dynamic>?)
                 ?.map((e) => e.toString())
                 .toList() ??
             const [],
-        clothingSeasons: (json['clothingSeasons'] as List<dynamic>?)
+        clothingSeasons:
+            (json['clothingSeasons'] as List<dynamic>?)
                 ?.map((e) => e.toString())
+                .where((s) => const ['春季', '夏季', '秋季', '冬季'].contains(s))
                 .toList() ??
             const [],
         clothingBrand: getNonEmptyString(json, 'clothingBrand'),
         clothingPrice: getNonEmptyString(json, 'clothingPrice'),
         clothingSize: getNonEmptyString(json, 'clothingSize'),
         clothingPurchaseDate: getNonEmptyString(json, 'clothingPurchaseDate'),
+        eventName: getNonEmptyString(json, 'eventName'),
+        eventStartTime: parseBillTime(
+          getNonEmptyString(json, 'eventStartTime'),
+        ),
+        eventEndTime: parseBillTime(getNonEmptyString(json, 'eventEndTime')),
       );
     } catch (e, stackTrace) {
       debugPrint('parseAnalysisResult 解析失败: $e');

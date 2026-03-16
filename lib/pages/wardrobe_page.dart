@@ -34,10 +34,11 @@ class _WardrobePageState extends State<WardrobePage> {
   @override
   void initState() {
     super.initState();
-    _clothes = widget.clothes
-        .where((m) => m.category == MemoryCategory.clothing)
-        .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    _clothes =
+        widget.clothes
+            .where((m) => m.category == MemoryCategory.clothing)
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     _scrollController.addListener(() {
       setState(() => _scrollOffset = _scrollController.offset);
     });
@@ -63,17 +64,23 @@ class _WardrobePageState extends State<WardrobePage> {
       final weatherStr = weather?.summary ?? '无法获取天气信息';
 
       // 构建衣橱摘要
-      final clothesSummary = _clothes.take(20).map((c) {
-        final parts = <String>[];
-        if (c.clothingName != null) parts.add(c.clothingName!);
-        if (c.clothingType != null) parts.add('(${c.clothingType})');
-        if (c.clothingColors.isNotEmpty) parts.add('颜色:${c.clothingColors.join(",")}');
-        if (c.clothingSeasons.isNotEmpty) parts.add('季节:${c.clothingSeasons.join(",")}');
-        return '- ${parts.join(" ")}';
-      }).join('\n');
+      final clothesSummary = _clothes
+          .take(20)
+          .map((c) {
+            final parts = <String>[];
+            if (c.clothingName != null) parts.add(c.clothingName!);
+            if (c.clothingType != null) parts.add('(${c.clothingType})');
+            if (c.clothingColors.isNotEmpty)
+              parts.add('颜色:${c.clothingColors.join(",")}');
+            if (c.clothingSeasons.isNotEmpty)
+              parts.add('季节:${c.clothingSeasons.join(",")}');
+            return '- ${parts.join(" ")}';
+          })
+          .join('\n');
 
       final now = DateTime.now();
-      final prompt = '''你是一个时尚穿搭顾问。请根据用户的衣橱内容和当前天气，给出简短的穿搭建议（60-100字）。
+      final prompt =
+          '''你是一个时尚穿搭顾问。请根据用户的衣橱内容和当前天气，给出简短的穿搭建议（60-100字）。
 
 当前时间：${now.year}年${now.month}月${now.day}日
 当前天气：$weatherStr
@@ -108,14 +115,23 @@ $clothesSummary
     final text = _aiSuggestion ?? '';
     final match = RegExp(r'【推荐[：:](.+?)】').firstMatch(text);
     if (match != null) {
-      final names = match.group(1)!.split(RegExp(r'[,，、]')).map((s) => s.trim()).toList();
+      final names = match
+          .group(1)!
+          .split(RegExp(r'[,，、]'))
+          .map((s) => s.trim())
+          .toList();
       _recommendedItems = [];
       for (final name in names) {
         final item = _clothes.firstWhere(
           (c) => c.clothingName == name,
           orElse: () => _clothes.firstWhere(
             (c) => c.clothingName != null && c.clothingName!.contains(name),
-            orElse: () => MemoryItem(id: '', title: '', category: MemoryCategory.clothing, createdAt: DateTime.now()),
+            orElse: () => MemoryItem(
+              id: '',
+              title: '',
+              category: MemoryCategory.clothing,
+              createdAt: DateTime.now(),
+            ),
           ),
         );
         if (item.id.isNotEmpty) _recommendedItems.add(item);
@@ -139,7 +155,9 @@ $clothesSummary
       body: Stack(
         children: [
           Positioned(
-            top: 0, left: 0, right: 0,
+            top: 0,
+            left: 0,
+            right: 0,
             child: IgnorePointer(
               child: Container(
                 height: 285,
@@ -176,7 +194,12 @@ $clothesSummary
                             curve: Curves.easeOut,
                             opacity: isCollapsed ? 0 : 1,
                             child: Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                16,
+                                16,
+                                16,
+                              ),
                               child: Center(
                                 child: Image.asset(
                                   'assets/clothes_picture.png',
@@ -191,7 +214,9 @@ $clothesSummary
                           ),
                         ),
                         // AI 穿搭建议卡片
-                        if (_isLoadingSuggestion || (_aiSuggestion != null && _aiSuggestion!.isNotEmpty))
+                        if (_isLoadingSuggestion ||
+                            (_aiSuggestion != null &&
+                                _aiSuggestion!.isNotEmpty))
                           SliverToBoxAdapter(
                             child: Padding(
                               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -208,7 +233,9 @@ $clothesSummary
                                   '暂无衣服',
                                   style: TextStyle(
                                     fontSize: 16,
-                                    color: AppColors.onSurfaceQuaternary(isDark),
+                                    color: AppColors.onSurfaceQuaternary(
+                                      isDark,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -217,18 +244,22 @@ $clothesSummary
                         else
                           SliverPadding(
                             padding: EdgeInsets.fromLTRB(
-                              16, 0, 16,
+                              16,
+                              0,
+                              16,
                               16 + MediaQuery.of(context).padding.bottom,
                             ),
                             sliver: SliverGrid(
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                mainAxisSpacing: 8,
-                                crossAxisSpacing: 8,
-                                childAspectRatio: 1.0,
-                              ),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    mainAxisSpacing: 8,
+                                    crossAxisSpacing: 8,
+                                    childAspectRatio: 1.0,
+                                  ),
                               delegate: SliverChildBuilderDelegate(
-                                (context, index) => _buildGridItem(_clothes[index], isDark),
+                                (context, index) =>
+                                    _buildGridItem(_clothes[index], isDark),
                                 childCount: _clothes.length,
                               ),
                             ),
@@ -246,7 +277,8 @@ $clothesSummary
   }
 
   Widget _buildAiCard(bool isDark) {
-    if (_isLoadingSuggestion && (_aiSuggestion == null || _aiSuggestion!.isEmpty)) {
+    if (_isLoadingSuggestion &&
+        (_aiSuggestion == null || _aiSuggestion!.isEmpty)) {
       return AIGlowBorder(
         borderRadius: BorderRadius.circular(20),
         child: Container(
@@ -291,14 +323,19 @@ $clothesSummary
                   final item = _recommendedItems[index];
                   return _PressableGridItem(
                     onTap: () async {
-                      final result = await Navigator.push<MemoryItem>(
-                        context,
-                        CupertinoPageRoute(
-                          builder: (_) => MemoryDetailPage(memory: item),
-                        ),
-                      );
+                      final result =
+                          await Navigator.of(
+                            context,
+                            rootNavigator: true,
+                          ).push<MemoryItem>(
+                            CupertinoPageRoute(
+                              builder: (_) => MemoryDetailPage(memory: item),
+                            ),
+                          );
                       if (result != null) {
-                        final idx = _clothes.indexWhere((c) => c.id == result.id);
+                        final idx = _clothes.indexWhere(
+                          (c) => c.id == result.id,
+                        );
                         if (idx != -1) setState(() => _clothes[idx] = result);
                       }
                     },
@@ -340,12 +377,12 @@ $clothesSummary
   Widget _buildGridItem(MemoryItem item, bool isDark) {
     return _PressableGridItem(
       onTap: () async {
-        final result = await Navigator.push<MemoryItem>(
-          context,
-          CupertinoPageRoute(
-            builder: (context) => MemoryDetailPage(memory: item),
-          ),
-        );
+        final result = await Navigator.of(context, rootNavigator: true)
+            .push<MemoryItem>(
+              CupertinoPageRoute(
+                builder: (context) => MemoryDetailPage(memory: item),
+              ),
+            );
         if (result != null) {
           final idx = _clothes.indexWhere((c) => c.id == result.id);
           if (idx != -1) setState(() => _clothes[idx] = result);
@@ -384,7 +421,9 @@ $clothesSummary
               clipBehavior: Clip.none,
               children: [
                 Positioned(
-                  left: 20, right: 20, top: 64,
+                  left: 20,
+                  right: 20,
+                  top: 64,
                   child: AnimatedOpacity(
                     duration: const Duration(milliseconds: 150),
                     curve: Curves.easeOut,
@@ -418,7 +457,9 @@ $clothesSummary
                   ),
                 ),
                 Positioned(
-                  left: 0, right: 0, top: 0,
+                  left: 0,
+                  right: 0,
+                  top: 0,
                   child: AnimatedOpacity(
                     duration: const Duration(milliseconds: 150),
                     curve: Curves.easeOut,
@@ -442,7 +483,8 @@ $clothesSummary
                   ),
                 ),
                 Positioned(
-                  left: 8, top: 0,
+                  left: 8,
+                  top: 0,
                   child: GlassButton(
                     icon: CupertinoIcons.back,
                     onTap: () => Navigator.pop(context),
@@ -473,13 +515,21 @@ class _PressableGridItem extends StatefulWidget {
 
 class _PressableGridItemState extends State<_PressableGridItem> {
   bool _pressed = false;
+
+  void _handleTap() async {
+    setState(() => _pressed = true);
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (mounted) setState(() => _pressed = false);
+    widget.onTap();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
+      onTapUp: (_) {},
       onTapCancel: () => setState(() => _pressed = false),
-      onTap: widget.onTap,
+      onTap: _handleTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
         scale: _pressed ? 0.95 : 1.0,
@@ -565,29 +615,29 @@ class _AskAiButton extends StatefulWidget {
 class _AskAiButtonState extends State<_AskAiButton> {
   bool _isPressed = false;
 
+  void _handleTap() async {
+    setState(() => _isPressed = true);
+    HapticFeedback.mediumImpact();
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (mounted) setState(() => _isPressed = false);
+    widget.onTap();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) async {
-        await Future.delayed(const Duration(milliseconds: 100));
-        if (mounted) setState(() => _isPressed = false);
-      },
+      onTapUp: (_) {},
       onTapCancel: () => setState(() => _isPressed = false),
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        widget.onTap();
-      },
+      onTap: _handleTap,
       child: AnimatedScale(
-        scale: _isPressed ? 0.92 : 1.0,
+        scale: _isPressed ? 0.95 : 1.0,
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
         child: CustomPaint(
           painter: _GradientBorderPainter(),
           child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20, vertical: 8,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             decoration: BoxDecoration(
               color: AppColors.surfaceHigh(widget.isDark),
               borderRadius: BorderRadius.circular(18),

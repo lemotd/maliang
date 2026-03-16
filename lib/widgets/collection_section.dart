@@ -6,6 +6,7 @@ import '../utils/scroll_edge_haptic.dart';
 import 'bill_card.dart';
 import 'clothing_card.dart';
 import 'add_collection_card.dart';
+import 'responsive_layout.dart';
 import '../pages/bill_summary_page.dart';
 import '../pages/wardrobe_page.dart';
 
@@ -55,23 +56,25 @@ class _CollectionSectionState extends State<CollectionSection> {
                   onTapDown: (_) {
                     setState(() => _isBillCardPressed = true);
                   },
-                  onTapUp: (_) async {
-                    await Future.delayed(const Duration(milliseconds: 150));
-                    if (mounted) {
-                      setState(() => _isBillCardPressed = false);
-                    }
-                  },
+                  onTapUp: (_) {},
                   onTapCancel: () {
                     setState(() => _isBillCardPressed = false);
                   },
-                  onTap: () {
-                    Navigator.push(
+                  onTap: () async {
+                    setState(() => _isBillCardPressed = true);
+                    await Future.delayed(const Duration(milliseconds: 80));
+                    if (mounted) setState(() => _isBillCardPressed = false);
+                    final page = BillSummaryPage(bills: widget.memories);
+                    if (!pushToDetailPane(
                       context,
-                      CupertinoPageRoute(
-                        builder: (context) =>
-                            BillSummaryPage(bills: widget.memories),
-                      ),
-                    );
+                      page,
+                      key: 'BillSummaryPage',
+                    )) {
+                      Navigator.push(
+                        context,
+                        CupertinoPageRoute(builder: (context) => page),
+                      );
+                    }
                   },
                   child: AnimatedScale(
                     scale: _isBillCardPressed ? 0.95 : 1.0,
@@ -85,23 +88,21 @@ class _CollectionSectionState extends State<CollectionSection> {
                   onTapDown: (_) {
                     setState(() => _isClothingCardPressed = true);
                   },
-                  onTapUp: (_) async {
-                    await Future.delayed(const Duration(milliseconds: 150));
-                    if (mounted) {
-                      setState(() => _isClothingCardPressed = false);
-                    }
-                  },
+                  onTapUp: (_) {},
                   onTapCancel: () {
                     setState(() => _isClothingCardPressed = false);
                   },
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      CupertinoPageRoute(
-                        builder: (context) =>
-                            WardrobePage(clothes: widget.memories),
-                      ),
-                    );
+                  onTap: () async {
+                    setState(() => _isClothingCardPressed = true);
+                    await Future.delayed(const Duration(milliseconds: 80));
+                    if (mounted) setState(() => _isClothingCardPressed = false);
+                    final page = WardrobePage(clothes: widget.memories);
+                    if (!pushToDetailPane(context, page, key: 'WardrobePage')) {
+                      Navigator.push(
+                        context,
+                        CupertinoPageRoute(builder: (context) => page),
+                      );
+                    }
                   },
                   child: AnimatedScale(
                     scale: _isClothingCardPressed ? 0.95 : 1.0,
@@ -112,16 +113,17 @@ class _CollectionSectionState extends State<CollectionSection> {
                 ),
                 const SizedBox(width: 12),
                 GestureDetector(
-                  onTapUp: (_) async {
-                    await Future.delayed(const Duration(milliseconds: 150));
-                    if (mounted) {
-                      setState(() => _isAddCardPressed = false);
-                    }
+                  onTapDown: (_) {
+                    setState(() => _isAddCardPressed = true);
                   },
+                  onTapUp: (_) {},
                   onTapCancel: () {
                     setState(() => _isAddCardPressed = false);
                   },
-                  onTap: () {
+                  onTap: () async {
+                    setState(() => _isAddCardPressed = true);
+                    await Future.delayed(const Duration(milliseconds: 80));
+                    if (mounted) setState(() => _isAddCardPressed = false);
                     // TODO: 新建合集功能
                   },
                   child: AnimatedScale(

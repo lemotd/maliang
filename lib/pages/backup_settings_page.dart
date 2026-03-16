@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
 import '../utils/scroll_edge_haptic.dart';
@@ -60,12 +61,36 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
       final deviceName = await _getDeviceName();
       final now = DateTime.now();
 
+      // 序列化每条记忆，并将图片编码为 base64
+      final memoriesWithImages = <Map<String, dynamic>>[];
+      for (final m in memories) {
+        final json = m.toJson();
+
+        // 编码原图
+        if (m.imagePath != null) {
+          final file = File(m.imagePath!);
+          if (await file.exists()) {
+            json['imageData'] = base64Encode(await file.readAsBytes());
+          }
+        }
+
+        // 编码缩略图
+        if (m.thumbnailPath != null && m.thumbnailPath != m.imagePath) {
+          final file = File(m.thumbnailPath!);
+          if (await file.exists()) {
+            json['thumbnailData'] = base64Encode(await file.readAsBytes());
+          }
+        }
+
+        memoriesWithImages.add(json);
+      }
+
       final backupData = {
-        'version': 1,
+        'version': 2,
         'deviceName': deviceName,
         'exportTime': now.toIso8601String(),
         'memoryCount': memories.length,
-        'memories': memories.map((m) => m.toJson()).toList(),
+        'memories': memoriesWithImages,
       };
 
       final dir = await _getExportDir();
@@ -106,12 +131,15 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
       }
 
       if (mounted) {
-        Navigator.push(
+        final result = await Navigator.push(
           context,
           CupertinoPageRoute(
             builder: (context) => BackupImportPage(backupData: data),
           ),
         );
+        if (result == true && mounted) {
+          Navigator.pop(context, true);
+        }
       }
     } catch (e) {
       _showToast('读取备份文件失败');
@@ -358,13 +386,20 @@ class _PressableItem extends StatefulWidget {
 class _PressableItemState extends State<_PressableItem> {
   bool _isPressed = false;
 
+  void _handleTap() async {
+    setState(() => _isPressed = true);
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (mounted) setState(() => _isPressed = false);
+    widget.onTap();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapUp: (_) {},
       onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onTap,
+      onTap: _handleTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
         scale: _isPressed ? 0.95 : 1.0,

@@ -18,6 +18,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.maliang.maliang_notes/notification"
+    private val CALENDAR_CHANNEL = "com.maliang.notes/calendar"
     private val NOTIFICATION_CHANNEL_ID = "memory_live_update"
     private val NOTIFICATION_GROUP_KEY = "com.maliang.maliang_notes.pending_group"
     private val ACTION_COMPLETE = "com.maliang.maliang_notes.ACTION_COMPLETE"
@@ -78,6 +79,21 @@ class MainActivity : FlutterActivity() {
         
         // 设置 MethodChannel 引用到 CompleteActionReceiver
         CompleteActionReceiver.setMethodChannel(methodChannel!!)
+
+        // 日历 MethodChannel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CALENDAR_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "addEvent" -> {
+                        val title = call.argument<String>("title") ?: ""
+                        val startTime = call.argument<Long>("startTime") ?: 0L
+                        val endTime = call.argument<Long>("endTime") ?: 0L
+                        addCalendarEvent(title, startTime, endTime)
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         
         // 如果有待处理的详情页请求
         initialMemoryIdHash?.let {
@@ -189,5 +205,15 @@ class MainActivity : FlutterActivity() {
     private fun cancelAllNotifications() {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancelAll()
+    }
+
+    private fun addCalendarEvent(title: String, startTime: Long, endTime: Long) {
+        val intent = Intent(Intent.ACTION_INSERT).apply {
+            data = android.provider.CalendarContract.Events.CONTENT_URI
+            putExtra(android.provider.CalendarContract.Events.TITLE, title)
+            putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, startTime)
+            putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, endTime)
+        }
+        startActivity(intent)
     }
 }

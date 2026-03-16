@@ -92,6 +92,11 @@ class MemoryItem {
   final List<String> customClothingSizes; // 自定义衣服尺码
   final List<String> customShoeSizes; // 自定义鞋子尺码
 
+  // 日程字段
+  final String? eventName; // 日程名称
+  final DateTime? eventStartTime; // 日程开始时间
+  final DateTime? eventEndTime; // 日程结束时间
+
   MemoryItem({
     required this.id,
     required this.title,
@@ -127,6 +132,9 @@ class MemoryItem {
     this.clothingPurchaseDate,
     this.customClothingSizes = const [],
     this.customShoeSizes = const [],
+    this.eventName,
+    this.eventStartTime,
+    this.eventEndTime,
   });
 
   MemoryItem copyWith({
@@ -164,6 +172,9 @@ class MemoryItem {
     String? clothingPurchaseDate,
     List<String>? customClothingSizes,
     List<String>? customShoeSizes,
+    String? eventName,
+    DateTime? eventStartTime,
+    DateTime? eventEndTime,
   }) {
     return MemoryItem(
       id: id ?? this.id,
@@ -200,6 +211,9 @@ class MemoryItem {
       clothingPurchaseDate: clothingPurchaseDate ?? this.clothingPurchaseDate,
       customClothingSizes: customClothingSizes ?? this.customClothingSizes,
       customShoeSizes: customShoeSizes ?? this.customShoeSizes,
+      eventName: eventName ?? this.eventName,
+      eventStartTime: eventStartTime ?? this.eventStartTime,
+      eventEndTime: eventEndTime ?? this.eventEndTime,
     );
   }
 
@@ -239,6 +253,9 @@ class MemoryItem {
       'clothingPurchaseDate': clothingPurchaseDate,
       'customClothingSizes': customClothingSizes,
       'customShoeSizes': customShoeSizes,
+      'eventName': eventName,
+      'eventStartTime': eventStartTime?.toIso8601String(),
+      'eventEndTime': eventEndTime?.toIso8601String(),
     };
   }
 
@@ -279,11 +296,13 @@ class MemoryItem {
           [],
       clothingName: json['clothingName'] as String?,
       clothingType: json['clothingType'] as String?,
-      clothingColors: (json['clothingColors'] as List<dynamic>?)
+      clothingColors:
+          (json['clothingColors'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           const [],
-      clothingSeasons: (json['clothingSeasons'] as List<dynamic>?)
+      clothingSeasons:
+          (json['clothingSeasons'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           const [],
@@ -291,14 +310,23 @@ class MemoryItem {
       clothingPrice: json['clothingPrice'] as String?,
       clothingSize: json['clothingSize'] as String?,
       clothingPurchaseDate: json['clothingPurchaseDate'] as String?,
-      customClothingSizes: (json['customClothingSizes'] as List<dynamic>?)
+      customClothingSizes:
+          (json['customClothingSizes'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           const [],
-      customShoeSizes: (json['customShoeSizes'] as List<dynamic>?)
+      customShoeSizes:
+          (json['customShoeSizes'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           const [],
+      eventName: json['eventName'] as String?,
+      eventStartTime: json['eventStartTime'] != null
+          ? DateTime.tryParse(json['eventStartTime'] as String)
+          : null,
+      eventEndTime: json['eventEndTime'] != null
+          ? DateTime.tryParse(json['eventEndTime'] as String)
+          : null,
     );
   }
 

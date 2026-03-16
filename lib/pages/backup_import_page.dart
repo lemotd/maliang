@@ -1,10 +1,14 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:path_provider/path_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
 import '../services/memory_service.dart';
 import '../models/memory_item.dart';
 import '../utils/scroll_edge_haptic.dart';
+import '../main.dart';
 
 class BackupImportPage extends StatefulWidget {
   final Map<String, dynamic> backupData;
@@ -43,12 +47,46 @@ class _BackupImportPageState extends State<BackupImportPage> {
 
     try {
       final memoriesJson = widget.backupData['memories'] as List<dynamic>;
-      final importedMemories = memoriesJson
-          .map((j) => MemoryItem.fromJson(j as Map<String, dynamic>))
-          .toList();
+      final docDir = await getApplicationDocumentsDirectory();
+
+      final importedMemories = <MemoryItem>[];
+      for (final j in memoriesJson) {
+        final json = j as Map<String, dynamic>;
+
+        // 还原图片文件
+        String? imagePath = json['imagePath'] as String?;
+        String? thumbnailPath = json['thumbnailPath'] as String?;
+
+        if (json['imageData'] != null) {
+          final bytes = base64Decode(json['imageData'] as String);
+          final fileName =
+              'img_restore_${DateTime.now().millisecondsSinceEpoch}_${importedMemories.length}.jpg';
+          final file = File('${docDir.path}/$fileName');
+          await file.writeAsBytes(bytes);
+          imagePath = file.path;
+          // 如果没有单独的缩略图数据，缩略图也用原图路径
+          if (json['thumbnailData'] == null) {
+            thumbnailPath = file.path;
+          }
+        }
+
+        if (json['thumbnailData'] != null) {
+          final bytes = base64Decode(json['thumbnailData'] as String);
+          final fileName =
+              'thumb_restore_${DateTime.now().millisecondsSinceEpoch}_${importedMemories.length}.jpg';
+          final file = File('${docDir.path}/$fileName');
+          await file.writeAsBytes(bytes);
+          thumbnailPath = file.path;
+        }
+
+        // 用还原后的路径覆盖 json 中的路径
+        json['imagePath'] = imagePath;
+        json['thumbnailPath'] = thumbnailPath;
+
+        importedMemories.add(MemoryItem.fromJson(json));
+      }
 
       if (_isMerge) {
-        // 合并：保留现有数据，添加不重复的新数据
         final existing = await _memoryService.getAllMemories();
         final existingIds = existing.map((m) => m.id).toSet();
         for (final memory in importedMemories) {
@@ -57,7 +95,6 @@ class _BackupImportPageState extends State<BackupImportPage> {
           }
         }
       } else {
-        // 覆盖：清空后写入
         final existing = await _memoryService.getAllMemories();
         for (final m in existing) {
           await _memoryService.deleteMemory(m.id);
@@ -68,6 +105,9 @@ class _BackupImportPageState extends State<BackupImportPage> {
       }
 
       if (mounted) {
+        // 通知首页刷新数据
+        await HomePage.onDataChanged?.call();
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('导入成功，共 ${importedMemories.length} 条记忆'),
@@ -78,8 +118,7 @@ class _BackupImportPageState extends State<BackupImportPage> {
             ),
           ),
         );
-        Navigator.pop(context);
-        Navigator.pop(context);
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
@@ -373,10 +412,8 @@ class _BackupImportPageState extends State<BackupImportPage> {
                 ],
               ),
             ),
-            Icon(
-              selected
-                  ? CupertinoIcons.checkmark_circle_fill
-                  : CupertinoIcons.circle,
+            _AnimatedCheckRadio(
+              selected: selected,
               size: 26,
               color: selected
                   ? AppColors.primary(isDark)
@@ -429,6 +466,150 @@ class _BackupImportPageState extends State<BackupImportPage> {
   }
 }
 
+class _AnimatedCheckRadio extends StatefulWidget {
+  final bool selected;
+  final double size;
+  final Color color;
+
+  const _AnimatedCheckRadio({
+    required this.selected,
+    required this.size,
+    required this.color,
+  });
+
+  @override
+  State<_AnimatedCheckRadio> createState() => _AnimatedCheckRadioState();
+}
+
+class _AnimatedCheckRadioState extends State<_AnimatedCheckRadio>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  bool _isSelecting = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _isSelecting = true;
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+      value: widget.selected ? 1.0 : 0.0,
+    );
+  }
+
+  @override
+  void didUpdateWidget(_AnimatedCheckRadio oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selected != oldWidget.selected) {
+      if (widget.selected) {
+        _isSelecting = true;
+        _controller.duration = const Duration(milliseconds: 200);
+        _controller.forward(from: 0.0);
+      } else {
+        _isSelecting = false;
+        _controller.duration = const Duration(milliseconds: 120);
+        _controller.reverse();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return CustomPaint(
+          size: Size(widget.size, widget.size),
+          painter: _CheckRadioPainter(
+            progress: _controller.value,
+            isSelecting: _isSelecting,
+            color: widget.color,
+            unselectedColor: widget.color,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CheckRadioPainter extends CustomPainter {
+  final double progress;
+  final bool isSelecting;
+  final Color color;
+  final Color unselectedColor;
+
+  _CheckRadioPainter({
+    required this.progress,
+    required this.isSelecting,
+    required this.color,
+    required this.unselectedColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    if (progress == 0) {
+      // 未选中：空心圆
+      final paint = Paint()
+        ..color = unselectedColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      canvas.drawCircle(center, radius - 0.75, paint);
+      return;
+    }
+
+    // 填充圆
+    final fillPaint = Paint()
+      ..color = color.withOpacity(progress)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, radius, fillPaint);
+
+    // 对勾
+    final checkPaint = Paint()
+      ..color = Colors.white.withOpacity(isSelecting ? 1.0 : progress)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path();
+    final p1 = Offset(size.width * 0.27, size.height * 0.50);
+    final p2 = Offset(size.width * 0.44, size.height * 0.66);
+    final p3 = Offset(size.width * 0.73, size.height * 0.36);
+
+    path.moveTo(p1.dx, p1.dy);
+    path.lineTo(p2.dx, p2.dy);
+    path.lineTo(p3.dx, p3.dy);
+
+    if (isSelecting) {
+      // 选中：沿路径绘制
+      final metrics = path.computeMetrics().first;
+      final drawPath = metrics.extractPath(
+        0,
+        metrics.length * Curves.easeOut.transform(progress),
+      );
+      canvas.drawPath(drawPath, checkPaint);
+    } else {
+      // 取消选中：整体淡出
+      canvas.drawPath(path, checkPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CheckRadioPainter oldDelegate) =>
+      progress != oldDelegate.progress ||
+      color != oldDelegate.color ||
+      unselectedColor != oldDelegate.unselectedColor;
+}
+
 class _PressableItem extends StatefulWidget {
   final Widget child;
   final VoidCallback onTap;
@@ -442,13 +623,20 @@ class _PressableItem extends StatefulWidget {
 class _PressableItemState extends State<_PressableItem> {
   bool _isPressed = false;
 
+  void _handleTap() async {
+    setState(() => _isPressed = true);
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (mounted) setState(() => _isPressed = false);
+    widget.onTap();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapUp: (_) {},
       onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onTap,
+      onTap: _handleTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
         scale: _isPressed ? 0.95 : 1.0,

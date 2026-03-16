@@ -15,7 +15,9 @@ class MemoryService {
     if (data == null) return [];
 
     final List<dynamic> jsonList = jsonDecode(data);
-    return jsonList.map((json) => MemoryItem.fromJson(json)).toList();
+    final memories = jsonList.map((json) => MemoryItem.fromJson(json)).toList();
+    memories.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return memories;
   }
 
   Future<void> addMemory(MemoryItem memory) async {

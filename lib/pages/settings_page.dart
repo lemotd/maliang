@@ -63,13 +63,16 @@ class _SettingsPageState extends State<SettingsPage> {
                         title: '备份与恢复',
                         subtitle: '导入、导出记忆数据',
                         icon: CupertinoIcons.arrow_2_circlepath,
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          final result = await Navigator.push(
                             context,
                             CupertinoPageRoute(
                               builder: (context) => const BackupSettingsPage(),
                             ),
                           );
+                          if (result == true && mounted) {
+                            Navigator.pop(context, true);
+                          }
                         },
                       ),
                     ],
@@ -244,13 +247,20 @@ class _PressableItem extends StatefulWidget {
 class _PressableItemState extends State<_PressableItem> {
   bool _isPressed = false;
 
+  void _handleTap() async {
+    setState(() => _isPressed = true);
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (mounted) setState(() => _isPressed = false);
+    widget.onTap();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapUp: (_) {},
       onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onTap,
+      onTap: _handleTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
         scale: _isPressed ? 0.95 : 1.0,

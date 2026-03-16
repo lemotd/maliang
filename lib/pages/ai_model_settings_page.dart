@@ -149,17 +149,19 @@ class _AiModelSettingsPageState extends State<AiModelSettingsPage> {
                               child: GestureDetector(
                                 onTapDown: (_) =>
                                     setState(() => _isButtonPressed = true),
-                                onTapUp: (_) async {
+                                onTapUp: (_) {},
+                                onTapCancel: () =>
+                                    setState(() => _isButtonPressed = false),
+                                onTap: () async {
+                                  setState(() => _isButtonPressed = true);
                                   await Future.delayed(
-                                    const Duration(milliseconds: 150),
+                                    const Duration(milliseconds: 80),
                                   );
                                   if (mounted) {
                                     setState(() => _isButtonPressed = false);
                                   }
                                   if (!_isSaving) _saveAndValidate();
                                 },
-                                onTapCancel: () =>
-                                    setState(() => _isButtonPressed = false),
                                 child: AnimatedScale(
                                   scale: _isButtonPressed ? 0.95 : 1.0,
                                   duration: const Duration(milliseconds: 150),
@@ -403,11 +405,13 @@ class _AiModelSettingsPageState extends State<AiModelSettingsPage> {
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _isGuidePressed = true),
-      onTapUp: (_) async {
-        await Future.delayed(const Duration(milliseconds: 150));
+      onTapUp: (_) {},
+      onTapCancel: () => setState(() => _isGuidePressed = false),
+      onTap: () async {
+        setState(() => _isGuidePressed = true);
+        await Future.delayed(const Duration(milliseconds: 80));
         if (mounted) setState(() => _isGuidePressed = false);
       },
-      onTapCancel: () => setState(() => _isGuidePressed = false),
       child: AnimatedScale(
         scale: _isGuidePressed ? 0.95 : 1.0,
         duration: const Duration(milliseconds: 150),

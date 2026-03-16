@@ -12,6 +12,7 @@ import 'widgets/main_app_bar.dart';
 import 'pages/memory_detail_page.dart';
 import 'widgets/memory_list_item.dart';
 import 'widgets/collection_section.dart';
+import 'widgets/responsive_layout.dart';
 import 'pages/settings_page.dart';
 import 'models/memory_item.dart';
 import 'services/memory_service.dart';
@@ -29,7 +30,11 @@ void main() async {
   PaintingBinding.instance.imageCache.maximumSizeBytes =
       200 * 1024 * 1024; // 200MB
 
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
 
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
@@ -114,13 +119,16 @@ class _MaliangNotesAppState extends State<MaliangNotesApp> {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: const HomePage(),
+      home: const ResponsiveShell(masterPane: HomePage()),
     );
   }
 }
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  /// 供外部（如导入页面）触发首页数据刷新
+  static Future<void> Function()? onDataChanged;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -145,6 +153,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    HomePage.onDataChanged = _loadMemories;
     WidgetsBinding.instance.addObserver(this);
     _initNotificationService();
     _loadMemories();
@@ -190,6 +199,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    HomePage.onDataChanged = null;
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     super.dispose();
@@ -351,10 +361,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.push(
-          context,
-          CupertinoPageRoute(builder: (context) => const SettingsPage()),
-        );
+        final page = const SettingsPage();
+        if (!pushToDetailPane(context, page)) {
+          Navigator.push(
+            context,
+            CupertinoPageRoute(builder: (context) => page),
+          );
+        }
       }
       return;
     }
@@ -383,10 +396,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.push(
-          context,
-          CupertinoPageRoute(builder: (context) => const SettingsPage()),
-        );
+        final page = const SettingsPage();
+        if (!pushToDetailPane(context, page)) {
+          Navigator.push(
+            context,
+            CupertinoPageRoute(builder: (context) => page),
+          );
+        }
       }
       return;
     }
@@ -443,10 +459,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       debugPrint('API密钥无效: $e');
       // 跳转到设置页面
       if (mounted) {
-        Navigator.push(
-          context,
-          CupertinoPageRoute(builder: (context) => const SettingsPage()),
-        );
+        final page = const SettingsPage();
+        if (!pushToDetailPane(context, page)) {
+          Navigator.push(
+            context,
+            CupertinoPageRoute(builder: (context) => page),
+          );
+        }
       }
       return null;
     } catch (e, stackTrace) {
@@ -567,10 +586,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           MainAppBar(
             scrollOffset: _scrollOffset,
             onSettingsTap: () {
-              Navigator.push(
-                context,
-                CupertinoPageRoute(builder: (context) => const SettingsPage()),
-              );
+              final page = const SettingsPage();
+              if (!pushToDetailPane(context, page)) {
+                Navigator.push(
+                  context,
+                  CupertinoPageRoute(builder: (context) => page),
+                ).then((result) {
+                  if (result == true) _loadMemories();
+                });
+              }
             },
           ),
           Expanded(child: _buildBody()),
@@ -603,11 +627,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset(
-                'assets/home_empty.png',
-                width: 200,
-                height: 200,
-              ),
+              Image.asset('assets/home_empty.png', width: 200, height: 200),
               const SizedBox(height: 6),
               Text(
                 '开始，收集碎片记忆',
@@ -635,42 +655,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     return ScrollEdgeHaptic(
       child: ListView.builder(
-      addAutomaticKeepAlives: true,
-      addRepaintBoundaries: true,
-      cacheExtent: 500,
-      controller: _scrollController,
-      physics: const BouncingScrollPhysics(
-        parent: AlwaysScrollableScrollPhysics(),
-      ),
-      padding: const EdgeInsets.only(top: 16, bottom: 80),
-      itemCount: totalItems + 2, // +2 for collection section and memory title
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return CollectionSection(memories: _memories);
-        }
-        if (index == 1) {
-          return _buildMemoryTitle(isDark);
-        }
+        addAutomaticKeepAlives: true,
+        addRepaintBoundaries: true,
+        cacheExtent: 500,
+        controller: _scrollController,
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        padding: const EdgeInsets.only(top: 16, bottom: 80),
+        itemCount: totalItems + 2, // +2 for collection section and memory title
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return CollectionSection(memories: _memories);
+          }
+          if (index == 1) {
+            return _buildMemoryTitle(isDark);
+          }
 
-        final adjustedIndex = index - 2;
-        if (adjustedIndex < _loadingCount) {
-          return const MemoryListItem(isLoading: true);
-        }
-        final memoryIndex = adjustedIndex - _loadingCount;
-        final memory = _memories[memoryIndex];
-        final isNew = _newlyAddedIds.contains(memory.id);
-        return MemoryListItem(
-          memory: memory,
-          isNew: isNew,
-          onAnimationComplete: () {
-            _newlyAddedIds.remove(memory.id);
-          },
-          onTap: () => _showMemoryDetail(memory),
-          onDelete: () => _deleteMemory(memory),
-          onToggleComplete: () => _toggleComplete(memory),
-        );
-      },
-    ),
+          final adjustedIndex = index - 2;
+          if (adjustedIndex < _loadingCount) {
+            return const MemoryListItem(isLoading: true);
+          }
+          final memoryIndex = adjustedIndex - _loadingCount;
+          final memory = _memories[memoryIndex];
+          final isNew = _newlyAddedIds.contains(memory.id);
+          return MemoryListItem(
+            memory: memory,
+            isNew: isNew,
+            onAnimationComplete: () {
+              _newlyAddedIds.remove(memory.id);
+            },
+            onTap: () => _showMemoryDetail(memory),
+            onDelete: () => _deleteMemory(memory),
+            onToggleComplete: () => _toggleComplete(memory),
+          );
+        },
+      ),
     );
   }
 
@@ -695,11 +715,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _showMemoryDetail(MemoryItem memory) {
+    final page = MemoryDetailPage(memory: memory);
     Navigator.push(
       context,
-      CupertinoPageRoute(
-        builder: (context) => MemoryDetailPage(memory: memory),
-      ),
+      CupertinoPageRoute(builder: (context) => page),
     ).then((updatedMemory) {
       debugPrint('返回数据: $updatedMemory');
       if (updatedMemory != null && updatedMemory is MemoryItem) {

@@ -979,12 +979,12 @@ class _BillSummaryPageState extends State<BillSummaryPage>
       padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
       child: _PressableBillItem(
         onTap: () async {
-          final result = await Navigator.push<MemoryItem>(
-            context,
-            CupertinoPageRoute(
-              builder: (context) => MemoryDetailPage(memory: bill),
-            ),
-          );
+          final result = await Navigator.of(context, rootNavigator: true)
+              .push<MemoryItem>(
+                CupertinoPageRoute(
+                  builder: (context) => MemoryDetailPage(memory: bill),
+                ),
+              );
           if (result != null) {
             final idx = _bills.indexWhere((b) => b.id == result.id);
             if (idx != -1) {
@@ -1110,13 +1110,20 @@ class _PressableBillItem extends StatefulWidget {
 class _PressableBillItemState extends State<_PressableBillItem> {
   bool _isPressed = false;
 
+  void _handleTap() async {
+    setState(() => _isPressed = true);
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (mounted) setState(() => _isPressed = false);
+    widget.onTap();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapUp: (_) {},
       onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onTap,
+      onTap: _handleTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
         scale: _isPressed ? 0.95 : 1.0,
@@ -1205,21 +1212,23 @@ class _AskAiButton extends StatefulWidget {
 class _AskAiButtonState extends State<_AskAiButton> {
   bool _isPressed = false;
 
+  void _handleTap() async {
+    setState(() => _isPressed = true);
+    HapticFeedback.mediumImpact();
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (mounted) setState(() => _isPressed = false);
+    widget.onTap();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) async {
-        await Future.delayed(const Duration(milliseconds: 100));
-        if (mounted) setState(() => _isPressed = false);
-      },
+      onTapUp: (_) {},
       onTapCancel: () => setState(() => _isPressed = false),
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        widget.onTap();
-      },
+      onTap: _handleTap,
       child: AnimatedScale(
-        scale: _isPressed ? 0.92 : 1.0,
+        scale: _isPressed ? 0.95 : 1.0,
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
         child: CustomPaint(

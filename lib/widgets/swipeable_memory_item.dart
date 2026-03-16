@@ -427,17 +427,14 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
           onTapDown: (_) {
             setState(() => _isPressed = true);
           },
-          onTapUp: (_) async {
-            // 确保动画至少执行150ms
-            await Future.delayed(const Duration(milliseconds: 150));
-            if (mounted) {
-              setState(() => _isPressed = false);
-            }
-          },
+          onTapUp: (_) {},
           onTapCancel: () {
             setState(() => _isPressed = false);
           },
-          onTap: () {
+          onTap: () async {
+            setState(() => _isPressed = true);
+            await Future.delayed(const Duration(milliseconds: 80));
+            if (mounted) setState(() => _isPressed = false);
             SwipeableMemoryItem.closeAll();
             widget.onTap?.call();
           },
@@ -477,16 +474,16 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
         onTapDown: (_) {
           setState(() => _isActionPressed = true);
         },
-        onTapUp: (_) async {
-          await Future.delayed(const Duration(milliseconds: 150));
-          if (mounted) {
-            setState(() => _isActionPressed = false);
-          }
-        },
+        onTapUp: (_) {},
         onTapCancel: () {
           setState(() => _isActionPressed = false);
         },
-        onTap: onTap,
+        onTap: () async {
+          setState(() => _isActionPressed = true);
+          await Future.delayed(const Duration(milliseconds: 80));
+          if (mounted) setState(() => _isActionPressed = false);
+          onTap?.call();
+        },
         child: AnimatedScale(
           scale: _isActionPressed ? 0.95 : 1.0,
           duration: const Duration(milliseconds: 150),
@@ -613,9 +610,6 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
                 Text(
                   _getDisplayTitle(),
                   style: TextStyle(
-                    fontFamily: widget.memory.category == MemoryCategory.bill
-                        ? 'DINPro'
-                        : null,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: textColor,
