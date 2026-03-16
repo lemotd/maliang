@@ -262,8 +262,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _loadMemories() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     final memories = await _memoryService.getAllMemories();
+    if (!mounted) return;
     setState(() {
       _memories = memories;
       _isLoading = false;

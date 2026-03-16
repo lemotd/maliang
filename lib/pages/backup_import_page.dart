@@ -105,10 +105,10 @@ class _BackupImportPageState extends State<BackupImportPage> {
         }
       }
 
-      if (mounted) {
-        // 通知首页刷新数据
-        await HomePage.onDataChanged?.call();
+      // 通知首页刷新数据（不依赖当前页面 mounted 状态）
+      await HomePage.onDataChanged?.call();
 
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('导入成功，共 ${importedMemories.length} 条记忆'),

@@ -1945,6 +1945,14 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       );
     }
 
+    final wideClippedImage = ClipSmoothRect(
+      radius: smoothRadius(16),
+      child: Hero(
+        tag: 'memory_image_${_memory.id}',
+        child: Image.file(File(_memory.imagePath!), fit: BoxFit.contain),
+      ),
+    );
+
     final wideImageWidget = Container(
       decoration: BoxDecoration(
         borderRadius: smoothRadius(16),
@@ -1957,13 +1965,12 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           ),
         ],
       ),
-      child: ClipSmoothRect(
-        radius: smoothRadius(16),
-        child: Hero(
-          tag: 'memory_image_${_memory.id}',
-          child: Image.file(File(_memory.imagePath!), fit: BoxFit.contain),
-        ),
-      ),
+      child: _isReanalyzing
+          ? AIGlowBorder(
+              borderRadius: smoothRadius(16),
+              child: wideClippedImage,
+            )
+          : wideClippedImage,
     );
 
     return _Pressable(
@@ -1971,12 +1978,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: _isReanalyzing
-              ? AIGlowBorder(
-                  borderRadius: smoothRadius(16),
-                  child: wideImageWidget,
-                )
-              : wideImageWidget,
+          child: wideImageWidget,
         ),
       ),
     );
@@ -2048,6 +2050,19 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     // 更新图片显示高度
     _imageDisplayHeight = displayHeight + verticalMargin * 2;
 
+    final clippedImage = ClipSmoothRect(
+      radius: smoothRadius(16),
+      child: Hero(
+        tag: 'memory_image_${_memory.id}',
+        child: Image.file(
+          File(_memory.imagePath!),
+          width: displayWidth,
+          height: displayHeight,
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+
     final imageWidget = Container(
       margin: EdgeInsets.symmetric(vertical: verticalMargin),
       decoration: BoxDecoration(
@@ -2061,27 +2076,13 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           ),
         ],
       ),
-      child: ClipSmoothRect(
-        radius: smoothRadius(16),
-        child: Hero(
-          tag: 'memory_image_${_memory.id}',
-          child: Image.file(
-            File(_memory.imagePath!),
-            width: displayWidth,
-            height: displayHeight,
-            fit: BoxFit.cover,
-          ),
-        ),
-      ),
+      child: _isReanalyzing
+          ? AIGlowBorder(borderRadius: smoothRadius(16), child: clippedImage)
+          : clippedImage,
     );
 
     return Center(
-      child: _Pressable(
-        onTap: () => _openImageViewer(),
-        child: _isReanalyzing
-            ? AIGlowBorder(borderRadius: smoothRadius(16), child: imageWidget)
-            : imageWidget,
-      ),
+      child: _Pressable(onTap: () => _openImageViewer(), child: imageWidget),
     );
   }
 
@@ -2335,14 +2336,26 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       builder: (_) => _GlassMorphMenu(
         isDark: isDark,
         buttonCenter: buttonCenter,
-        buttonSize: 40.0, // GlassButton 内部圆形尺寸
+        buttonSize: 40.0,
         onReanalyze: () {
           removeEntry();
-          _confirmReanalyze(isDark);
+          _showConfirmOverlay(
+            isDark: isDark,
+            buttonCenter: buttonCenter,
+            message: '将使用 AI 重新分析这张图片，当前内容将被覆盖',
+            actionLabel: '继续',
+            onConfirm: _reanalyzeWithAI,
+          );
         },
         onDelete: () {
           removeEntry();
-          _confirmDelete(isDark);
+          _showConfirmOverlay(
+            isDark: isDark,
+            buttonCenter: buttonCenter,
+            message: '确定要删除这条记忆？此操作不可撤销',
+            actionLabel: '删除',
+            onConfirm: _deleteMemory,
+          );
         },
         onDismiss: removeEntry,
       ),
@@ -2352,28 +2365,38 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     overlay.insert(entry);
   }
 
-  void _confirmReanalyze(bool isDark) {
-    showCupertinoDialog(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('AI 重新分析'),
-        content: const Text('将使用 AI 重新识别这张图片，当前内容会被覆盖。'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.pop(ctx);
-              _reanalyzeWithAI();
-            },
-            child: const Text('继续'),
-          ),
-        ],
+  void _showConfirmOverlay({
+    required bool isDark,
+    required Offset buttonCenter,
+    required String message,
+    required String actionLabel,
+    required VoidCallback onConfirm,
+  }) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+
+    void removeEntry() {
+      entry.remove();
+      _menuOverlay = null;
+    }
+
+    entry = OverlayEntry(
+      builder: (_) => _GlassConfirmMenu(
+        isDark: isDark,
+        buttonCenter: buttonCenter,
+        buttonSize: 40.0,
+        message: message,
+        actionLabel: actionLabel,
+        onConfirm: () {
+          removeEntry();
+          onConfirm();
+        },
+        onDismiss: removeEntry,
       ),
     );
+
+    _menuOverlay = entry;
+    overlay.insert(entry);
   }
 
   Future<void> _reanalyzeWithAI() async {
@@ -2473,30 +2496,6 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       },
       blendMode: BlendMode.dstIn,
       child: child,
-    );
-  }
-
-  void _confirmDelete(bool isDark) {
-    showCupertinoDialog(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('删除记忆'),
-        content: const Text('确定要删除这条记忆吗？此操作不可撤销。'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.pop(ctx);
-              _deleteMemory();
-            },
-            child: const Text('删除'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -3827,7 +3826,7 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
   // 菜单尺寸
   static const double _menuWidth = 200.0;
   static const double _menuItemHeight = 48.0;
-  static const double _menuHeight = _menuItemHeight * 2 + 0.5; // 两项 + 分割线
+  static const double _menuHeight = _menuItemHeight * 2 + 20; // 两项 + 上下10px边距
 
   @override
   void initState() {
@@ -3835,7 +3834,7 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
-      reverseDuration: const Duration(milliseconds: 320),
+      reverseDuration: const Duration(milliseconds: 400),
     );
     _controller.forward();
   }
@@ -3876,13 +3875,16 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
     return 1.0 - decay * math.cos(math.pi * 0.8 * t);
   }
 
-  /// 收起曲线：带回缩弹性
+  /// 收起曲线：丝滑减速 + 结尾轻微回弹
   double _closeCurve(double t) {
     if (t <= 0) return 0;
     if (t >= 1) return 1;
-    // 收起时先略微放大再缩小
-    final s = 1.0 - t;
-    return 1.0 - s * s * (3.0 * s + 1) / 3.0;
+    // smoothstep: 两端速度为零，中间快速过渡
+    final smooth = t * t * (3.0 - 2.0 * t);
+    // 在 t 接近 0 时叠加轻微过冲（值短暂低于 0 再回归）
+    final overshoot =
+        math.exp(-8.0 * (1.0 - t)) * math.sin(t * math.pi * 1.5) * -0.04;
+    return smooth + overshoot;
   }
 
   @override
@@ -3918,11 +3920,11 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
                 (_menuHeight - widget.buttonSize) * clampedT;
             final currentRadius =
                 widget.buttonSize / 2 +
-                (14.0 - widget.buttonSize / 2) * clampedT;
+                (24.0 - widget.buttonSize / 2) * clampedT;
 
             // 弹性过冲 → 明显的缩放弹性
             final overshoot = t - clampedT;
-            final bounceScale = 1.0 + overshoot * 0.15;
+            final bounceScale = 1.0 + overshoot.abs() * 0.15;
 
             // 弥散阴影透明度跟随动画
             final shadowOpacity = clampedT;
@@ -3951,7 +3953,7 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
                                   (widget.isDark
                                           ? Colors.black
                                           : const Color(0xFFAEAEB2))
-                                      .withOpacity(0.08 * shadowOpacity),
+                                      .withOpacity(0.12 * shadowOpacity),
                               blurRadius: 60 * shadowOpacity,
                               spreadRadius: 4 * shadowOpacity,
                               offset: Offset(0, 16 * shadowOpacity),
@@ -3962,7 +3964,7 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
                                   (widget.isDark
                                           ? Colors.black
                                           : const Color(0xFFAEAEB2))
-                                      .withOpacity(0.05 * shadowOpacity),
+                                      .withOpacity(0.08 * shadowOpacity),
                               blurRadius: 30 * shadowOpacity,
                               offset: Offset(0, 8 * shadowOpacity),
                             ),
@@ -4038,27 +4040,24 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
               ],
             );
           },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildMenuItem(
-                icon: CupertinoIcons.sparkles,
-                label: 'AI 重新分析',
-                onTap: () => _selectItem(widget.onReanalyze),
-              ),
-              Container(
-                height: 0.5,
-                color: widget.isDark
-                    ? const Color(0xFF3A3A3C)
-                    : const Color(0xFFE5E5EA),
-              ),
-              _buildMenuItem(
-                icon: CupertinoIcons.trash,
-                label: '删除',
-                isDestructive: true,
-                onTap: () => _selectItem(widget.onDelete),
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildMenuItem(
+                  icon: CupertinoIcons.sparkles,
+                  label: 'AI 重新分析',
+                  onTap: () => _selectItem(widget.onReanalyze),
+                ),
+                _buildMenuItem(
+                  icon: CupertinoIcons.trash,
+                  label: '删除',
+                  isDestructive: true,
+                  onTap: () => _selectItem(widget.onDelete),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -4081,6 +4080,356 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
       color: color,
       isDark: widget.isDark,
       onTap: onTap,
+    );
+  }
+}
+
+/// 确认操作的毛玻璃弹出菜单（从更多菜单位置原地弹出）
+class _GlassConfirmMenu extends StatefulWidget {
+  final bool isDark;
+  final Offset buttonCenter;
+  final double buttonSize;
+  final String message;
+  final String actionLabel;
+  final VoidCallback onConfirm;
+  final VoidCallback onDismiss;
+
+  const _GlassConfirmMenu({
+    required this.isDark,
+    required this.buttonCenter,
+    required this.buttonSize,
+    required this.message,
+    required this.actionLabel,
+    required this.onConfirm,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_GlassConfirmMenu> createState() => _GlassConfirmMenuState();
+}
+
+class _GlassConfirmMenuState extends State<_GlassConfirmMenu>
+    with TickerProviderStateMixin {
+  late AnimationController _controller;
+  late AnimationController _pressController;
+  bool _dismissing = false;
+  final GlobalKey _contentKey = GlobalKey();
+  double? _measuredHeight;
+
+  static const double _menuWidth = 220.0;
+
+  double get _menuHeight => _measuredHeight ?? 200.0; // 首帧用足够大的值
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+      reverseDuration: const Duration(milliseconds: 400),
+    );
+    _pressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+      reverseDuration: const Duration(milliseconds: 350),
+    );
+    _controller.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measureContent();
+    });
+  }
+
+  void _measureContent() {
+    final renderBox =
+        _contentKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox != null && _measuredHeight == null) {
+      setState(() {
+        _measuredHeight = renderBox.size.height;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _pressController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _dismissWithAnimation() async {
+    if (_dismissing) return;
+    _dismissing = true;
+    await _controller.reverse(from: _controller.value);
+    widget.onDismiss();
+  }
+
+  double _openCurve(double t) {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    final decay = math.exp(-6.0 * t);
+    return 1.0 - decay * math.cos(math.pi * 0.8 * t);
+  }
+
+  double _closeCurve(double t) {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    final smooth = t * t * (3.0 - 2.0 * t);
+    final overshoot =
+        math.exp(-8.0 * (1.0 - t)) * math.sin(t * math.pi * 1.5) * -0.04;
+    return smooth + overshoot;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final right =
+        screenWidth - (widget.buttonCenter.dx + widget.buttonSize / 2);
+    final top = widget.buttonCenter.dy - widget.buttonSize / 2;
+
+    return GestureDetector(
+      onTap: () => _dismissWithAnimation(),
+      behavior: HitTestBehavior.translucent,
+      child: Material(
+        color: Colors.transparent,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            final rawT = _controller.value;
+            final isReversing = _controller.status == AnimationStatus.reverse;
+            final t = isReversing ? _closeCurve(rawT) : _openCurve(rawT);
+
+            final contentOpacity = isReversing
+                ? Curves.easeIn.transform((rawT / 0.4).clamp(0.0, 1.0))
+                : Curves.easeOut.transform(
+                    ((rawT - 0.15) / 0.5).clamp(0.0, 1.0),
+                  );
+
+            final clampedT = t.clamp(0.0, 1.0);
+            final currentWidth =
+                widget.buttonSize + (_menuWidth - widget.buttonSize) * clampedT;
+            final currentHeight =
+                widget.buttonSize +
+                (_menuHeight - widget.buttonSize) * clampedT;
+            final currentRadius =
+                widget.buttonSize / 2 +
+                (24.0 - widget.buttonSize / 2) * clampedT;
+
+            final bounceScale = 1.0 + (t - clampedT).abs() * 0.05;
+            final shadowOpacity = clampedT;
+
+            return Stack(
+              children: [
+                Positioned(
+                  right: right - 12,
+                  top: top - 6,
+                  child: IgnorePointer(
+                    child: Transform.scale(
+                      scale: bounceScale,
+                      alignment: Alignment.topRight,
+                      child: Container(
+                        width: currentWidth + 24,
+                        height: currentHeight + 16,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(
+                            currentRadius + 6,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  (widget.isDark
+                                          ? Colors.black
+                                          : const Color(0xFFAEAEB2))
+                                      .withOpacity(0.12 * shadowOpacity),
+                              blurRadius: 60 * shadowOpacity,
+                              spreadRadius: 4 * shadowOpacity,
+                              offset: Offset(0, 16 * shadowOpacity),
+                            ),
+                            BoxShadow(
+                              color:
+                                  (widget.isDark
+                                          ? Colors.black
+                                          : const Color(0xFFAEAEB2))
+                                      .withOpacity(0.08 * shadowOpacity),
+                              blurRadius: 30 * shadowOpacity,
+                              offset: Offset(0, 8 * shadowOpacity),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: right,
+                  top: top,
+                  width: _menuWidth,
+                  height: _menuHeight,
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: GestureDetector(
+                      onTapDown: (_) => _pressController.forward(),
+                      onTapUp: (_) {
+                        _pressController.reverse();
+                        _dismissWithAnimation();
+                      },
+                      onTapCancel: () => _pressController.reverse(),
+                      child: AnimatedBuilder(
+                        animation: _pressController,
+                        builder: (context, pressChild) {
+                          final pressT = Curves.easeOut.transform(
+                            _pressController.value,
+                          );
+                          final pressScale = 1.0 + 0.06 * pressT;
+                          return Transform.scale(
+                            scale: bounceScale * pressScale,
+                            alignment: Alignment.topRight,
+                            child: pressChild,
+                          );
+                        },
+                        child: SizedBox(
+                          width: currentWidth,
+                          height: currentHeight,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(currentRadius),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(
+                                sigmaX: 40 * clampedT.clamp(0.1, 1.0),
+                                sigmaY: 40 * clampedT.clamp(0.1, 1.0),
+                              ),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: widget.isDark
+                                      ? Color.lerp(
+                                          const Color(
+                                            0xFF2C2C2E,
+                                          ).withOpacity(0.0),
+                                          const Color(
+                                            0xFF2C2C2E,
+                                          ).withOpacity(0.85),
+                                          clampedT,
+                                        )
+                                      : Color.lerp(
+                                          Colors.white.withOpacity(0.0),
+                                          Colors.white.withOpacity(0.80),
+                                          clampedT,
+                                        ),
+                                  border: Border.all(
+                                    color:
+                                        (widget.isDark
+                                                ? const Color(0xFF3A3A3C)
+                                                : Colors.white.withOpacity(0.8))
+                                            .withOpacity(clampedT),
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: OverflowBox(
+                                  alignment: Alignment.topCenter,
+                                  maxWidth: _menuWidth,
+                                  maxHeight: _menuHeight,
+                                  child: Opacity(
+                                    opacity: contentOpacity.clamp(0.0, 1.0),
+                                    child: child,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+          child: Padding(
+            key: _contentKey,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Text(
+                    widget.message,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.onSurface(widget.isDark),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _ConfirmCapsuleButton(
+                    label: widget.actionLabel,
+                    isDark: widget.isDark,
+                    onTap: () {
+                      if (_dismissing) return;
+                      _dismissing = true;
+                      _controller.reverse(from: _controller.value).then((_) {
+                        widget.onConfirm();
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ConfirmCapsuleButton extends StatefulWidget {
+  final String label;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _ConfirmCapsuleButton({
+    required this.label,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  State<_ConfirmCapsuleButton> createState() => _ConfirmCapsuleButtonState();
+}
+
+class _ConfirmCapsuleButtonState extends State<_ConfirmCapsuleButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _pressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainer(widget.isDark),
+            borderRadius: BorderRadius.circular(100),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: AppColors.warning(widget.isDark),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -4118,12 +4467,15 @@ class _GlassMenuItemState extends State<_GlassMenuItem> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         height: _GlassMorphMenuState._menuItemHeight,
-        color: _pressed
-            ? (widget.isDark
-                  ? Colors.white.withOpacity(0.08)
-                  : Colors.black.withOpacity(0.06))
-            : Colors.transparent,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: _pressed
+              ? (widget.isDark
+                    ? Colors.white.withOpacity(0.08)
+                    : Colors.black.withOpacity(0.06))
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(100),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         child: Row(
           children: [
             Icon(widget.icon, size: 20, color: widget.color),

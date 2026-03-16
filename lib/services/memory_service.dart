@@ -11,6 +11,7 @@ class MemoryService {
 
   Future<List<MemoryItem>> getAllMemories() async {
     final prefs = await _getPrefs();
+    await prefs.reload();
     final String? data = prefs.getString(_keyMemories);
     if (data == null) return [];
 
