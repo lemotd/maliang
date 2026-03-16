@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'package:figma_squircle/figma_squircle.dart';
 import 'dart:ui';
 import 'dart:io';
 import 'dart:math' as math;
@@ -11,6 +12,7 @@ import '../services/ai_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
 import '../utils/scroll_edge_haptic.dart';
+import '../utils/smooth_radius.dart';
 import '../widgets/ai_glow_border.dart';
 import '../main.dart';
 import 'image_viewer_page.dart';
@@ -323,7 +325,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                 ),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceContainer(isDark),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: smoothRadius(16),
                 ),
                 child: Column(
                   children: [
@@ -390,7 +392,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                             ),
                             decoration: BoxDecoration(
                               color: AppColors.surfaceContainer(isDark),
-                              borderRadius: BorderRadius.circular(100),
+                              borderRadius: smoothRadius(100),
                             ),
                             child: Text(
                               _formatDateShort(_selectedDate),
@@ -412,7 +414,7 @@ class _EditBillBottomSheetState extends State<_EditBillBottomSheet> {
                             ),
                             decoration: BoxDecoration(
                               color: AppColors.surfaceContainer(isDark),
-                              borderRadius: BorderRadius.circular(100),
+                              borderRadius: smoothRadius(100),
                             ),
                             child: Text(
                               _formatTimeShort(_selectedDate),
@@ -727,7 +729,7 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet> {
               child: CupertinoButton(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 color: AppColors.primary(isDark),
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: smoothRadius(24),
                 onPressed: () => widget.onChanged(_selected),
                 child: const Text(
                   '确定',
@@ -955,19 +957,19 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
                           color: AppColors.onSurfaceOctonary(isDark),
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: smoothRadius(20),
                           borderSide: BorderSide(
                             color: AppColors.outline(isDark),
                           ),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: smoothRadius(20),
                           borderSide: BorderSide(
                             color: AppColors.outline(isDark),
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: smoothRadius(20),
                           borderSide: BorderSide(
                             color: AppColors.primary(isDark),
                           ),
@@ -1008,7 +1010,7 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
           color: selected
               ? AppColors.primary(isDark).withOpacity(0.1)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: smoothRadius(20),
           border: Border.all(
             color: selected
                 ? AppColors.primary(isDark)
@@ -1161,6 +1163,12 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     _menuOverlay?.remove();
     _menuOverlay = null;
     super.dispose();
+  }
+
+  /// 立即移除更多菜单 overlay（页面退出前调用）
+  void _removeMenuImmediately() {
+    _menuOverlay?.remove();
+    _menuOverlay = null;
   }
 
   void _onDragStart(double y) {
@@ -1378,6 +1386,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             return;
           }
           debugPrint('PopScope 返回数据: ${_memory.title}');
+          _removeMenuImmediately();
           Navigator.pop(context, _memory);
         }
       },
@@ -1496,24 +1505,36 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                   isDark,
                 ).withOpacity((1.0 - (_offset / 0.5).clamp(0.0, 1.0))),
                 child: Stack(
+                  clipBehavior: Clip.none,
                   children: [
+                    // 返回按钮：编辑时向左滑出 + 缩小
                     Positioned(
                       left: 8,
                       top: 0,
                       bottom: 0,
                       child: AnimatedBuilder(
                         animation: _editAnimation,
-                        builder: (context, child) => Opacity(
-                          opacity: 1.0 - _editAnimation.value,
-                          child: IgnorePointer(
-                            ignoring: _isEditingClothing,
-                            child: child,
-                          ),
-                        ),
+                        builder: (context, child) {
+                          final t = _editAnimation.value;
+                          return Transform.translate(
+                            offset: Offset(-30.0 * t, 0),
+                            child: Transform.scale(
+                              scale: 1.0 - 0.3 * t,
+                              child: Opacity(
+                                opacity: (1.0 - t * 1.5).clamp(0.0, 1.0),
+                                child: IgnorePointer(
+                                  ignoring: _isEditingClothing,
+                                  child: child,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                         child: GlassButton(
                           icon: CupertinoIcons.back,
                           onTap: () {
                             debugPrint('返回按钮点击，返回数据: ${_memory.title}');
+                            _removeMenuImmediately();
                             Navigator.pop(context, _memory);
                           },
                         ),
@@ -1523,16 +1544,16 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                       Center(
                         child: AnimatedBuilder(
                           animation: _editAnimation,
-                          builder: (context, child) => Opacity(
-                            opacity: _editAnimation.value,
-                            child: Transform.translate(
-                              offset: Offset(
-                                0,
-                                6 * (1.0 - _editAnimation.value),
+                          builder: (context, child) {
+                            final t = _editAnimation.value;
+                            return Opacity(
+                              opacity: t,
+                              child: Transform.translate(
+                                offset: Offset(0, 6 * (1.0 - t)),
+                                child: child,
                               ),
-                              child: child,
-                            ),
-                          ),
+                            );
+                          },
                           child: Text(
                             '编辑中',
                             style: TextStyle(
@@ -1545,40 +1566,67 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                       ),
                     if (_memory.category == MemoryCategory.clothing)
                       Positioned(
-                        right: 54,
+                        right: 58,
                         top: 0,
                         bottom: 0,
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 250),
-                          transitionBuilder: (child, anim) => FadeTransition(
-                            opacity: anim,
-                            child: ScaleTransition(scale: anim, child: child),
-                          ),
+                        child: AnimatedBuilder(
+                          animation: _editAnimation,
+                          builder: (context, child) {
+                            final t = _editAnimation.value;
+                            // 编辑时从 right:58 滑到 right:8（向右移 50px）
+                            return Transform.translate(
+                              offset: Offset(50.0 * t, 0),
+                              child: child,
+                            );
+                          },
                           child: GlassButton(
-                            key: ValueKey(_isEditingClothing),
-                            icon: _isEditingClothing
-                                ? CupertinoIcons.checkmark_alt
-                                : CupertinoIcons.pencil,
+                            icon: CupertinoIcons.pencil,
                             onTap: _isEditingClothing
                                 ? _saveClothingEdits
                                 : _enterClothingEditMode,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 250),
+                              switchInCurve: Curves.easeOut,
+                              switchOutCurve: Curves.easeIn,
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                    opacity: animation,
+                                    child: ScaleTransition(
+                                      scale: animation,
+                                      child: child,
+                                    ),
+                                  ),
+                              child: Icon(
+                                _isEditingClothing
+                                    ? CupertinoIcons.checkmark_alt
+                                    : CupertinoIcons.pencil,
+                                key: ValueKey(_isEditingClothing),
+                                size: 22,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    // 更多菜单按钮
+                    // 更多菜单按钮：编辑时缩小消失
                     Positioned(
                       right: 8,
                       top: 0,
                       bottom: 0,
                       child: AnimatedBuilder(
                         animation: _editAnimation,
-                        builder: (context, child) => Opacity(
-                          opacity: 1.0 - _editAnimation.value,
-                          child: IgnorePointer(
-                            ignoring: _isEditingClothing,
-                            child: child,
-                          ),
-                        ),
+                        builder: (context, child) {
+                          final t = _editAnimation.value;
+                          return Transform.scale(
+                            scale: 1.0 - 0.3 * t,
+                            child: Opacity(
+                              opacity: (1.0 - t * 1.5).clamp(0.0, 1.0),
+                              child: IgnorePointer(
+                                ignoring: _isEditingClothing,
+                                child: child,
+                              ),
+                            ),
+                          );
+                        },
                         child: GlassButton(
                           key: _moreButtonKey,
                           icon: CupertinoIcons.ellipsis,
@@ -1615,6 +1663,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             _saveClothingEdits();
             return;
           }
+          _removeMenuImmediately();
           Navigator.pop(context, _memory);
         }
       },
@@ -1657,17 +1706,31 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                                   bottom: 0,
                                   child: AnimatedBuilder(
                                     animation: _editAnimation,
-                                    builder: (context, child) => Opacity(
-                                      opacity: 1.0 - _editAnimation.value,
-                                      child: IgnorePointer(
-                                        ignoring: _isEditingClothing,
-                                        child: child,
-                                      ),
-                                    ),
+                                    builder: (context, child) {
+                                      final t = _editAnimation.value;
+                                      return Transform.translate(
+                                        offset: Offset(-30.0 * t, 0),
+                                        child: Transform.scale(
+                                          scale: 1.0 - 0.3 * t,
+                                          child: Opacity(
+                                            opacity: (1.0 - t * 1.5).clamp(
+                                              0.0,
+                                              1.0,
+                                            ),
+                                            child: IgnorePointer(
+                                              ignoring: _isEditingClothing,
+                                              child: child,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
                                     child: GlassButton(
                                       icon: CupertinoIcons.back,
-                                      onTap: () =>
-                                          Navigator.pop(context, _memory),
+                                      onTap: () {
+                                        _removeMenuImmediately();
+                                        Navigator.pop(context, _memory);
+                                      },
                                     ),
                                   ),
                                 ),
@@ -1694,16 +1757,16 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                               Center(
                                 child: AnimatedBuilder(
                                   animation: _editAnimation,
-                                  builder: (context, child) => Opacity(
-                                    opacity: _editAnimation.value,
-                                    child: Transform.translate(
-                                      offset: Offset(
-                                        0,
-                                        6 * (1.0 - _editAnimation.value),
+                                  builder: (context, child) {
+                                    final t = _editAnimation.value;
+                                    return Opacity(
+                                      opacity: t,
+                                      child: Transform.translate(
+                                        offset: Offset(0, 6 * (1.0 - t)),
+                                        child: child,
                                       ),
-                                      child: child,
-                                    ),
-                                  ),
+                                    );
+                                  },
                                   child: Text(
                                     '编辑中',
                                     style: TextStyle(
@@ -1716,27 +1779,45 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                               ),
                             if (_memory.category == MemoryCategory.clothing)
                               Positioned(
-                                right: 54,
+                                right: 58,
                                 top: 0,
                                 bottom: 0,
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 250),
-                                  transitionBuilder: (child, anim) =>
-                                      FadeTransition(
-                                        opacity: anim,
-                                        child: ScaleTransition(
-                                          scale: anim,
-                                          child: child,
-                                        ),
-                                      ),
+                                child: AnimatedBuilder(
+                                  animation: _editAnimation,
+                                  builder: (context, child) {
+                                    final t = _editAnimation.value;
+                                    return Transform.translate(
+                                      offset: Offset(50.0 * t, 0),
+                                      child: child,
+                                    );
+                                  },
                                   child: GlassButton(
-                                    key: ValueKey(_isEditingClothing),
-                                    icon: _isEditingClothing
-                                        ? CupertinoIcons.checkmark_alt
-                                        : CupertinoIcons.pencil,
+                                    icon: CupertinoIcons.pencil,
                                     onTap: _isEditingClothing
                                         ? _saveClothingEdits
                                         : _enterClothingEditMode,
+                                    child: AnimatedSwitcher(
+                                      duration: const Duration(
+                                        milliseconds: 250,
+                                      ),
+                                      switchInCurve: Curves.easeOut,
+                                      switchOutCurve: Curves.easeIn,
+                                      transitionBuilder: (child, animation) =>
+                                          FadeTransition(
+                                            opacity: animation,
+                                            child: ScaleTransition(
+                                              scale: animation,
+                                              child: child,
+                                            ),
+                                          ),
+                                      child: Icon(
+                                        _isEditingClothing
+                                            ? CupertinoIcons.checkmark_alt
+                                            : CupertinoIcons.pencil,
+                                        key: ValueKey(_isEditingClothing),
+                                        size: 22,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1747,13 +1828,19 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                               bottom: 0,
                               child: AnimatedBuilder(
                                 animation: _editAnimation,
-                                builder: (context, child) => Opacity(
-                                  opacity: 1.0 - _editAnimation.value,
-                                  child: IgnorePointer(
-                                    ignoring: _isEditingClothing,
-                                    child: child,
-                                  ),
-                                ),
+                                builder: (context, child) {
+                                  final t = _editAnimation.value;
+                                  return Transform.scale(
+                                    scale: 1.0 - 0.3 * t,
+                                    child: Opacity(
+                                      opacity: (1.0 - t * 1.5).clamp(0.0, 1.0),
+                                      child: IgnorePointer(
+                                        ignoring: _isEditingClothing,
+                                        child: child,
+                                      ),
+                                    ),
+                                  );
+                                },
                                 child: GlassButton(
                                   key: _moreButtonKey,
                                   icon: CupertinoIcons.ellipsis,
@@ -1860,7 +1947,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
 
     final wideImageWidget = Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: smoothRadius(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.15),
@@ -1870,8 +1957,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+      child: ClipSmoothRect(
+        radius: smoothRadius(16),
         child: Hero(
           tag: 'memory_image_${_memory.id}',
           child: Image.file(File(_memory.imagePath!), fit: BoxFit.contain),
@@ -1886,7 +1973,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           padding: const EdgeInsets.all(24),
           child: _isReanalyzing
               ? AIGlowBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: smoothRadius(16),
                   child: wideImageWidget,
                 )
               : wideImageWidget,
@@ -1964,7 +2051,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     final imageWidget = Container(
       margin: EdgeInsets.symmetric(vertical: verticalMargin),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: smoothRadius(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.15),
@@ -1974,8 +2061,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+      child: ClipSmoothRect(
+        radius: smoothRadius(16),
         child: Hero(
           tag: 'memory_image_${_memory.id}',
           child: Image.file(
@@ -1992,10 +2079,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       child: _Pressable(
         onTap: () => _openImageViewer(),
         child: _isReanalyzing
-            ? AIGlowBorder(
-                borderRadius: BorderRadius.circular(16),
-                child: imageWidget,
-              )
+            ? AIGlowBorder(borderRadius: smoothRadius(16), child: imageWidget)
             : imageWidget,
       ),
     );
@@ -2143,7 +2227,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                 ),
                 decoration: BoxDecoration(
                   color: AppColors.containerList(isDark),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: smoothRadius(12),
                 ),
                 child: Row(
                   children: [
@@ -2152,7 +2236,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                       height: 40,
                       decoration: BoxDecoration(
                         color: AppColors.primary(isDark).withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: smoothRadius(10),
                       ),
                       child: Icon(
                         CupertinoIcons.calendar,
@@ -2697,7 +2781,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.primary(isDark).withOpacity(0.06),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: smoothRadius(16),
         border: Border.all(
           color: AppColors.primary(isDark).withOpacity(0.1),
           width: 0.6,
@@ -2849,12 +2933,9 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
-            child: _EditBillBottomSheet(memory: _memory),
-          ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: _EditBillBottomSheet(memory: _memory),
         ),
       ),
     );
@@ -3451,7 +3532,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
                 color: selected ? color.withOpacity(0.1) : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: smoothRadius(20),
                 border: Border.all(
                   color: selected
                       ? color.withOpacity(0.4)
@@ -3484,7 +3565,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: smoothRadius(20),
               border: Border.all(color: color.withOpacity(0.4)),
             ),
             child: Text(
@@ -3618,7 +3699,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: smoothRadius(20),
             border: Border.all(color: AppColors.outline(isDark)),
           ),
           child: Row(
@@ -3708,7 +3789,7 @@ class _SkeletonBoxState extends State<_SkeletonBox>
           width: widget.width,
           height: widget.height,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: smoothRadius(4),
             color: Color.lerp(baseColor, highlightColor, t),
           ),
         );
@@ -3741,8 +3822,6 @@ class _GlassMorphMenu extends StatefulWidget {
 class _GlassMorphMenuState extends State<_GlassMorphMenu>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _expandAnim;
-  late Animation<double> _contentFadeAnim;
   bool _dismissing = false;
 
   // 菜单尺寸
@@ -3755,18 +3834,8 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 320),
-      reverseDuration: const Duration(milliseconds: 220),
-    );
-    _expandAnim = CurvedAnimation(
-      parent: _controller,
-      curve: const _MildBounceCurve(),
-      reverseCurve: Curves.easeInCubic,
-    );
-    _contentFadeAnim = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
-      reverseCurve: const Interval(0.0, 0.5, curve: Curves.easeIn),
+      duration: const Duration(milliseconds: 500),
+      reverseDuration: const Duration(milliseconds: 320),
     );
     _controller.forward();
   }
@@ -3777,14 +3846,20 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
     super.dispose();
   }
 
-  /// 选择菜单项时：立即回调（overlay 由外部移除）
+  /// 立即移除，不播放动画（页面退出时用）
+  void removeImmediately() {
+    _dismissing = true;
+    widget.onDismiss();
+  }
+
   void _selectItem(VoidCallback action) {
     if (_dismissing) return;
     _dismissing = true;
-    action();
+    _controller.reverse(from: _controller.value).then((_) {
+      action();
+    });
   }
 
-  /// 点击空白区域关闭：播放收缩动画后回调
   Future<void> _dismissWithAnimation() async {
     if (_dismissing) return;
     _dismissing = true;
@@ -3792,8 +3867,31 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
     widget.onDismiss();
   }
 
+  /// 展开弹性曲线：一次柔和过冲 + 平滑回弹
+  double _openCurve(double t) {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    // 高阻尼弹簧：只过冲一次，然后平滑归位
+    final decay = math.exp(-6.0 * t);
+    return 1.0 - decay * math.cos(math.pi * 0.8 * t);
+  }
+
+  /// 收起曲线：带回缩弹性
+  double _closeCurve(double t) {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    // 收起时先略微放大再缩小
+    final s = 1.0 - t;
+    return 1.0 - s * s * (3.0 * s + 1) / 3.0;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final right =
+        screenWidth - (widget.buttonCenter.dx + widget.buttonSize / 2);
+    final top = widget.buttonCenter.dy - widget.buttonSize / 2;
+
     return GestureDetector(
       onTap: () => _dismissWithAnimation(),
       behavior: HitTestBehavior.translucent,
@@ -3801,98 +3899,134 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
         color: Colors.transparent,
         child: AnimatedBuilder(
           animation: _controller,
-          builder: (context, _) {
-            final t = _expandAnim.value;
-            final contentOpacity = _contentFadeAnim.value;
+          builder: (context, child) {
+            final rawT = _controller.value;
+            final isReversing = _controller.status == AnimationStatus.reverse;
+            final t = isReversing ? _closeCurve(rawT) : _openCurve(rawT);
 
-            // 从按钮圆形 → 菜单矩形的插值
-            final currentWidth = lerpDouble(widget.buttonSize, _menuWidth, t)!;
-            final currentHeight = lerpDouble(
-              widget.buttonSize,
-              _menuHeight,
-              t,
-            )!;
-            final currentRadius = lerpDouble(widget.buttonSize / 2, 14.0, t)!;
+            final contentOpacity = isReversing
+                ? Curves.easeIn.transform((rawT / 0.4).clamp(0.0, 1.0))
+                : Curves.easeOut.transform(
+                    ((rawT - 0.15) / 0.5).clamp(0.0, 1.0),
+                  );
 
-            // 菜单右上角对齐按钮右上角
-            final right =
-                MediaQuery.of(context).size.width -
-                (widget.buttonCenter.dx + widget.buttonSize / 2);
-            final top = widget.buttonCenter.dy - widget.buttonSize / 2;
+            final clampedT = t.clamp(0.0, 1.0);
+            final currentWidth =
+                widget.buttonSize + (_menuWidth - widget.buttonSize) * clampedT;
+            final currentHeight =
+                widget.buttonSize +
+                (_menuHeight - widget.buttonSize) * clampedT;
+            final currentRadius =
+                widget.buttonSize / 2 +
+                (14.0 - widget.buttonSize / 2) * clampedT;
+
+            // 弹性过冲 → 明显的缩放弹性
+            final overshoot = t - clampedT;
+            final bounceScale = 1.0 + overshoot * 0.15;
+
+            // 弥散阴影透明度跟随动画
+            final shadowOpacity = clampedT;
 
             return Stack(
               children: [
+                // 弥散阴影层（独立于 ClipRRect，不被裁剪）
+                Positioned(
+                  right: right - 12,
+                  top: top - 6,
+                  child: IgnorePointer(
+                    child: Transform.scale(
+                      scale: bounceScale,
+                      alignment: Alignment.topRight,
+                      child: Container(
+                        width: currentWidth + 24,
+                        height: currentHeight + 16,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(
+                            currentRadius + 6,
+                          ),
+                          boxShadow: [
+                            // 大范围弥散阴影 — 更淡更散
+                            BoxShadow(
+                              color:
+                                  (widget.isDark
+                                          ? Colors.black
+                                          : const Color(0xFFAEAEB2))
+                                      .withOpacity(0.08 * shadowOpacity),
+                              blurRadius: 60 * shadowOpacity,
+                              spreadRadius: 4 * shadowOpacity,
+                              offset: Offset(0, 16 * shadowOpacity),
+                            ),
+                            // 中层柔和阴影
+                            BoxShadow(
+                              color:
+                                  (widget.isDark
+                                          ? Colors.black
+                                          : const Color(0xFFAEAEB2))
+                                      .withOpacity(0.05 * shadowOpacity),
+                              blurRadius: 30 * shadowOpacity,
+                              offset: Offset(0, 8 * shadowOpacity),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // 菜单主体
                 Positioned(
                   right: right,
                   top: top,
-                  child: SizedBox(
-                    width: currentWidth,
-                    height: currentHeight,
-                    child: UnconstrainedBox(
+                  width: _menuWidth,
+                  height: _menuHeight,
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: Transform.scale(
+                      scale: bounceScale,
                       alignment: Alignment.topRight,
-                      clipBehavior: Clip.hardEdge,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(currentRadius),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(
-                            sigmaX: 40 * t.clamp(0.1, 1.0),
-                            sigmaY: 40 * t.clamp(0.1, 1.0),
-                          ),
-                          child: Container(
-                            width: _menuWidth,
-                            height: _menuHeight,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(
-                                currentRadius,
-                              ),
-                              color: widget.isDark
-                                  ? const Color(
-                                      0xFF2C2C2E,
-                                    ).withOpacity(0.75 + 0.1 * t)
-                                  : Colors.white.withOpacity(0.65 + 0.15 * t),
-                              border: Border.all(
-                                color: widget.isDark
-                                    ? const Color(0xFF3A3A3C)
-                                    : Colors.white.withOpacity(0.8),
-                                width: 0.5,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.12 * t),
-                                  blurRadius: 24 * t,
-                                  offset: Offset(0, 8 * t),
-                                ),
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.06 * t),
-                                  blurRadius: 6 * t,
-                                  offset: Offset(0, 2 * t),
-                                ),
-                              ],
+                      child: SizedBox(
+                        width: currentWidth,
+                        height: currentHeight,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(currentRadius),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(
+                              sigmaX: 40 * clampedT.clamp(0.1, 1.0),
+                              sigmaY: 40 * clampedT.clamp(0.1, 1.0),
                             ),
-                            child: Opacity(
-                              opacity: contentOpacity,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _buildMenuItem(
-                                    icon: CupertinoIcons.sparkles,
-                                    label: 'AI 重新分析',
-                                    onTap: () =>
-                                        _selectItem(widget.onReanalyze),
-                                  ),
-                                  Container(
-                                    height: 0.5,
-                                    color: widget.isDark
-                                        ? const Color(0xFF3A3A3C)
-                                        : const Color(0xFFE5E5EA),
-                                  ),
-                                  _buildMenuItem(
-                                    icon: CupertinoIcons.trash,
-                                    label: '删除',
-                                    isDestructive: true,
-                                    onTap: () => _selectItem(widget.onDelete),
-                                  ),
-                                ],
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: widget.isDark
+                                    ? Color.lerp(
+                                        const Color(
+                                          0xFF2C2C2E,
+                                        ).withOpacity(0.0),
+                                        const Color(
+                                          0xFF2C2C2E,
+                                        ).withOpacity(0.85),
+                                        clampedT,
+                                      )
+                                    : Color.lerp(
+                                        Colors.white.withOpacity(0.0),
+                                        Colors.white.withOpacity(0.80),
+                                        clampedT,
+                                      ),
+                                border: Border.all(
+                                  color:
+                                      (widget.isDark
+                                              ? const Color(0xFF3A3A3C)
+                                              : Colors.white.withOpacity(0.8))
+                                          .withOpacity(clampedT),
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: OverflowBox(
+                                alignment: Alignment.topCenter,
+                                maxWidth: _menuWidth,
+                                maxHeight: _menuHeight,
+                                child: Opacity(
+                                  opacity: contentOpacity.clamp(0.0, 1.0),
+                                  child: child,
+                                ),
                               ),
                             ),
                           ),
@@ -3904,6 +4038,28 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
               ],
             );
           },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildMenuItem(
+                icon: CupertinoIcons.sparkles,
+                label: 'AI 重新分析',
+                onTap: () => _selectItem(widget.onReanalyze),
+              ),
+              Container(
+                height: 0.5,
+                color: widget.isDark
+                    ? const Color(0xFF3A3A3C)
+                    : const Color(0xFFE5E5EA),
+              ),
+              _buildMenuItem(
+                icon: CupertinoIcons.trash,
+                label: '删除',
+                isDestructive: true,
+                onTap: () => _selectItem(widget.onDelete),
+              ),
+            ],
+          ),
         ),
       ),
     );

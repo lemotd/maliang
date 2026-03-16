@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'package:figma_squircle/figma_squircle.dart';
 import 'dart:io';
 import 'package:gal/gal.dart';
+import '../utils/smooth_radius.dart';
 
 class ImageViewerPage extends StatefulWidget {
   final String imagePath;
@@ -77,7 +79,7 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
         content: Text(msg, textAlign: TextAlign.center),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: smoothRadius(12)),
         margin: EdgeInsets.only(
           bottom: MediaQuery.of(context).size.height * 0.1,
           left: 60,
@@ -181,11 +183,9 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
                                     animation: anim,
                                     builder: (context, child) {
                                       final radius = 16.0 * (1.0 - anim.value);
-                                      return ClipRRect(
-                                        borderRadius: BorderRadius.circular(
-                                          radius,
-                                        ),
-                                        child: child,
+                                      return ClipSmoothRect(
+                                        radius: smoothRadius(radius),
+                                        child: child!,
                                       );
                                     },
                                     child: Image.file(
@@ -264,7 +264,7 @@ class _SaveButtonState extends State<_SaveButton> {
           height: 44,
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: smoothRadius(22),
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.12),
               width: 0.5,

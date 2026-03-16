@@ -6,6 +6,7 @@ import '../services/ai_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
 import '../utils/scroll_edge_haptic.dart';
+import '../utils/smooth_radius.dart';
 
 class AiModelSettingsPage extends StatefulWidget {
   const AiModelSettingsPage({super.key});
@@ -106,7 +107,7 @@ class _AiModelSettingsPageState extends State<AiModelSettingsPage> {
         content: Text(message),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: smoothRadius(10)),
       ),
     );
   }
@@ -175,7 +176,7 @@ class _AiModelSettingsPageState extends State<AiModelSettingsPage> {
                                               isDark,
                                             ).withValues(alpha: 0.5)
                                           : AppColors.primary(isDark),
-                                      borderRadius: BorderRadius.circular(100),
+                                      borderRadius: smoothRadius(100),
                                     ),
                                     child: Center(
                                       child: _isSaving
@@ -308,7 +309,7 @@ class _AiModelSettingsPageState extends State<AiModelSettingsPage> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: smoothRadius(20),
         border: _isCardFocused
             ? Border.all(color: AppColors.primary(isDark), width: 1.5)
             : Border.all(color: Colors.transparent, width: 1.5),
@@ -421,7 +422,7 @@ class _AiModelSettingsPageState extends State<AiModelSettingsPage> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: smoothRadius(20),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -475,7 +476,7 @@ class _AiModelSettingsPageState extends State<AiModelSettingsPage> {
                     color: isDark
                         ? const Color(0xFF2C2C2E)
                         : const Color(0xFFF2F2F7),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: smoothRadius(8),
                   ),
                   child: Row(
                     children: [

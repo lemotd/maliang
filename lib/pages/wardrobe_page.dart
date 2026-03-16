@@ -10,6 +10,7 @@ import '../widgets/ai_chat_sheet.dart';
 import '../services/ai_service.dart';
 import '../services/weather_service.dart';
 import '../utils/scroll_edge_haptic.dart';
+import '../utils/smooth_radius.dart';
 import 'memory_detail_page.dart';
 
 class WardrobePage extends StatefulWidget {
@@ -280,13 +281,13 @@ $clothesSummary
     if (_isLoadingSuggestion &&
         (_aiSuggestion == null || _aiSuggestion!.isEmpty)) {
       return AIGlowBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: smoothRadius(20),
         child: Container(
           padding: const EdgeInsets.all(16),
           height: 80,
           decoration: BoxDecoration(
             color: AppColors.surfaceHigh(isDark),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: smoothRadius(20),
           ),
           child: _AiShimmer(isDark: isDark),
         ),
@@ -297,7 +298,7 @@ $clothesSummary
       constraints: const BoxConstraints(minHeight: 80),
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh(isDark),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: smoothRadius(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,7 +345,7 @@ $clothesSummary
                       height: 72,
                       decoration: BoxDecoration(
                         color: AppColors.surfaceContainer(isDark),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: smoothRadius(12),
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: item.imagePath != null
@@ -391,7 +392,7 @@ $clothesSummary
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surfaceHigh(isDark),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: smoothRadius(12),
         ),
         clipBehavior: Clip.antiAlias,
         child: item.imagePath != null
@@ -595,7 +596,7 @@ class _AiShimmerState extends State<_AiShimmer>
           width: width,
           height: height,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: smoothRadius(4),
             color: Color.lerp(base, highlight, t)!,
           ),
         );
@@ -640,7 +641,7 @@ class _AskAiButtonState extends State<_AskAiButton> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             decoration: BoxDecoration(
               color: AppColors.surfaceHigh(widget.isDark),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: smoothRadius(18),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,

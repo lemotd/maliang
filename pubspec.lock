@@ -137,6 +137,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.2.0"
+  figma_squircle:
+    dependency: "direct main"
+    description:
+      name: figma_squircle
+      sha256: "2cddb2071282b610610b8d438cf8c69e7271b0b27ded93673c76b159e8242803"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.6.2"
   file:
     dependency: transitive
     description:

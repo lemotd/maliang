@@ -10,6 +10,7 @@ import '../widgets/ai_chat_sheet.dart';
 import '../services/ai_service.dart';
 import 'memory_detail_page.dart';
 import '../utils/scroll_edge_haptic.dart';
+import '../utils/smooth_radius.dart';
 
 class BillSummaryPage extends StatefulWidget {
   final List<MemoryItem> bills;
@@ -442,9 +443,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                                             (_aiSummary == null ||
                                                 _aiSummary!.isEmpty))
                                         ? AIGlowBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              20,
-                                            ),
+                                            borderRadius: smoothRadius(20),
                                             child: Container(
                                               padding: const EdgeInsets.all(16),
                                               height: 80,
@@ -452,8 +451,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                                                 color: AppColors.surfaceHigh(
                                                   isDark,
                                                 ),
-                                                borderRadius:
-                                                    BorderRadius.circular(20),
+                                                borderRadius: smoothRadius(20),
                                               ),
                                               child: _AiSummaryShimmer(
                                                 isDark: isDark,
@@ -469,8 +467,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                                               color: AppColors.surfaceHigh(
                                                 isDark,
                                               ),
-                                              borderRadius:
-                                                  BorderRadius.circular(20),
+                                              borderRadius: smoothRadius(20),
                                             ),
                                             child: Column(
                                               crossAxisAlignment:
@@ -630,11 +627,8 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                                 child: Container(
                                   decoration: BoxDecoration(
                                     borderRadius: _isStickyPinned
-                                        ? const BorderRadius.only(
-                                            bottomLeft: Radius.circular(20),
-                                            bottomRight: Radius.circular(20),
-                                          )
-                                        : BorderRadius.circular(20),
+                                        ? smoothRadiusBottom(20)
+                                        : smoothRadius(20),
                                     boxShadow: _isStickyPinned
                                         ? [
                                             BoxShadow(
@@ -779,12 +773,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
     required double income,
     bool pinned = false,
   }) {
-    final radius = pinned
-        ? const BorderRadius.only(
-            bottomLeft: Radius.circular(20),
-            bottomRight: Radius.circular(20),
-          )
-        : BorderRadius.circular(20);
+    final radius = pinned ? smoothRadiusBottom(20) : smoothRadius(20);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -917,7 +906,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh(isDark),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: smoothRadius(20),
       ),
       child: Column(
         children: [
@@ -1001,7 +990,7 @@ class _BillSummaryPageState extends State<BillSummaryPage>
               height: 36,
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainer(isDark),
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: smoothRadius(18),
               ),
               child: Icon(
                 category,
@@ -1190,7 +1179,7 @@ class _AiSummaryShimmerState extends State<_AiSummaryShimmer>
           width: width,
           height: height,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: smoothRadius(4),
             color: Color.lerp(baseColor, highlightColor, t)!,
           ),
         );
@@ -1237,7 +1226,7 @@ class _AskAiButtonState extends State<_AskAiButton> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             decoration: BoxDecoration(
               color: AppColors.surfaceHigh(widget.isDark),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: smoothRadius(18),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,

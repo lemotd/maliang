@@ -3,10 +3,12 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:figma_squircle/figma_squircle.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../services/ai_service.dart';
 import '../models/memory_item.dart';
 import '../models/bill_category.dart';
+import '../utils/smooth_radius.dart';
 
 class AiChatSheet extends StatefulWidget {
   final List<MemoryItem> bills;
@@ -600,8 +602,8 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
                     ),
                   );
                 },
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
+                child: ClipSmoothRect(
+                  radius: smoothRadius(24),
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                     child: Container(
@@ -611,7 +613,7 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: smoothRadius(24),
                         border: Border.all(
                           color: Colors.white.withValues(alpha: 0.25),
                         ),
@@ -715,8 +717,8 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
             // 用户问题
             Align(
               alignment: Alignment.centerRight,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
+              child: ClipSmoothRect(
+                radius: smoothRadius(16),
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
@@ -729,7 +731,7 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
                     ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: smoothRadius(16),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.15),
                       ),
@@ -750,8 +752,8 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
             if (_isAiLoading)
               _buildThinkingDots()
             else
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
+              ClipSmoothRect(
+                radius: smoothRadius(16),
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                   child: Container(
@@ -761,7 +763,7 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
                     ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: smoothRadius(16),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.1),
                       ),
@@ -848,8 +850,8 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
           const SizedBox(width: 8),
           // 输入框 — 带背景模糊
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
+            child: ClipSmoothRect(
+              radius: smoothRadius(20),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                 child: Container(
@@ -857,7 +859,7 @@ ${incomeBills.isNotEmpty ? '收入明细：\n${incomeBills.join('\n')}' : ''}
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: smoothRadius(20),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.2),
                     ),

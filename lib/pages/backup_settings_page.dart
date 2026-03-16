@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
 import '../utils/scroll_edge_haptic.dart';
+import '../utils/smooth_radius.dart';
 import '../services/memory_service.dart';
 import 'backup_import_page.dart';
 
@@ -152,7 +153,7 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
         content: Text(message),
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: smoothRadius(10)),
       ),
     );
   }
@@ -311,7 +312,7 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: smoothRadius(20),
         ),
         child: Row(
           children: [
@@ -320,7 +321,7 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
               height: 38,
               decoration: BoxDecoration(
                 color: AppColors.primary(isDark).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: smoothRadius(10),
               ),
               child: isLoading
                   ? Center(

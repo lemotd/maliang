@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:figma_squircle/figma_squircle.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
 import '../utils/scroll_edge_haptic.dart';
+import '../utils/smooth_radius.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
@@ -46,8 +48,8 @@ class _AboutPageState extends State<AboutPage> {
                       Center(
                         child: Column(
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(22),
+                            ClipSmoothRect(
+                              radius: smoothRadius(22),
                               child: Image.asset(
                                 'logo.png',
                                 width: 100,

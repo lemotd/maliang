@@ -8,6 +8,7 @@ import '../widgets/glass_button.dart';
 import '../services/memory_service.dart';
 import '../models/memory_item.dart';
 import '../utils/scroll_edge_haptic.dart';
+import '../utils/smooth_radius.dart';
 import '../main.dart';
 
 class BackupImportPage extends StatefulWidget {
@@ -113,9 +114,7 @@ class _BackupImportPageState extends State<BackupImportPage> {
             content: Text('导入成功，共 ${importedMemories.length} 条记忆'),
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: smoothRadius(10)),
           ),
         );
         Navigator.pop(context, true);
@@ -127,9 +126,7 @@ class _BackupImportPageState extends State<BackupImportPage> {
             content: Text('导入失败：$e'),
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: smoothRadius(10)),
           ),
         );
       }
@@ -293,7 +290,7 @@ class _BackupImportPageState extends State<BackupImportPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: smoothRadius(20),
       ),
       child: Column(
         children: [
@@ -345,7 +342,7 @@ class _BackupImportPageState extends State<BackupImportPage> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: smoothRadius(20),
       ),
       child: Column(
         children: [
@@ -439,7 +436,7 @@ class _BackupImportPageState extends State<BackupImportPage> {
             color: _isImporting
                 ? AppColors.primary(isDark).withValues(alpha: 0.5)
                 : AppColors.primary(isDark),
-            borderRadius: BorderRadius.circular(100),
+            borderRadius: smoothRadius(100),
           ),
           child: Center(
             child: _isImporting

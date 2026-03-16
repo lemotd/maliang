@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
 import '../utils/scroll_edge_haptic.dart';
+import '../utils/smooth_radius.dart';
 import 'ai_model_settings_page.dart';
 import 'backup_settings_page.dart';
 import 'about_page.dart';
@@ -200,7 +201,7 @@ class _SettingsPageState extends State<SettingsPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: smoothRadius(20),
         ),
         child: Row(
           children: [
@@ -209,7 +210,7 @@ class _SettingsPageState extends State<SettingsPage> {
               height: 38,
               decoration: BoxDecoration(
                 color: AppColors.primary(isDark).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: smoothRadius(10),
               ),
               child: Icon(icon, size: 20, color: AppColors.primary(isDark)),
             ),

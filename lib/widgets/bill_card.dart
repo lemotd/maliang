@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../models/memory_item.dart';
-import '../pages/bill_summary_page.dart';
+import '../utils/smooth_radius.dart';
 
 class BillCard extends StatefulWidget {
   final List<MemoryItem> bills;
@@ -75,7 +75,7 @@ class _BillCardState extends State<BillCard> {
       height: 160,
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh(isDark),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: smoothRadius(20),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),

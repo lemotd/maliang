@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'ai_glow_border.dart';
+import '../utils/smooth_radius.dart';
 
 class SkeletonListItem extends StatefulWidget {
   const SkeletonListItem({super.key});
@@ -34,12 +35,12 @@ class _SkeletonListItemState extends State<SkeletonListItem>
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: AIGlowBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: smoothRadius(20),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: smoothRadius(20),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -105,7 +106,7 @@ class _SkeletonListItemState extends State<SkeletonListItem>
           width: width,
           height: height,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(borderRadius),
+            borderRadius: smoothRadius(borderRadius),
             color: Color.lerp(baseColor, highlightColor, t)!,
           ),
         );

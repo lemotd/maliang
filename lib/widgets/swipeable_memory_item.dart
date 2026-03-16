@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
+import 'package:figma_squircle/figma_squircle.dart';
 import '../models/memory_item.dart';
-import '../models/bill_category.dart';
 import '../theme/app_colors.dart';
 import '../services/image_cache_service.dart';
+import '../utils/smooth_radius.dart';
 
 class SwipeableMemoryItem extends StatefulWidget {
   final MemoryItem memory;
@@ -495,10 +495,10 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
             height: 40,
             decoration: BoxDecoration(
               color: actionColor,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: smoothRadius(20),
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
+            child: ClipSmoothRect(
+              radius: smoothRadius(20),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Stack(
@@ -598,7 +598,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh(isDark),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: smoothRadius(20),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -728,8 +728,8 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
         displayWidth = maxHeight * aspectRatio;
       }
 
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
+      return ClipSmoothRect(
+        radius: smoothRadius(8),
         child: RepaintBoundary(
           child: Image(
             image: imageProvider,
@@ -754,7 +754,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
       height: 72,
       decoration: BoxDecoration(
         color: AppColors.surfaceContainer(isDark),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: smoothRadius(8),
       ),
       child: Icon(
         _getCategoryIcon(widget.memory.category),

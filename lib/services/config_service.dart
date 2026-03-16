@@ -15,7 +15,7 @@ class ConfigService {
 
   Future<String> getApiAddress() async {
     final prefs = await _getPrefs();
-    return prefs.getString(_keyApiAddress) ?? '';
+    return prefs.getString(_keyApiAddress) ?? defaultApiAddress;
   }
 
   Future<void> setApiAddress(String address) async {

@@ -1,15 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../utils/smooth_radius.dart';
 
 class AIGlowBorder extends StatefulWidget {
   final Widget child;
   final BorderRadius? borderRadius;
 
-  const AIGlowBorder({
-    super.key,
-    required this.child,
-    this.borderRadius,
-  });
+  const AIGlowBorder({super.key, required this.child, this.borderRadius});
 
   @override
   State<AIGlowBorder> createState() => _AIGlowBorderState();
@@ -36,7 +33,7 @@ class _AIGlowBorderState extends State<AIGlowBorder>
 
   @override
   Widget build(BuildContext context) {
-    final borderRadius = widget.borderRadius ?? BorderRadius.circular(20);
+    final borderRadius = widget.borderRadius ?? smoothRadius(20);
 
     return AnimatedBuilder(
       animation: _controller,

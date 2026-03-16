@@ -21,6 +21,7 @@ import 'services/notification_service.dart';
 import 'services/image_cache_service.dart';
 import 'theme/app_colors.dart';
 import 'utils/scroll_edge_haptic.dart';
+import 'utils/smooth_radius.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -844,7 +845,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surfaceContainer(isDark),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: smoothRadius(12),
         ),
         child: Column(children: _addDividers(children)),
       ),
@@ -1214,7 +1215,7 @@ class _ToastWidgetState extends State<_ToastWidget>
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.7),
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: smoothRadius(24),
               ),
               child: Text(
                 widget.message,

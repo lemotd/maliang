@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import '../utils/smooth_radius.dart';
 
 class AddCollectionCard extends StatelessWidget {
   const AddCollectionCard({super.key});
@@ -13,7 +14,7 @@ class AddCollectionCard extends StatelessWidget {
       height: 160,
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh(isDark),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: smoothRadius(20),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

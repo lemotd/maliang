@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:figma_squircle/figma_squircle.dart';
 import '../theme/app_colors.dart';
 import '../models/memory_item.dart';
+import '../utils/smooth_radius.dart';
 
 class ClothingCard extends StatelessWidget {
   final List<MemoryItem> clothes;
@@ -15,7 +17,9 @@ class ClothingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final withImage = clothes
-        .where((m) => m.category == MemoryCategory.clothing && m.imagePath != null)
+        .where(
+          (m) => m.category == MemoryCategory.clothing && m.imagePath != null,
+        )
         .take(4)
         .toList();
 
@@ -24,7 +28,7 @@ class ClothingCard extends StatelessWidget {
       height: 160,
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh(isDark),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: smoothRadius(20),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 15, 16, 14),
@@ -54,8 +58,8 @@ class ClothingCard extends StatelessWidget {
                 children: withImage.map((item) {
                   return Padding(
                     padding: const EdgeInsets.only(right: 4),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
+                    child: ClipSmoothRect(
+                      radius: smoothRadius(6),
                       child: Image.file(
                         File(item.imagePath!),
                         width: 28,
