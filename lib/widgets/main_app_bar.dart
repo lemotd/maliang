@@ -119,12 +119,6 @@ class MainAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ],
               ),
             ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              curve: Curves.easeOut,
-              height: isCollapsed ? 0.6 : 0,
-              child: Container(height: 0.6, color: const Color(0x0F000000)),
-            ),
           ],
         ),
       ),

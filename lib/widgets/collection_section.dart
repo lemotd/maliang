@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import '../theme/app_colors.dart';
 import '../models/memory_item.dart';
 import '../models/collection_item.dart';
 import '../services/collection_service.dart';
@@ -51,23 +50,9 @@ class _CollectionSectionState extends State<CollectionSection> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            '合集',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.onSurface(isDark),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
         SizedBox(
           height: 160,
           child: ScrollEdgeHaptic(

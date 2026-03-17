@@ -135,7 +135,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+class _HomePageState extends State<HomePage>
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   final _memoryService = MemoryService();
   final _aiService = AiService();
   final _notificationService = NotificationService();
@@ -147,6 +148,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
+  MemoryCategory? _selectedCategory; // null = 全部
+  late AnimationController _tabSwitchController;
+  late Animation<double> _tabFade;
+  late Animation<double> _tabScale;
 
   // 待处理的详情页请求
   int? _pendingDetailMemoryIdHash;
@@ -156,6 +161,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.initState();
     HomePage.onDataChanged = _loadMemories;
     WidgetsBinding.instance.addObserver(this);
+    _tabSwitchController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+    );
+    _tabFade = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _tabSwitchController, curve: Curves.easeOut),
+    );
+    _tabScale = Tween<double>(begin: 1.0, end: 0.97).animate(
+      CurvedAnimation(parent: _tabSwitchController, curve: Curves.easeOut),
+    );
     _initNotificationService();
     _loadMemories();
     _initShareListener();
@@ -202,6 +217,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void dispose() {
     HomePage.onDataChanged = null;
     WidgetsBinding.instance.removeObserver(this);
+    _tabSwitchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -663,67 +679,101 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       );
     }
 
-    final totalItems = _loadingCount + _memories.length;
+    // 按分类过滤
+    final filteredMemories = _selectedCategory == null
+        ? _memories
+        : _memories.where((m) => m.category == _selectedCategory).toList();
 
     return ScrollEdgeHaptic(
-      child: ListView.builder(
-        addAutomaticKeepAlives: true,
-        addRepaintBoundaries: true,
-        cacheExtent: 500,
+      child: CustomScrollView(
         controller: _scrollController,
         physics: const BouncingScrollPhysics(
           parent: AlwaysScrollableScrollPhysics(),
         ),
-        padding: const EdgeInsets.only(top: 16, bottom: 80),
-        itemCount: totalItems + 2, // +2 for collection section and memory title
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return CollectionSection(memories: _memories);
-          }
-          if (index == 1) {
-            return _buildMemoryTitle(isDark);
-          }
-
-          final adjustedIndex = index - 2;
-          if (adjustedIndex < _loadingCount) {
-            return const MemoryListItem(isLoading: true);
-          }
-          final memoryIndex = adjustedIndex - _loadingCount;
-          final memory = _memories[memoryIndex];
-          final isNew = _newlyAddedIds.contains(memory.id);
-          return MemoryListItem(
-            memory: memory,
-            isNew: isNew,
-            onAnimationComplete: () {
-              _newlyAddedIds.remove(memory.id);
-            },
-            onTap: () => _showMemoryDetail(memory),
-            onDelete: () => _deleteMemory(memory),
-            onToggleComplete: () => _toggleComplete(memory),
-          );
-        },
+        slivers: [
+          // 顶部间距
+          const SliverPadding(padding: EdgeInsets.only(top: 16)),
+          // 合集卡片区
+          SliverToBoxAdapter(child: CollectionSection(memories: _memories)),
+          // 合集与 tab 之间的间距
+          const SliverPadding(padding: EdgeInsets.only(top: 20)),
+          // 吸顶 Tab 栏
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _StickyTabBarDelegate(
+              isDark: isDark,
+              child: _CategoryTabBar(
+                selectedCategory: _selectedCategory,
+                memories: _memories,
+                isDark: isDark,
+                onSelect: _switchCategory,
+                iconForCategory: _iconForCategory,
+              ),
+            ),
+          ),
+          // 记忆列表
+          SliverList(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              if (index < _loadingCount) {
+                return const MemoryListItem(isLoading: true);
+              }
+              final memoryIndex = index - _loadingCount;
+              if (memoryIndex >= filteredMemories.length) return null;
+              final memory = filteredMemories[memoryIndex];
+              final isNew = _newlyAddedIds.contains(memory.id);
+              return AnimatedBuilder(
+                animation: _tabSwitchController,
+                builder: (context, child) {
+                  return Opacity(
+                    opacity: _tabFade.value,
+                    child: Transform.scale(
+                      scale: _tabScale.value,
+                      child: child,
+                    ),
+                  );
+                },
+                child: MemoryListItem(
+                  memory: memory,
+                  isNew: isNew,
+                  onAnimationComplete: () {
+                    _newlyAddedIds.remove(memory.id);
+                  },
+                  onTap: () => _showMemoryDetail(memory),
+                  onDelete: () => _deleteMemory(memory),
+                  onToggleComplete: () => _toggleComplete(memory),
+                ),
+              );
+            }, childCount: _loadingCount + filteredMemories.length),
+          ),
+          // 底部间距
+          const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
+        ],
       ),
     );
   }
 
-  Widget _buildMemoryTitle(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 16, right: 16, top: 24),
-          child: Text(
-            '记忆',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.onSurface(isDark),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-      ],
-    );
+  void _switchCategory(MemoryCategory? cat) {
+    if (_selectedCategory == cat) return;
+    _tabSwitchController.forward().then((_) {
+      if (!mounted) return;
+      setState(() => _selectedCategory = cat);
+      _tabSwitchController.reverse();
+    });
+  }
+
+  IconData _iconForCategory(MemoryCategory cat) {
+    switch (cat) {
+      case MemoryCategory.bill:
+        return Icons.receipt_long_outlined;
+      case MemoryCategory.clothing:
+        return Icons.checkroom_outlined;
+      case MemoryCategory.pickupCode:
+        return Icons.restaurant_menu;
+      case MemoryCategory.packageCode:
+        return Icons.inventory_2_outlined;
+      case MemoryCategory.note:
+        return Icons.note_outlined;
+    }
   }
 
   void _showMemoryDetail(MemoryItem memory) {
@@ -1230,4 +1280,381 @@ class _ToastWidgetState extends State<_ToastWidget>
       ),
     );
   }
+}
+
+class _CategoryCapsule extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final int count;
+  final bool isSelected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _CategoryCapsule({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.isSelected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  State<_CategoryCapsule> createState() => _CategoryCapsuleState();
+}
+
+class _CategoryCapsuleState extends State<_CategoryCapsule> {
+  bool _pressed = false;
+
+  void _handleTap() async {
+    setState(() => _pressed = true);
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (mounted) setState(() => _pressed = false);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = AppColors.onSurface(widget.isDark);
+
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {},
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: _handleTap,
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(100)),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(widget.icon, size: 14, color: textColor),
+              const SizedBox(width: 4),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: widget.isSelected
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                  color: textColor,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '${widget.count}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.onSurfaceQuaternary(widget.isDark),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 吸顶 Tab 栏 delegate
+class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final bool isDark;
+
+  _StickyTabBarDelegate({required this.child, required this.isDark});
+
+  @override
+  double get minExtent => 48; // 32 tab + 8 top padding + 8 bottom padding
+  @override
+  double get maxExtent => 48;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    final bgColor = AppColors.surfaceLow(isDark);
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // 背景：上方不透明，底部渐变淡出，让光效自然过渡
+        Positioned.fill(
+          child: Column(
+            children: [
+              Expanded(child: Container(color: bgColor)),
+              Container(
+                height: 8,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [bgColor, bgColor.withValues(alpha: 0)],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // tab 内容
+        Positioned.fill(
+          child: Column(
+            children: [
+              const SizedBox(height: 8),
+              Expanded(child: child),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _StickyTabBarDelegate oldDelegate) {
+    return oldDelegate.child != child || oldDelegate.isDark != isDark;
+  }
+}
+
+/// 分类 Tab 栏：滑动背景胶囊 + 前景内容
+class _CategoryTabBar extends StatefulWidget {
+  final MemoryCategory? selectedCategory;
+  final List<MemoryItem> memories;
+  final bool isDark;
+  final ValueChanged<MemoryCategory?> onSelect;
+  final IconData Function(MemoryCategory) iconForCategory;
+
+  const _CategoryTabBar({
+    required this.selectedCategory,
+    required this.memories,
+    required this.isDark,
+    required this.onSelect,
+    required this.iconForCategory,
+  });
+
+  @override
+  State<_CategoryTabBar> createState() => _CategoryTabBarState();
+}
+
+class _CategoryTabBarState extends State<_CategoryTabBar> {
+  final GlobalKey _rowKey = GlobalKey();
+  final List<GlobalKey> _tabKeys = [];
+  Rect? _indicatorRect;
+
+  List<_TabData> get _tabs {
+    return [
+      _TabData(null, Icons.apps_rounded, '全部记忆', widget.memories.length),
+      ...MemoryCategory.values.map(
+        (cat) => _TabData(
+          cat,
+          widget.iconForCategory(cat),
+          cat.label,
+          widget.memories.where((m) => m.category == cat).length,
+        ),
+      ),
+    ];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureKeys();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureSelected());
+  }
+
+  @override
+  void didUpdateWidget(covariant _CategoryTabBar old) {
+    super.didUpdateWidget(old);
+    _ensureKeys();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureSelected());
+  }
+
+  void _ensureKeys() {
+    final count = _tabs.length;
+    while (_tabKeys.length < count) {
+      _tabKeys.add(GlobalKey());
+    }
+  }
+
+  void _measureSelected() {
+    final tabs = _tabs;
+    final selectedIdx = tabs.indexWhere(
+      (t) => t.category == widget.selectedCategory,
+    );
+    if (selectedIdx < 0 || selectedIdx >= _tabKeys.length) return;
+
+    final rowBox = _rowKey.currentContext?.findRenderObject() as RenderBox?;
+    final tabBox =
+        _tabKeys[selectedIdx].currentContext?.findRenderObject() as RenderBox?;
+    if (rowBox == null || tabBox == null) return;
+
+    final tabPos = tabBox.localToGlobal(Offset.zero, ancestor: rowBox);
+    final newRect = Rect.fromLTWH(
+      tabPos.dx,
+      tabPos.dy,
+      tabBox.size.width,
+      tabBox.size.height,
+    );
+
+    if (_indicatorRect != newRect) {
+      setState(() => _indicatorRect = newRect);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tabs = _tabs;
+    final bgColor = AppColors.onPrimary(widget.isDark);
+    final unselectedBg = AppColors.surfaceContainer(widget.isDark);
+
+    return SizedBox(
+      height: 32,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        physics: const BouncingScrollPhysics(),
+        child: Stack(
+          key: _rowKey,
+          children: [
+            // 未选中的背景层（也用于测量尺寸）
+            Row(
+              children: List.generate(tabs.length, (i) {
+                return Padding(
+                  padding: EdgeInsets.only(left: i == 0 ? 0 : 8),
+                  child: Container(
+                    key: _tabKeys[i],
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: unselectedBg,
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Opacity(
+                      opacity: 0.0,
+                      child: _buildTabContent(tabs[i]),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            // 滑动选中背景 — 用 tab 区域裁切，不溢出到间隙
+            if (_indicatorRect != null)
+              Positioned.fill(
+                child: ClipPath(
+                  clipper: _TabsClipper(tabKeys: _tabKeys, rowKey: _rowKey),
+                  child: Stack(
+                    children: [
+                      AnimatedPositioned(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                        left: _indicatorRect!.left,
+                        top: _indicatorRect!.top,
+                        width: _indicatorRect!.width,
+                        height: _indicatorRect!.height,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: bgColor,
+                            borderRadius: BorderRadius.circular(100),
+                            boxShadow: [
+                              BoxShadow(
+                                color: bgColor.withOpacity(0.25),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            // 前景内容层
+            Row(
+              children: List.generate(tabs.length, (i) {
+                final tab = tabs[i];
+                final isSelected = tab.category == widget.selectedCategory;
+                return Padding(
+                  padding: EdgeInsets.only(left: i == 0 ? 0 : 8),
+                  child: _CategoryCapsule(
+                    key: ValueKey('cat_${tab.category?.name ?? 'all'}'),
+                    icon: tab.icon,
+                    label: tab.label,
+                    count: tab.count,
+                    isSelected: isSelected,
+                    isDark: widget.isDark,
+                    onTap: () => widget.onSelect(tab.category),
+                  ),
+                );
+              }),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabContent(_TabData tab) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(tab.icon, size: 14),
+        const SizedBox(width: 4),
+        Text(tab.label, style: const TextStyle(fontSize: 14)),
+        const SizedBox(width: 4),
+        Text('${tab.count}', style: const TextStyle(fontSize: 12)),
+      ],
+    );
+  }
+}
+
+class _TabData {
+  final MemoryCategory? category;
+  final IconData icon;
+  final String label;
+  final int count;
+  const _TabData(this.category, this.icon, this.label, this.count);
+}
+
+/// 裁切路径：只在各 tab 胶囊区域内显示内容
+class _TabsClipper extends CustomClipper<Path> {
+  final List<GlobalKey> tabKeys;
+  final GlobalKey rowKey;
+
+  _TabsClipper({required this.tabKeys, required this.rowKey});
+
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    final rowBox = rowKey.currentContext?.findRenderObject() as RenderBox?;
+    if (rowBox == null) return path..addRect(Offset.zero & size);
+
+    for (final key in tabKeys) {
+      final tabBox = key.currentContext?.findRenderObject() as RenderBox?;
+      if (tabBox == null) continue;
+      final pos = tabBox.localToGlobal(Offset.zero, ancestor: rowBox);
+      final rect = Rect.fromLTWH(
+        pos.dx,
+        pos.dy,
+        tabBox.size.width,
+        tabBox.size.height,
+      );
+      path.addRRect(
+        RRect.fromRectAndRadius(rect, Radius.circular(rect.height / 2)),
+      );
+    }
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant _TabsClipper oldClipper) => true;
 }
