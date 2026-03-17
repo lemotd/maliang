@@ -583,6 +583,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.surfaceLow(isDark),
       body: Stack(
         children: [
@@ -608,7 +609,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           Positioned(
             left: 0,
             right: 0,
-            bottom: MediaQuery.of(context).padding.bottom + 16,
+            bottom: MediaQuery.of(context).viewPadding.bottom + 16,
             child: Center(child: _AddButton(onPressed: _pickImage)),
           ),
         ],

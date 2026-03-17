@@ -3833,8 +3833,8 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
-      reverseDuration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 380),
+      reverseDuration: const Duration(milliseconds: 280),
     );
     _controller.forward();
   }
@@ -3866,24 +3866,22 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
     widget.onDismiss();
   }
 
-  /// 展开弹性曲线：一次柔和过冲 + 平滑回弹
+  /// 展开弹性曲线：明显回弹过冲 + 快速归位
   double _openCurve(double t) {
     if (t <= 0) return 0;
     if (t >= 1) return 1;
-    // 高阻尼弹簧：只过冲一次，然后平滑归位
-    final decay = math.exp(-6.0 * t);
-    return 1.0 - decay * math.cos(math.pi * 0.8 * t);
+    // 更强的弹簧回弹：更大振幅、更快衰减
+    final decay = math.exp(-5.0 * t);
+    return 1.0 - decay * math.cos(math.pi * 1.2 * t);
   }
 
-  /// 收起曲线：丝滑减速 + 结尾轻微回弹
+  /// 收起曲线：快速收缩 + 轻微回弹
   double _closeCurve(double t) {
     if (t <= 0) return 0;
     if (t >= 1) return 1;
-    // smoothstep: 两端速度为零，中间快速过渡
     final smooth = t * t * (3.0 - 2.0 * t);
-    // 在 t 接近 0 时叠加轻微过冲（值短暂低于 0 再回归）
     final overshoot =
-        math.exp(-8.0 * (1.0 - t)) * math.sin(t * math.pi * 1.5) * -0.04;
+        math.exp(-6.0 * (1.0 - t)) * math.sin(t * math.pi * 1.8) * -0.06;
     return smooth + overshoot;
   }
 
@@ -3907,9 +3905,9 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
             final t = isReversing ? _closeCurve(rawT) : _openCurve(rawT);
 
             final contentOpacity = isReversing
-                ? Curves.easeIn.transform((rawT / 0.4).clamp(0.0, 1.0))
+                ? Curves.easeIn.transform((rawT / 0.35).clamp(0.0, 1.0))
                 : Curves.easeOut.transform(
-                    ((rawT - 0.15) / 0.5).clamp(0.0, 1.0),
+                    ((rawT - 0.1) / 0.45).clamp(0.0, 1.0),
                   );
 
             final clampedT = t.clamp(0.0, 1.0);
@@ -3922,9 +3920,9 @@ class _GlassMorphMenuState extends State<_GlassMorphMenu>
                 widget.buttonSize / 2 +
                 (24.0 - widget.buttonSize / 2) * clampedT;
 
-            // 弹性过冲 → 明显的缩放弹性
+            // 弹性过冲 → 明显的缩放回弹
             final overshoot = t - clampedT;
-            final bounceScale = 1.0 + overshoot.abs() * 0.15;
+            final bounceScale = 1.0 + overshoot.abs() * 0.25;
 
             // 弥散阴影透明度跟随动画
             final shadowOpacity = clampedT;
@@ -4125,8 +4123,8 @@ class _GlassConfirmMenuState extends State<_GlassConfirmMenu>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
-      reverseDuration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 380),
+      reverseDuration: const Duration(milliseconds: 280),
     );
     _pressController = AnimationController(
       vsync: this,
@@ -4166,8 +4164,8 @@ class _GlassConfirmMenuState extends State<_GlassConfirmMenu>
   double _openCurve(double t) {
     if (t <= 0) return 0;
     if (t >= 1) return 1;
-    final decay = math.exp(-6.0 * t);
-    return 1.0 - decay * math.cos(math.pi * 0.8 * t);
+    final decay = math.exp(-5.0 * t);
+    return 1.0 - decay * math.cos(math.pi * 1.2 * t);
   }
 
   double _closeCurve(double t) {
@@ -4175,7 +4173,7 @@ class _GlassConfirmMenuState extends State<_GlassConfirmMenu>
     if (t >= 1) return 1;
     final smooth = t * t * (3.0 - 2.0 * t);
     final overshoot =
-        math.exp(-8.0 * (1.0 - t)) * math.sin(t * math.pi * 1.5) * -0.04;
+        math.exp(-6.0 * (1.0 - t)) * math.sin(t * math.pi * 1.8) * -0.06;
     return smooth + overshoot;
   }
 
@@ -4199,9 +4197,9 @@ class _GlassConfirmMenuState extends State<_GlassConfirmMenu>
             final t = isReversing ? _closeCurve(rawT) : _openCurve(rawT);
 
             final contentOpacity = isReversing
-                ? Curves.easeIn.transform((rawT / 0.4).clamp(0.0, 1.0))
+                ? Curves.easeIn.transform((rawT / 0.35).clamp(0.0, 1.0))
                 : Curves.easeOut.transform(
-                    ((rawT - 0.15) / 0.5).clamp(0.0, 1.0),
+                    ((rawT - 0.1) / 0.45).clamp(0.0, 1.0),
                   );
 
             final clampedT = t.clamp(0.0, 1.0);
@@ -4214,7 +4212,7 @@ class _GlassConfirmMenuState extends State<_GlassConfirmMenu>
                 widget.buttonSize / 2 +
                 (24.0 - widget.buttonSize / 2) * clampedT;
 
-            final bounceScale = 1.0 + (t - clampedT).abs() * 0.05;
+            final bounceScale = 1.0 + (t - clampedT).abs() * 0.15;
             final shadowOpacity = clampedT;
 
             return Stack(
