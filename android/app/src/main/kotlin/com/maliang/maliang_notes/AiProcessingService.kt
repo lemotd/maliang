@@ -46,18 +46,16 @@ class AiProcessingService : Service() {
     override fun onCreate() {
         super.onCreate()
         createChannel()
+        Log.d(TAG, "前台服务创建")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "前台服务启动")
+        Log.d(TAG, "前台服务启动命令")
         startForeground(NOTIFICATION_ID, buildNotification())
 
         val path = pendingImagePath
         if (path != null) {
             pendingImagePath = null
-            // 注意：不在这里清理 SharedPreferences，
-            // 让 MainActivity.configureFlutterEngine 作为兜底来清理，
-            // 以防 startActivity 失败时图片路径不会丢失
             deliverImageToFlutter(path)
         }
 
@@ -66,21 +64,14 @@ class AiProcessingService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        Log.d(TAG, "用户划掉后台卡片，停止前台服务")
-        stopSelf()
-        super.onTaskRemoved(rootIntent)
-    }
-
     override fun onDestroy() {
-        Log.d(TAG, "前台服务停止")
         timeoutHandler.removeCallbacksAndMessages(null)
         super.onDestroy()
+        Log.d(TAG, "前台服务销毁")
     }
 
     private fun deliverImageToFlutter(imagePath: String) {
         if (MainActivity.isEngineActive && MainActivity.methodChannelInstance != null) {
-            // 主引擎已活跃，直接发送
             Log.d(TAG, "主引擎活跃，直接发送图片")
             Handler(Looper.getMainLooper()).post {
                 MainActivity.methodChannelInstance?.invokeMethod(
@@ -89,17 +80,16 @@ class AiProcessingService : Service() {
                 )
             }
         } else {
-            // 主引擎不活跃，在后台启动 MainActivity（不显示界面）
             Log.d(TAG, "主引擎不活跃，后台启动 MainActivity")
             val launchIntent = Intent(this, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                // 不带 FLAG_ACTIVITY_BROUGHT_TO_FRONT，不会把界面带到前台
+                addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
                 putExtra("tile_image_path", imagePath)
+                putExtra("from_tile_background", true)
             }
             startActivity(launchIntent)
         }
 
-        // 超时保护：90秒后如果服务还在运行，强制停止
         timeoutHandler.postDelayed({
             Log.w(TAG, "处理超时，强制停止服务")
             stopSelf()
