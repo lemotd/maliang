@@ -8,6 +8,10 @@ class AppColors {
   static const Color onSurfaceQuaternaryLight = Color(0x66000000); // 40%
   static const Color onSurfaceOctonaryLight = Color(0x4D000000); // 30%
 
+  // 文字图标色 - Button Select
+  static const Color onSurfaceButtonSelectLight = Color(0xFFFFFFFF); // 100%
+  static const Color onSurfaceButtonSelectDark = Color(0x4DFFFFFF); // 30%
+
   // 文字图标色 - Dark Mode
   static const Color onSurfaceDark = Color(0xFFFFFFFF);
   static const Color onSurfaceSecondaryDark = Color(0xCCFFFFFF); // 80%
@@ -64,14 +68,14 @@ class AppColors {
       isDark ? onSurfaceQuaternaryDark : onSurfaceQuaternaryLight;
   static Color onSurfaceOctonary(bool isDark) =>
       isDark ? onSurfaceOctonaryDark : onSurfaceOctonaryLight;
+  static Color onSurfaceButtonSelect(bool isDark) =>
+      isDark ? onSurfaceButtonSelectDark : onSurfaceButtonSelectLight;
 
-  static Color primary(bool isDark) =>
-      isDark ? primaryDark : primaryLight;
+  static Color primary(bool isDark) => isDark ? primaryDark : primaryLight;
   static Color onPrimary(bool isDark) =>
       isDark ? onPrimaryDark : onPrimaryLight;
 
-  static Color surface(bool isDark) =>
-      isDark ? surfaceDark : surfaceLight;
+  static Color surface(bool isDark) => isDark ? surfaceDark : surfaceLight;
   static Color surfaceLow(bool isDark) =>
       isDark ? surfaceLowDark : surfaceLowLight;
   static Color surfaceHigh(bool isDark) =>
@@ -86,17 +90,13 @@ class AppColors {
   static Color containerList(bool isDark) =>
       isDark ? containerListDark : containerListLight;
 
-  static Color outline(bool isDark) =>
-      isDark ? outlineDark : outlineLight;
+  static Color outline(bool isDark) => isDark ? outlineDark : outlineLight;
 
-  static Color warning(bool isDark) =>
-      isDark ? warningDark : warningLight;
-  static Color success(bool isDark) =>
-      isDark ? successDark : successLight;
+  static Color warning(bool isDark) => isDark ? warningDark : warningLight;
+  static Color success(bool isDark) => isDark ? successDark : successLight;
   static Color highlightPurple(bool isDark) =>
       isDark ? highlightPurpleDark : highlightPurpleLight;
-  static Color yellow(bool isDark) =>
-      isDark ? yellowDark : yellowLight;
+  static Color yellow(bool isDark) => isDark ? yellowDark : yellowLight;
 
   // 从 BuildContext 获取颜色
   static Color onSurfaceContext(BuildContext context) =>

@@ -181,65 +181,36 @@ class AiService {
     final systemPrompt =
         '''你是一个智能助手，专门分析用户分享的图片内容。
 
-【重要】分类判断必须按以下顺序逐步检查，命中即停：
+【重要】一张图片可能同时包含多种类型的信息。你需要识别出所有类型，并为每种类型分别生成一条记录。
 
-第一步：是否是取餐码？
-包含明确的取餐码/取餐号/排队号等数字编码，如"A001"、"12号"。仅有餐厅菜单、食物图片不算。
+分类类型（按以下顺序逐一检查，每种类型独立判断，可同时命中多个）：
 
-第二步：是否是取件码？
-包含明确的快递取件码/取件号，如"12-3-4567"。
+1. 取餐码：包含明确的取餐码/取餐号/排队号等数字编码，如"A001"、"12号"。仅有餐厅菜单、食物图片不算。
+2. 取件码：包含明确的快递取件码/取件号，如"12-3-4567"。
+3. 账单：包含金额和交易/支付信息（支付截图、转账、小票、发票、外卖订单、购物订单、缴费等）。
+4. 服饰：服饰实物照片、服饰商品图、电商服饰详情页。社交媒体截图中有人穿衣服不算。
+5. 随手记：以上都不是时使用。
 
-第三步：是否是账单？
-以下任何一种情况都归为"账单"：
-  - 支付成功/完成页面截图（微信支付、支付宝、银行卡等）
-  - 转账记录、红包记录
-  - 消费小票、发票、收据
-  - 外卖订单（美团、饿了么等显示金额的订单页）
-  - 购物订单截图（淘宝、京东、拼多多等显示支付金额的页面）
-  - 话费、水电费、充值等缴费截图
-  - 任何包含"¥"、"元"、"支付"、"付款"、"收款"、"转账"等金额/交易关键词的截图
-简单来说：只要图片中出现了明确的金额和交易/支付信息，就归为"账单"。
+例如：一张外卖订单截图同时包含取餐码和支付金额，应生成两条记录：一条取餐码、一条账单。
+如果图片中包含多个同类型的信息（如多个取件码、多笔账单），也要为每一个分别生成独立的记录。
 
-第四步：是否涉及服饰？
-服饰包括：上衣、下装、鞋子、配饰等。以下情况归为"服饰"：
-  a) 服饰实物照片（穿搭照、平铺展示、挂在衣架上等）
-  b) 服饰商品图或电商商品详情页截图
-  c) 服饰订单截图中主要展示商品信息的
-注意：社交媒体截图（微博、朋友圈等）即使图中有人穿着衣服，也不应归为"服饰"，应归为"随手记"。只有图片主题明确是展示服饰本身时才归为"服饰"。
+每条记录的字段规则：
+- 标题要精简：取餐码用"店铺+取餐码"如"肯德基 A001"，取件码的title字段必须且只能填取件码数字本身如"12-3-4567"（绝对不要填商品名、快递公司名或其他任何非码值内容），账单用金额带符号如"-¥35.00"，服饰用名称，随手记用一句话概括
+- 特别强调：当图片中有多个取件码时，每条取件码记录的title必须是对应的取件码数字（如"12-3-4567"），不是商品名称
+- 所有类型都必须填summary
+- 取餐码/取件码/随手记必须填infoSections
+- 账单提取：amount、isExpense、billCategory、billTime、paymentMethod、merchantName
+  billCategory必须从以下列表选择英文名：
+  支出：${BillExpenseCategory.aiPromptList}
+  收入：${BillIncomeCategory.aiPromptList}
+  无法匹配时支出用"other_expense"，收入用"other_income"
+- 服饰提取：clothingName、clothingType、clothingColors(hex数组)、clothingSeasons(只能从["春季","夏季","秋季","冬季"]选)、clothingBrand、clothingPrice、clothingSize、clothingPurchaseDate
+- 日程识别（所有分类均可附加）：eventName、eventStartTime、eventEndTime，格式"YYYY-MM-DD HH:mm"，缺少年份用${DateTime.now().year}
 
-第五步：以上都不是，归类为"随手记"。
+请严格按以下JSON格式返回（注意最外层是数组）：
+[{"category":"分类名称","title":"标题","summary":"总结","infoSections":[{"title":"小标题","items":[{"label":"标签","value":"值"}]}],"amount":"金额","isExpense":true/false,"billCategory":"分类","paymentMethod":"支付方式","merchantName":"商户","billTime":"YYYY-MM-DD HH:mm","clothingName":"名称","clothingType":"分类","clothingColors":["#hex"],"clothingSeasons":["季节"],"clothingBrand":"品牌","clothingPrice":"价格","clothingSize":"尺码","clothingPurchaseDate":"YYYY-MM-DD","eventName":"日程名称","eventStartTime":"YYYY-MM-DD HH:mm","eventEndTime":"YYYY-MM-DD HH:mm"}]
 
-2. 根据分类提取关键信息作为标题（标题要精简）：
-   - 取餐码：店铺名称+取餐码，如"肯德基 A001"
-   - 取件码：取件码，如"12-3-4567"
-   - 账单：金额带符号，支出如"-¥35.00"，收入如"+¥100.00"
-   - 服饰：服饰名称，如"白色圆领T恤"
-   - 随手记：一句话概括图片内容
-
-3. 对于非账单非服饰类型（取餐码、取件码、随手记），必须填写infoSections：
-   - 取餐码示例：{"title":"🍔 取餐信息","items":[{"label":"店铺","value":"肯德基"},{"label":"取餐码","value":"A001"}]}
-   - 取件码示例：{"title":"📦 取件信息","items":[{"label":"取件码","value":"12-3-4567"},{"label":"快递公司","value":"顺丰快递"}]}
-   - 随手记：将识别出的信息组织成结构化格式
-
-4. 对于账单类型，提取：amount、isExpense、billCategory、billTime、paymentMethod、merchantName、summary
-   billCategory必须且只能从以下列表中选择一个英文名称，禁止使用列表以外的任何值：
-   支出类型：${BillExpenseCategory.aiPromptList}
-   收入类型：${BillIncomeCategory.aiPromptList}
-   如果无法匹配，支出用"other_expense"，收入用"other_income"。
-
-5. 对于服饰类型，提取（只填能识别到的）：clothingName、clothingType、clothingColors(hex数组)、clothingSeasons、clothingBrand、clothingPrice、clothingSize、clothingPurchaseDate
-   clothingSeasons必须且只能从以下四个值中选择（可多选）：["春季", "夏季", "秋季", "冬季"]，禁止使用其他任何季节名称。
-
-6. 日程识别（适用于所有分类）：如果图片中包含日程、活动、会议、截止日期、预约、航班、火车票、演出、考试等时间相关信息，额外提取：
-   - eventName：日程名称（简洁描述）
-   - eventStartTime：开始时间，格式"YYYY-MM-DD HH:mm"。如果图片中没有显示年份，使用当前年份${DateTime.now().year}。
-   - eventEndTime：结束时间，格式"YYYY-MM-DD HH:mm"（如果无法确定结束时间，默认为开始时间后1小时）。如果图片中没有显示年份，使用当前年份${DateTime.now().year}。
-   注意：日程信息是附加提取的，不影响主分类判断。
-
-请严格按以下JSON格式返回：
-{"category":"分类名称","title":"标题","summary":"一段话总结","infoSections":[{"title":"小标题","items":[{"label":"标签","value":"值"}]}],"amount":"金额","isExpense":true/false,"billCategory":"分类","paymentMethod":"支付方式","merchantName":"商户","billTime":"YYYY-MM-DD HH:mm","clothingName":"名称","clothingType":"分类","clothingColors":["#hex"],"clothingSeasons":["季节"],"clothingBrand":"品牌","clothingPrice":"价格","clothingSize":"尺码","clothingPurchaseDate":"YYYY-MM-DD","eventName":"日程名称","eventStartTime":"YYYY-MM-DD HH:mm","eventEndTime":"YYYY-MM-DD HH:mm"}
-
-注意：所有类型都必须填summary。只填图片中实际存在的字段，不存在的省略。billCategory必须从上方列表选择英文名，不要自创分类。clothingSeasons只能从["春季","夏季","秋季","冬季"]中选择。''';
+如果只有一种类型，数组中也只有一个元素。只填图片中实际存在的字段，不存在的省略。''';
 
     final url = Uri.parse('$apiAddress/chat/completions');
     debugPrint('请求URL: $url');
@@ -264,8 +235,7 @@ class AiService {
                   },
                   {
                     'type': 'text',
-                    'text':
-                        '请分析这张图片并按要求分类。注意按顺序判断：先看是否是取餐码/取件码/账单，再看是否是服饰，最后才归为随手记。',
+                    'text': '请分析这张图片，识别所有类型的信息，为每种类型分别生成一条记录，以JSON数组返回。',
                   },
                 ],
               },
@@ -309,11 +279,120 @@ class AiService {
     return (isExpense ?? true) ? 'other_expense' : 'other_income';
   }
 
-  MemoryItem? parseAnalysisResult(
+  /// 从 JSON 中提取码值：先查顶层字段，再查 infoSections
+  static String? _extractCodeFromJson(
+    Map<String, dynamic> json,
+    String fieldKey,
+    List<String> labelKeywords,
+  ) {
+    // 1. 先查顶层字段
+    final direct = json[fieldKey];
+    if (direct is String && direct.trim().isNotEmpty) return direct.trim();
+
+    // 2. 从 infoSections 中按 label 关键词查找
+    final sections = json['infoSections'] as List<dynamic>?;
+    if (sections != null) {
+      for (final section in sections) {
+        final items = section['items'] as List<dynamic>?;
+        if (items == null) continue;
+        for (final item in items) {
+          final label = (item['label'] as String? ?? '');
+          for (final kw in labelKeywords) {
+            if (label.contains(kw)) {
+              final val = item['value'] as String?;
+              if (val != null && val.trim().isNotEmpty) return val.trim();
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /// 解析 AI 返回的多条记录（JSON 数组或单对象格式）
+  List<MemoryItem> parseMultipleResults(
     String? result,
     String imagePath,
     String? thumbnailPath,
   ) {
+    if (result == null) return [];
+
+    try {
+      final jsonStr = result
+          .replaceAll(RegExp(r'```json\n?'), '')
+          .replaceAll(RegExp(r'\n?```'), '')
+          .trim();
+
+      debugPrint(
+        'parseMultipleResults 输入: ${jsonStr.substring(0, jsonStr.length.clamp(0, 300))}...',
+      );
+
+      // 先尝试直接解析整个字符串
+      dynamic decoded;
+      try {
+        decoded = jsonDecode(jsonStr);
+      } catch (_) {
+        // 尝试提取 JSON 数组或对象
+        final arrayMatch = RegExp(r'\[[\s\S]*\]').firstMatch(jsonStr);
+        if (arrayMatch != null) {
+          try {
+            decoded = jsonDecode(arrayMatch.group(0)!);
+          } catch (_) {}
+        }
+        if (decoded == null) {
+          final objMatch = RegExp(r'\{[\s\S]*\}').firstMatch(jsonStr);
+          if (objMatch != null) {
+            try {
+              decoded = jsonDecode(objMatch.group(0)!);
+            } catch (_) {}
+          }
+        }
+      }
+
+      if (decoded == null) {
+        debugPrint('parseMultipleResults: 无法解析JSON');
+        return [];
+      }
+
+      // 如果是数组，逐个解析
+      if (decoded is List) {
+        debugPrint('parseMultipleResults: 检测到数组，长度=${decoded.length}');
+        final items = <MemoryItem>[];
+        for (var i = 0; i < decoded.length; i++) {
+          final itemJson = jsonEncode(decoded[i]);
+          final item = parseAnalysisResult(
+            itemJson,
+            imagePath,
+            thumbnailPath,
+            idOffset: i,
+          );
+          if (item != null) items.add(item);
+        }
+        if (items.isNotEmpty) return items;
+      }
+
+      // 如果是单个对象，直接解析
+      if (decoded is Map<String, dynamic>) {
+        debugPrint('parseMultipleResults: 检测到单对象');
+        final item = parseAnalysisResult(result, imagePath, thumbnailPath);
+        return item != null ? [item] : [];
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint('parseMultipleResults 解析失败: $e');
+      // 最终回退
+      final single = parseAnalysisResult(result, imagePath, thumbnailPath);
+      return single != null ? [single] : [];
+    }
+  }
+
+  MemoryItem? parseAnalysisResult(
+    String? result,
+    String imagePath,
+    String? thumbnailPath, {
+    int idOffset = 0,
+  }) {
     if (result == null) return null;
 
     try {
@@ -342,7 +421,7 @@ class AiService {
       final json = decoded;
 
       final categoryStr = json['category'] as String? ?? '随手记';
-      final title = json['title'] as String? ?? '未命名记忆';
+      var title = json['title'] as String? ?? '未命名记忆';
 
       MemoryCategory category;
       switch (categoryStr) {
@@ -439,6 +518,107 @@ class AiService {
         }
       }
 
+      // 标题后处理：取件码类型强制使用取件码作为标题
+      if (category == MemoryCategory.packageCode) {
+        debugPrint('取件码原始title: $title');
+        debugPrint('取件码JSON: ${jsonEncode(json)}');
+
+        // 收集所有候选码值
+        final List<String> candidates = [];
+
+        // 1. 顶层 pickupCode / code 字段
+        for (final key in ['pickupCode', 'code', 'packageCode']) {
+          final val = json[key];
+          if (val is String && val.trim().isNotEmpty) {
+            candidates.add(val.trim());
+          }
+        }
+
+        // 2. 从 infoSections 中按 label 关键词查找
+        final sections = json['infoSections'] as List<dynamic>?;
+        if (sections != null) {
+          for (final section in sections) {
+            final items = section['items'] as List<dynamic>?;
+            if (items == null) continue;
+            for (final item in items) {
+              final label = (item['label'] as String? ?? '');
+              final val = (item['value'] as String? ?? '').trim();
+              if (val.isEmpty) continue;
+              // 标签含关键词
+              if (label.contains('取件码') ||
+                  label.contains('取件号') ||
+                  label.contains('编号') ||
+                  label.contains('码') ||
+                  label.contains('code')) {
+                candidates.add(val);
+              }
+            }
+          }
+        }
+
+        // 3. 从 infoSections 中找所有看起来像码值的 value
+        //    码值特征：含数字和分隔符（如 12-3-4567, 3 1 1234）
+        if (sections != null) {
+          for (final section in sections) {
+            final items = section['items'] as List<dynamic>?;
+            if (items == null) continue;
+            for (final item in items) {
+              final val = (item['value'] as String? ?? '').trim();
+              if (val.isEmpty) continue;
+              // 宽松匹配：主要由数字和分隔符组成，至少含2个数字
+              if (RegExp(r'^[\d\-\s\.]+$').hasMatch(val) &&
+                  RegExp(r'\d.*\d').hasMatch(val)) {
+                candidates.add(val);
+              }
+            }
+          }
+        }
+
+        // 4. 检查 title 本身是否就是码值
+        if (RegExp(r'^[\d\-\s\.]+$').hasMatch(title) &&
+            RegExp(r'\d').hasMatch(title)) {
+          candidates.insert(0, title);
+        }
+
+        // 5. 从整个 JSON 文本中用正则提取码值模式（如 12-3-4567）
+        if (candidates.isEmpty) {
+          final fullText = jsonEncode(json);
+          // 匹配 数字-数字-数字 格式（典型取件码）
+          final codeMatches = RegExp(
+            r'\d+[\-\s]\d+[\-\s]\d+',
+          ).allMatches(fullText);
+          for (final m in codeMatches) {
+            candidates.add(m.group(0)!.trim());
+          }
+          // 匹配纯数字序列（至少3位）
+          if (candidates.isEmpty) {
+            final numMatch = RegExp(
+              r'(?<!\d)\d{3,}(?!\d)',
+            ).firstMatch(fullText);
+            if (numMatch != null) {
+              candidates.add(numMatch.group(0)!.trim());
+            }
+          }
+        }
+
+        debugPrint('取件码候选: $candidates');
+
+        if (candidates.isNotEmpty) {
+          title = candidates.first;
+        }
+        debugPrint('取件码最终标题: $title');
+      }
+      // 标题后处理：取餐码类型强制使用"店铺+取餐码"
+      if (category == MemoryCategory.pickupCode) {
+        final shop =
+            getNonEmptyString(json, 'shopName') ??
+            getNonEmptyString(json, 'merchantName');
+        final code = _extractCodeFromJson(json, 'pickupCode', ['取餐码', '取餐号']);
+        if (code != null) {
+          title = shop != null ? '$shop $code' : code;
+        }
+      }
+
       // 辅助函数：获取布尔值
       bool? getBoolValue(Map<String, dynamic> json, String key) {
         final value = json[key];
@@ -507,7 +687,7 @@ class AiService {
       }
 
       return MemoryItem(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: (DateTime.now().millisecondsSinceEpoch + idOffset).toString(),
         title: title,
         category: category,
         imagePath: imagePath,

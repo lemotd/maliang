@@ -2415,11 +2415,19 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         return;
       }
 
-      final newMemory = _aiService.parseAnalysisResult(
+      final results = _aiService.parseMultipleResults(
         result,
         _memory.imagePath!,
         _memory.thumbnailPath,
       );
+
+      // 优先取与当前记忆同分类的结果，否则取第一条
+      final newMemory = results.isEmpty
+          ? null
+          : results.firstWhere(
+              (m) => m.category == _memory.category,
+              orElse: () => results.first,
+            );
 
       if (newMemory != null) {
         // 保留原始 id 和创建时间

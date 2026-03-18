@@ -725,8 +725,12 @@ class _ExpandGlowWidgetState extends State<_ExpandGlowWidget>
       curve: const Cubic(0.25, 0.1, 0.25, 0.6),
     );
 
-    _expandController.forward().then((_) {
-      if (mounted) _fadeController.forward();
+    // 延迟到第一帧渲染完成后再启动动画，避免首帧掉帧
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _expandController.forward().then((_) {
+        if (mounted) _fadeController.forward();
+      });
     });
   }
 
@@ -743,11 +747,15 @@ class _ExpandGlowWidgetState extends State<_ExpandGlowWidget>
       animation: Listenable.merge([_expandCurved, _fadeCurved]),
       builder: (context, _) {
         final fade = 1.0 - _fadeCurved.value;
-        return CustomPaint(
-          size: widget.screenSize,
-          painter: _ExpandGlowPainter(
-            progress: _expandCurved.value,
-            fade: fade,
+        return RepaintBoundary(
+          child: CustomPaint(
+            size: widget.screenSize,
+            painter: _ExpandGlowPainter(
+              progress: _expandCurved.value,
+              fade: fade,
+            ),
+            isComplex: true,
+            willChange: true,
           ),
         );
       },

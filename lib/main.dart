@@ -397,6 +397,7 @@ class _HomePageState extends State<HomePage>
     );
 
     if (image != null) {
+      // 立刻进入骨架屏状态，压缩在后台 isolate 中进行
       _processImage(image.path);
     }
   }
@@ -458,25 +459,27 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  Future<MemoryItem?> _analyzeImageWithAI(String imagePath) async {
+  Future<List<MemoryItem>> _analyzeImageWithAI(String imagePath) async {
     try {
       debugPrint('开始AI分析图片: $imagePath');
       final result = await _aiService.analyzeImage(imagePath);
       debugPrint('AI分析结果: $result');
       if (result == null) {
         debugPrint('AI分析返回null');
-        return null;
+        return [];
       }
-      final memory = _aiService.parseAnalysisResult(
+      final memories = _aiService.parseMultipleResults(
         result,
         imagePath,
         imagePath,
       );
-      debugPrint('解析后的memory: ${memory?.title}');
-      return memory;
+      debugPrint('解析后的记忆数量: ${memories.length}');
+      if (memories.isEmpty) {
+        debugPrint('parseMultipleResults 返回空列表，原始结果: $result');
+      }
+      return memories;
     } on ApiKeyInvalidException catch (e) {
       debugPrint('API密钥无效: $e');
-      // 跳转到设置页面
       if (mounted) {
         final page = const SettingsPage();
         if (!pushToDetailPane(context, page)) {
@@ -486,28 +489,36 @@ class _HomePageState extends State<HomePage>
           );
         }
       }
-      return null;
+      return [];
     } catch (e, stackTrace) {
       debugPrint('AI分析错误: $e');
       debugPrint('堆栈: $stackTrace');
-      return null;
+      if (e is ApiKeyInvalidException) return [];
+      // 重新抛出以显示具体错误
+      rethrow;
     }
   }
 
-  Future<bool> _saveMemoryAndUpdateUI(MemoryItem memory) async {
+  Future<bool> _saveMemoriesAndUpdateUI(List<MemoryItem> newMemories) async {
     try {
-      await _memoryService.addMemory(memory);
+      for (final memory in newMemories) {
+        await _memoryService.addMemory(memory);
+      }
       final memories = await _memoryService.getAllMemories();
       if (mounted) {
+        // 多条记录只减一个 loadingCount（对应一次图片处理）
         setState(() {
           _memories = memories;
           _loadingCount--;
-          _newlyAddedIds.add(memory.id);
+          for (final m in newMemories) {
+            _newlyAddedIds.add(m.id);
+          }
         });
 
-        // 显示待办事项通知
-        if (!memory.isCompleted) {
-          await _notificationService.showLiveUpdateNotification(memory);
+        for (final memory in newMemories) {
+          if (!memory.isCompleted) {
+            await _notificationService.showLiveUpdateNotification(memory);
+          }
         }
       }
       return true;
@@ -540,37 +551,48 @@ class _HomePageState extends State<HomePage>
         return;
       }
 
-      final memory = await _analyzeImageWithAI(localPath);
-      if (memory == null) {
+      final memories = await _analyzeImageWithAI(localPath);
+      if (memories.isEmpty) {
         _handleProcessingError('AI 分析失败，请重试');
         return;
       }
 
-      final success = await _saveMemoryAndUpdateUI(memory);
+      final success = await _saveMemoriesAndUpdateUI(memories);
       if (!success) {
         _handleProcessingError('保存失败');
       }
     } catch (e) {
+      debugPrint('_processImageAsync 异常: $e');
       _handleProcessingError(e);
     }
   }
 
   Future<void> _deleteMemory(MemoryItem memory) async {
+    // 先从本地列表移除，避免整页闪烁
+    setState(() {
+      _memories.removeWhere((m) => m.id == memory.id);
+    });
+
     await _memoryService.deleteMemory(memory.id);
     await _notificationService.cancelNotification(memory.id);
 
-    // 删除图片缓存
-    final imageCacheService = ImageCacheService();
-    imageCacheService.removeFromCache(memory.thumbnailPath);
-    imageCacheService.removeFromCache(memory.imagePath);
+    // 检查是否有其他记忆引用同一张图片
+    final stillReferenced = _memories.any(
+      (m) => m.imagePath == memory.imagePath,
+    );
 
-    if (memory.imagePath != null) {
-      final file = File(memory.imagePath!);
-      if (await file.exists()) {
-        await file.delete();
+    if (!stillReferenced) {
+      final imageCacheService = ImageCacheService();
+      imageCacheService.removeFromCache(memory.thumbnailPath);
+      imageCacheService.removeFromCache(memory.imagePath);
+
+      if (memory.imagePath != null) {
+        final file = File(memory.imagePath!);
+        if (await file.exists()) {
+          await file.delete();
+        }
       }
     }
-    await _loadMemories();
   }
 
   Future<void> _toggleComplete(MemoryItem memory) async {
@@ -1511,93 +1533,96 @@ class _CategoryTabBarState extends State<_CategoryTabBar> {
   @override
   Widget build(BuildContext context) {
     final tabs = _tabs;
-    final bgColor = AppColors.onPrimary(widget.isDark);
+    final bgColor = AppColors.onSurfaceButtonSelect(widget.isDark);
     final unselectedBg = AppColors.surfaceContainer(widget.isDark);
 
     return SizedBox(
       height: 32,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        physics: const BouncingScrollPhysics(),
-        child: Stack(
-          key: _rowKey,
-          children: [
-            // 未选中的背景层（也用于测量尺寸）
-            Row(
-              children: List.generate(tabs.length, (i) {
-                return Padding(
-                  padding: EdgeInsets.only(left: i == 0 ? 0 : 8),
-                  child: Container(
-                    key: _tabKeys[i],
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+      child: ScrollEdgeHaptic(
+        axis: Axis.horizontal,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          physics: const BouncingScrollPhysics(),
+          child: Stack(
+            key: _rowKey,
+            children: [
+              // 未选中的背景层（也用于测量尺寸）
+              Row(
+                children: List.generate(tabs.length, (i) {
+                  return Padding(
+                    padding: EdgeInsets.only(left: i == 0 ? 0 : 8),
+                    child: Container(
+                      key: _tabKeys[i],
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: unselectedBg,
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                      child: Opacity(
+                        opacity: 0.0,
+                        child: _buildTabContent(tabs[i]),
+                      ),
                     ),
-                    decoration: BoxDecoration(
-                      color: unselectedBg,
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Opacity(
-                      opacity: 0.0,
-                      child: _buildTabContent(tabs[i]),
-                    ),
-                  ),
-                );
-              }),
-            ),
-            // 滑动选中背景 — 用 tab 区域裁切，不溢出到间隙
-            if (_indicatorRect != null)
-              Positioned.fill(
-                child: ClipPath(
-                  clipper: _TabsClipper(tabKeys: _tabKeys, rowKey: _rowKey),
-                  child: Stack(
-                    children: [
-                      AnimatedPositioned(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                        left: _indicatorRect!.left,
-                        top: _indicatorRect!.top,
-                        width: _indicatorRect!.width,
-                        height: _indicatorRect!.height,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: bgColor,
-                            borderRadius: BorderRadius.circular(100),
-                            boxShadow: [
-                              BoxShadow(
-                                color: bgColor.withOpacity(0.25),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                  );
+                }),
+              ),
+              // 滑动选中背景 — 用 tab 区域裁切，不溢出到间隙
+              if (_indicatorRect != null)
+                Positioned.fill(
+                  child: ClipPath(
+                    clipper: _TabsClipper(tabKeys: _tabKeys, rowKey: _rowKey),
+                    child: Stack(
+                      children: [
+                        AnimatedPositioned(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOutCubic,
+                          left: _indicatorRect!.left,
+                          top: _indicatorRect!.top,
+                          width: _indicatorRect!.width,
+                          height: _indicatorRect!.height,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: bgColor,
+                              borderRadius: BorderRadius.circular(100),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: bgColor.withOpacity(0.25),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
+              // 前景内容层
+              Row(
+                children: List.generate(tabs.length, (i) {
+                  final tab = tabs[i];
+                  final isSelected = tab.category == widget.selectedCategory;
+                  return Padding(
+                    padding: EdgeInsets.only(left: i == 0 ? 0 : 8),
+                    child: _CategoryCapsule(
+                      key: ValueKey('cat_${tab.category?.name ?? 'all'}'),
+                      icon: tab.icon,
+                      label: tab.label,
+                      count: tab.count,
+                      isSelected: isSelected,
+                      isDark: widget.isDark,
+                      onTap: () => widget.onSelect(tab.category),
+                    ),
+                  );
+                }),
               ),
-            // 前景内容层
-            Row(
-              children: List.generate(tabs.length, (i) {
-                final tab = tabs[i];
-                final isSelected = tab.category == widget.selectedCategory;
-                return Padding(
-                  padding: EdgeInsets.only(left: i == 0 ? 0 : 8),
-                  child: _CategoryCapsule(
-                    key: ValueKey('cat_${tab.category?.name ?? 'all'}'),
-                    icon: tab.icon,
-                    label: tab.label,
-                    count: tab.count,
-                    isSelected: isSelected,
-                    isDark: widget.isDark,
-                    onTap: () => widget.onSelect(tab.category),
-                  ),
-                );
-              }),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

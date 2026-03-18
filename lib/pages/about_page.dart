@@ -52,24 +52,24 @@ class _AboutPageState extends State<AboutPage> {
                               radius: smoothRadius(22),
                               child: Image.asset(
                                 'logo.png',
-                                width: 100,
-                                height: 100,
+                                width: 80,
+                                height: 80,
                               ),
                             ),
                             const SizedBox(height: 16),
                             Text(
                               '马良神记',
                               style: TextStyle(
-                                fontSize: 24,
+                                fontSize: 18,
                                 fontWeight: FontWeight.w500,
                                 color: AppColors.onSurface(isDark),
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'V1.0.0',
+                              'V1.0.1',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 14,
 
                                 fontWeight: FontWeight.w400,
                                 color: AppColors.onSurfaceQuaternary(isDark),
