@@ -18,12 +18,19 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+  Future<void>? _initFuture;
   MemoryActionCallback? onCompleteMemory;
   MemoryActionCallback? onOpenDetail;
+  void Function(String path)? onTileImage;
 
   Future<void> initialize() async {
     if (_initialized) return;
+    // 防止并发初始化
+    _initFuture ??= _doInitialize();
+    return _initFuture;
+  }
 
+  Future<void> _doInitialize() async {
     // 初始化本地通知
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
@@ -55,11 +62,18 @@ class NotificationService {
           onOpenDetail!(id);
         }
         break;
+      case 'onTileImage':
+        final path = call.arguments['path'] as String?;
+        debugPrint('磁贴图片: $path');
+        if (path != null && onTileImage != null) {
+          onTileImage!(path);
+        }
+        break;
     }
   }
 
   /// 固定的处理中通知 ID
-  static const int _processingNotificationId = -99999;
+  static const int _processingNotificationId = 99999;
 
   Future<void> showProcessingNotification() async {
     if (!_initialized) await initialize();

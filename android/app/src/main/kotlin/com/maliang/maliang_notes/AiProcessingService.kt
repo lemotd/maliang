@@ -7,7 +7,9 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
 
@@ -15,8 +17,10 @@ class AiProcessingService : Service() {
 
     companion object {
         private const val TAG = "AiProcessingService"
-        private const val NOTIFICATION_ID = -99999
+        const val NOTIFICATION_ID = 99999
         private const val CHANNEL_ID = "memory_live_update"
+
+        private var pendingImagePath: String? = null
 
         fun start(context: Context) {
             val intent = Intent(context, AiProcessingService::class.java)
@@ -27,10 +31,17 @@ class AiProcessingService : Service() {
             }
         }
 
+        fun startWithImage(context: Context, imagePath: String) {
+            pendingImagePath = imagePath
+            start(context)
+        }
+
         fun stop(context: Context) {
             context.stopService(Intent(context, AiProcessingService::class.java))
         }
     }
+
+    private val timeoutHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
@@ -39,16 +50,60 @@ class AiProcessingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "前台服务启动")
-        val notification = buildNotification()
-        startForeground(NOTIFICATION_ID, notification)
+        startForeground(NOTIFICATION_ID, buildNotification())
+
+        val path = pendingImagePath
+        if (path != null) {
+            pendingImagePath = null
+            // 注意：不在这里清理 SharedPreferences，
+            // 让 MainActivity.configureFlutterEngine 作为兜底来清理，
+            // 以防 startActivity 失败时图片路径不会丢失
+            deliverImageToFlutter(path)
+        }
+
         return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.d(TAG, "用户划掉后台卡片，停止前台服务")
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         Log.d(TAG, "前台服务停止")
+        timeoutHandler.removeCallbacksAndMessages(null)
         super.onDestroy()
+    }
+
+    private fun deliverImageToFlutter(imagePath: String) {
+        if (MainActivity.isEngineActive && MainActivity.methodChannelInstance != null) {
+            // 主引擎已活跃，直接发送
+            Log.d(TAG, "主引擎活跃，直接发送图片")
+            Handler(Looper.getMainLooper()).post {
+                MainActivity.methodChannelInstance?.invokeMethod(
+                    "onTileImage",
+                    mapOf("path" to imagePath)
+                )
+            }
+        } else {
+            // 主引擎不活跃，在后台启动 MainActivity（不显示界面）
+            Log.d(TAG, "主引擎不活跃，后台启动 MainActivity")
+            val launchIntent = Intent(this, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                // 不带 FLAG_ACTIVITY_BROUGHT_TO_FRONT，不会把界面带到前台
+                putExtra("tile_image_path", imagePath)
+            }
+            startActivity(launchIntent)
+        }
+
+        // 超时保护：90秒后如果服务还在运行，强制停止
+        timeoutHandler.postDelayed({
+            Log.w(TAG, "处理超时，强制停止服务")
+            stopSelf()
+        }, 90_000)
     }
 
     private fun createChannel() {

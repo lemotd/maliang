@@ -225,9 +225,8 @@ class _HomePageState extends State<HomePage>
 
   Future<void> _initNotificationService() async {
     await _notificationService.initialize();
-    await _notificationService.requestNotificationPermission();
 
-    // 设置通知回调
+    // 设置通知回调（不等待权限请求，避免阻塞回调注册）
     _notificationService.onCompleteMemory = (memoryIdHash) async {
       debugPrint('收到完成回调: memoryIdHash=$memoryIdHash');
       // 根据 hashCode 找到对应的 memory
@@ -250,6 +249,14 @@ class _HomePageState extends State<HomePage>
     _notificationService.onOpenDetail = (memoryIdHash) {
       _handleOpenDetailRequest(memoryIdHash);
     };
+
+    _notificationService.onTileImage = (path) {
+      debugPrint('收到磁贴图片: $path');
+      _processImage(path);
+    };
+
+    // 权限请求放在最后，不阻塞回调注册
+    _notificationService.requestNotificationPermission();
   }
 
   void _handleOpenDetailRequest(int? memoryIdHash) {
@@ -435,10 +442,17 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  void _processImage(String sharedPath) {
-    setState(() {
+  Future<void> _processImage(String sharedPath) async {
+    if (mounted) {
+      setState(() {
+        _loadingCount++;
+      });
+    } else {
       _loadingCount++;
-    });
+    }
+
+    // 确保通知发出后再开始处理
+    await _notificationService.showProcessingNotification();
 
     _processImageAsync(sharedPath);
   }
@@ -506,8 +520,15 @@ class _HomePageState extends State<HomePage>
         await _memoryService.addMemory(memory);
       }
       final memories = await _memoryService.getAllMemories();
+
+      // 通知不依赖 mounted，后台也要发
+      for (final memory in newMemories) {
+        if (!memory.isCompleted) {
+          await _notificationService.showLiveUpdateNotification(memory);
+        }
+      }
+
       if (mounted) {
-        // 多条记录只减一个 loadingCount（对应一次图片处理）
         setState(() {
           _memories = memories;
           _loadingCount--;
@@ -515,12 +536,9 @@ class _HomePageState extends State<HomePage>
             _newlyAddedIds.add(m.id);
           }
         });
-
-        for (final memory in newMemories) {
-          if (!memory.isCompleted) {
-            await _notificationService.showLiveUpdateNotification(memory);
-          }
-        }
+      } else {
+        _memories = memories;
+        _loadingCount--;
       }
       return true;
     } catch (e) {
@@ -541,14 +559,14 @@ class _HomePageState extends State<HomePage>
           behavior: SnackBarBehavior.floating,
         ),
       );
+    } else {
+      _loadingCount--;
+      debugPrint('后台处理失败: $error');
     }
   }
 
   Future<void> _processImageAsync(String sharedPath) async {
     try {
-      // 显示 AI 识别中通知
-      await _notificationService.showProcessingNotification();
-
       final localPath = await _copySharedImageToLocal(sharedPath);
       if (localPath == null) {
         await _notificationService.cancelProcessingNotification();

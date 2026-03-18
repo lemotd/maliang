@@ -15,7 +15,6 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
@@ -43,6 +42,26 @@
             android:name=".AiProcessingService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <service
+            android:name=".QuickTileService"
+            android:exported="true"
+            android:icon="@drawable/maliang_control"
+            android:label="马良神记"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="true" />
+        </service>
+        <activity
+            android:name=".TilePickerActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:taskAffinity="com.maliang.maliang_notes.tile"
+            android:launchMode="singleInstance" />
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

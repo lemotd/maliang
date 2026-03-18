@@ -23,25 +23,61 @@ class MainActivity : FlutterActivity() {
     private val NOTIFICATION_GROUP_KEY = "com.maliang.maliang_notes.pending_group"
     private val ACTION_COMPLETE = "com.maliang.maliang_notes.ACTION_COMPLETE"
     
-    private var methodChannel: MethodChannel? = null
+    companion object {
+        var methodChannelInstance: MethodChannel? = null
+            private set
+        var isEngineActive: Boolean = false
+            private set
+    }
+
     private var initialMemoryIdHash: Int? = null
+    private var pendingTileImagePath: String? = null
+
+    // 是否是从磁贴后台启动的（不应显示界面）
+    private var launchedFromTile: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 必须在 super.onCreate 之前处理 Intent，
+        // 因为 super.onCreate 会触发 configureFlutterEngine，
+        // 此时 pendingTileImagePath 需要已经设置好
+        handleIncomingIntent(intent)
         super.onCreate(savedInstanceState)
-        checkNotificationIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 如果是从磁贴后台启动的，立即回到后台
+        if (launchedFromTile) {
+            launchedFromTile = false
+            moveTaskToBack(true)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        checkNotificationIntent(intent)
+        handleIncomingIntent(intent)
     }
 
-    private fun checkNotificationIntent(intent: Intent?) {
-        intent?.let {
-            val memoryIdHash = it.getIntExtra("memory_id_hash", -1)
-            if (memoryIdHash != -1) {
-                initialMemoryIdHash = memoryIdHash
-                methodChannel?.invokeMethod("onOpenDetail", mapOf("id" to memoryIdHash))
+    private fun handleIncomingIntent(intent: Intent?) {
+        intent ?: return
+        // 处理通知点击打开详情
+        val memoryIdHash = intent.getIntExtra("memory_id_hash", -1)
+        if (memoryIdHash != -1) {
+            initialMemoryIdHash = memoryIdHash
+            methodChannelInstance?.invokeMethod("onOpenDetail", mapOf("id" to memoryIdHash))
+        }
+        // 处理磁贴图片（后台启动时传入）
+        val tileImagePath = intent.getStringExtra("tile_image_path")
+        if (tileImagePath != null) {
+            intent.removeExtra("tile_image_path") // 防止重复处理
+            pendingTileImagePath = tileImagePath
+            launchedFromTile = true
+            // 如果引擎已就绪，立即发送
+            if (isEngineActive && methodChannelInstance != null) {
+                Handler(Looper.getMainLooper()).post {
+                    methodChannelInstance?.invokeMethod("onTileImage", mapOf("path" to tileImagePath))
+                    pendingTileImagePath = null
+                }
             }
         }
     }
@@ -50,9 +86,10 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         
         createNotificationChannel()
+        isEngineActive = true
         
-        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
-        methodChannel?.setMethodCallHandler { call, result ->
+        methodChannelInstance = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        methodChannelInstance?.setMethodCallHandler { call, result ->
             Log.d("MainActivity", "收到方法调用: ${call.method}")
             when (call.method) {
                 "showLiveUpdateNotification" -> {
@@ -72,7 +109,7 @@ class MainActivity : FlutterActivity() {
                 "cancelNotification" -> {
                     val id = call.argument<Int>("id") ?: 0
                     // 如果取消的是处理中通知，停止前台服务
-                    if (id == -99999) {
+                    if (id == 99999) {
                         AiProcessingService.stop(this)
                     } else {
                         cancelNotification(id)
@@ -88,7 +125,7 @@ class MainActivity : FlutterActivity() {
         }
         
         // 设置 MethodChannel 引用到 CompleteActionReceiver
-        CompleteActionReceiver.setMethodChannel(methodChannel!!)
+        CompleteActionReceiver.setMethodChannel(methodChannelInstance!!)
 
         // 日历 MethodChannel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CALENDAR_CHANNEL)
@@ -108,10 +145,42 @@ class MainActivity : FlutterActivity() {
         // 如果有待处理的详情页请求
         initialMemoryIdHash?.let {
             Handler(Looper.getMainLooper()).postDelayed({
-                methodChannel?.invokeMethod("onOpenDetail", mapOf("id" to it))
+                methodChannelInstance?.invokeMethod("onOpenDetail", mapOf("id" to it))
                 initialMemoryIdHash = null
             }, 500)
         }
+
+        // 检查 SharedPreferences 中是否有未处理的磁贴图片（兜底机制）
+        val prefs = getSharedPreferences(TilePickerActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val savedPath = prefs.getString(TilePickerActivity.KEY_PENDING_IMAGE, null)
+        if (savedPath != null) {
+            prefs.edit().remove(TilePickerActivity.KEY_PENDING_IMAGE).apply()
+            // 只有当 Intent 没有传入图片路径时才使用 SharedPreferences 的路径
+            if (pendingTileImagePath == null) {
+                pendingTileImagePath = savedPath
+            }
+        }
+
+        // 发送待处理的磁贴图片
+        if (pendingTileImagePath != null) {
+            val path = pendingTileImagePath
+            pendingTileImagePath = null
+            Handler(Looper.getMainLooper()).postDelayed({
+                methodChannelInstance?.invokeMethod("onTileImage", mapOf("path" to path))
+            }, 800)
+        }
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        isEngineActive = false
+        methodChannelInstance = null
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    override fun onDestroy() {
+        // 确保前台服务也被停止
+        AiProcessingService.stop(this)
+        super.onDestroy()
     }
 
     private fun createNotificationChannel() {
