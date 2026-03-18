@@ -51,6 +51,7 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
 
   bool _isPressed = false;
   bool _isActionPressed = false;
+  bool _isActionExecuting = false;
 
   // 打字机动画
   int _visibleChars = 0;
@@ -150,7 +151,9 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     final halfScreen = screenWidth * 0.5;
     final absDrag = _dragExtent.abs();
 
-    if (absDrag > halfScreen) {
+    if (absDrag > halfScreen && !_isActionExecuting) {
+      _isActionExecuting = true;
+      HapticFeedback.lightImpact();
       if (_dragExtent > 0) {
         widget.onToggleComplete?.call();
       } else {
@@ -183,7 +186,9 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     _resetAnimation = Tween<double>(begin: _dragExtent, end: 0).animate(
       CurvedAnimation(parent: _resetController, curve: Curves.easeOutCubic),
     );
-    _resetController.forward(from: 0);
+    _resetController.forward(from: 0).then((_) {
+      _isActionExecuting = false;
+    });
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
@@ -217,12 +222,16 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
   }
 
   void _onRightPillTap() {
+    if (_isActionExecuting) return;
+    _isActionExecuting = true;
     HapticFeedback.lightImpact();
     widget.onToggleComplete?.call();
     _animateReset();
   }
 
   void _onLeftPillTap() {
+    if (_isActionExecuting) return;
+    _isActionExecuting = true;
     HapticFeedback.lightImpact();
     widget.onDelete?.call();
     _animateReset();

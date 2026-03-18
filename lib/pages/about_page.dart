@@ -95,7 +95,19 @@ class _AboutPageState extends State<AboutPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              _buildLogItem(
+                                isDark,
+                                '新增',
+                                '控制中心磁贴，可快速上传图片并在后台识别',
+                              ),
+                              const SizedBox(height: 10),
                               _buildLogItem(isDark, '新增', '设置页支持自定义使用其他模型'),
+                              const SizedBox(height: 10),
+                              _buildLogItem(
+                                isDark,
+                                '新增',
+                                '识别图片时支持上岛通知，同时支持后台识别',
+                              ),
                               const SizedBox(height: 10),
                               _buildLogItem(isDark, '新增', '备份数据支持备份 AI 模型配置文件'),
                               const SizedBox(height: 10),
