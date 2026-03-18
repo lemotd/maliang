@@ -546,13 +546,21 @@ class _HomePageState extends State<HomePage>
 
   Future<void> _processImageAsync(String sharedPath) async {
     try {
+      // 显示 AI 识别中通知
+      await _notificationService.showProcessingNotification();
+
       final localPath = await _copySharedImageToLocal(sharedPath);
       if (localPath == null) {
+        await _notificationService.cancelProcessingNotification();
         _handleProcessingError('文件复制失败');
         return;
       }
 
       final memories = await _analyzeImageWithAI(localPath);
+
+      // 取消处理中通知
+      await _notificationService.cancelProcessingNotification();
+
       if (memories.isEmpty) {
         _handleProcessingError('AI 分析失败，请重试');
         return;
@@ -563,6 +571,7 @@ class _HomePageState extends State<HomePage>
         _handleProcessingError('保存失败');
       }
     } catch (e) {
+      await _notificationService.cancelProcessingNotification();
       debugPrint('_processImageAsync 异常: $e');
       _handleProcessingError(e);
     }

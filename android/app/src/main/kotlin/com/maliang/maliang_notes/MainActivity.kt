@@ -64,9 +64,19 @@ class MainActivity : FlutterActivity() {
                     showLiveUpdateNotification(id, title, category, detail)
                     result.success(null)
                 }
+                "showProcessingNotification" -> {
+                    val id = call.argument<Int>("id") ?: 0
+                    AiProcessingService.start(this)
+                    result.success(null)
+                }
                 "cancelNotification" -> {
                     val id = call.argument<Int>("id") ?: 0
-                    cancelNotification(id)
+                    // 如果取消的是处理中通知，停止前台服务
+                    if (id == -99999) {
+                        AiProcessingService.stop(this)
+                    } else {
+                        cancelNotification(id)
+                    }
                     result.success(null)
                 }
                 "cancelAllNotifications" -> {

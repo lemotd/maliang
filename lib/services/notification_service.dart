@@ -58,6 +58,33 @@ class NotificationService {
     }
   }
 
+  /// 固定的处理中通知 ID
+  static const int _processingNotificationId = -99999;
+
+  Future<void> showProcessingNotification() async {
+    if (!_initialized) await initialize();
+
+    try {
+      await _channel.invokeMethod('showProcessingNotification', {
+        'id': _processingNotificationId,
+      });
+      debugPrint('处理中通知已显示');
+    } catch (e) {
+      debugPrint('显示处理中通知失败: $e');
+    }
+  }
+
+  Future<void> cancelProcessingNotification() async {
+    try {
+      await _channel.invokeMethod('cancelNotification', {
+        'id': _processingNotificationId,
+      });
+      debugPrint('处理中通知已取消');
+    } catch (e) {
+      debugPrint('取消处理中通知失败: $e');
+    }
+  }
+
   Future<void> showLiveUpdateNotification(MemoryItem memory) async {
     if (!_initialized) await initialize();
 

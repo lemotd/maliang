@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Google Gemini 风格 sparkle：大星 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,1C12,1 14,8 16,10C18,12 23,12 23,12C23,12 18,12 16,14C14,16 12,23 12,23C12,23 10,16 8,14C6,12 1,12 1,12C1,12 6,12 8,10C10,8 12,1 12,1Z"/>
+    <!-- 右上小星 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,1C20,1 20.6,3.4 21.6,4.4C22.6,5.4 25,6 25,6C25,6 22.6,6.6 21.6,7.6C20.6,8.6 20,11 20,11C20,11 19.4,8.6 18.4,7.6C17.4,6.6 15,6 15,6C15,6 17.4,5.4 18.4,4.4C19.4,3.4 20,1 20,1Z"/>
+</vector>

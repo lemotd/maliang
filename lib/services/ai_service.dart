@@ -218,38 +218,51 @@ class AiService {
     final url = Uri.parse('$apiAddress/chat/completions');
     debugPrint('请求URL: $url');
 
-    final response = await http
-        .post(
-          url,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $apiKey',
-          },
-          body: jsonEncode({
-            'model': visionModel,
-            'messages': [
-              {'role': 'system', 'content': systemPrompt},
-              {
-                'role': 'user',
-                'content': [
-                  {
-                    'type': 'image_url',
-                    'image_url': {'url': 'data:image/jpeg;base64,$base64Image'},
-                  },
-                  {
-                    'type': 'text',
-                    'text': '请分析这张图片，识别所有类型的信息，为每种类型分别生成一条记录，以JSON数组返回。',
-                  },
-                ],
-              },
-            ],
-            'temperature': 0.3,
-            'max_tokens': 1024,
-          }),
-        )
-        .timeout(const Duration(seconds: 60));
+    final requestBody = jsonEncode({
+      'model': visionModel,
+      'messages': [
+        {'role': 'system', 'content': systemPrompt},
+        {
+          'role': 'user',
+          'content': [
+            {
+              'type': 'image_url',
+              'image_url': {'url': 'data:image/jpeg;base64,$base64Image'},
+            },
+            {
+              'type': 'text',
+              'text': '请分析这张图片，识别所有类型的信息，为每种类型分别生成一条记录，以JSON数组返回。',
+            },
+          ],
+        },
+      ],
+      'temperature': 0.3,
+      'max_tokens': 1024,
+    });
 
-    debugPrint('响应状态码: ${response.statusCode}');
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $apiKey',
+    };
+
+    // 重试机制：连接中断（如切后台）时自动重试
+    const maxRetries = 3;
+    http.Response? response;
+    for (var attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        response = await http
+            .post(url, headers: headers, body: requestBody)
+            .timeout(const Duration(seconds: 60));
+        break; // 成功则跳出
+      } catch (e) {
+        debugPrint('请求失败 (第${attempt + 1}次): $e');
+        if (attempt >= maxRetries) rethrow;
+        // 递增等待：1s, 2s, 3s，等待网络恢复
+        await Future.delayed(Duration(seconds: attempt + 1));
+      }
+    }
+
+    debugPrint('响应状态码: ${response!.statusCode}');
     debugPrint('响应体长度: ${response.bodyBytes.length}');
 
     if (response.statusCode == 200) {
