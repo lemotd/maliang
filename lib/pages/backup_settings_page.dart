@@ -11,6 +11,7 @@ import '../widgets/glass_button.dart';
 import '../utils/scroll_edge_haptic.dart';
 import '../utils/smooth_radius.dart';
 import '../services/memory_service.dart';
+import '../services/config_service.dart';
 import 'backup_import_page.dart';
 
 class BackupSettingsPage extends StatefulWidget {
@@ -22,6 +23,7 @@ class BackupSettingsPage extends StatefulWidget {
 
 class _BackupSettingsPageState extends State<BackupSettingsPage> {
   final _memoryService = MemoryService();
+  final _configService = ConfigService();
   bool _isExporting = false;
   double _scrollOffset = 0;
 
@@ -92,6 +94,15 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
         'exportTime': now.toIso8601String(),
         'memoryCount': memories.length,
         'memories': memoriesWithImages,
+        'aiConfig': {
+          'modelType': await _configService.getModelType(),
+          'apiAddress': await _configService.getApiAddress(),
+          'apiKey': await _configService.getApiKey(),
+          'customApiAddress': await _configService.getCustomApiAddress(),
+          'customApiKey': await _configService.getCustomApiKey(),
+          'customTextModel': await _configService.getCustomTextModel(),
+          'customVisionModel': await _configService.getCustomVisionModel(),
+        },
       };
 
       final dir = await _getExportDir();
@@ -201,6 +212,8 @@ class _BackupSettingsPageState extends State<BackupSettingsPage> {
                         icon: CupertinoIcons.arrow_down_doc,
                         onTap: _pickAndImport,
                       ),
+                      // 补偿 AppBar 收缩高度差，防止弹回
+                      const SizedBox(height: 54),
                     ],
                   ),
                 ),

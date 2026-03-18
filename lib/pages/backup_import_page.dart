@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
 import '../services/memory_service.dart';
+import '../services/config_service.dart';
 import '../models/memory_item.dart';
 import '../utils/scroll_edge_haptic.dart';
 import '../utils/smooth_radius.dart';
@@ -22,6 +23,7 @@ class BackupImportPage extends StatefulWidget {
 
 class _BackupImportPageState extends State<BackupImportPage> {
   final _memoryService = MemoryService();
+  final _configService = ConfigService();
   bool _isMerge = true; // true=合并, false=覆盖
   bool _isImporting = false;
   double _scrollOffset = 0;
@@ -105,6 +107,39 @@ class _BackupImportPageState extends State<BackupImportPage> {
         }
       }
 
+      // 恢复 AI 大模型配置
+      final aiConfig = widget.backupData['aiConfig'] as Map<String, dynamic>?;
+      if (aiConfig != null) {
+        final modelType = aiConfig['modelType'] as String?;
+        if (modelType != null) await _configService.setModelType(modelType);
+
+        final apiAddress = aiConfig['apiAddress'] as String?;
+        if (apiAddress != null && apiAddress.isNotEmpty) {
+          await _configService.setApiAddress(apiAddress);
+        }
+        final apiKey = aiConfig['apiKey'] as String?;
+        if (apiKey != null && apiKey.isNotEmpty) {
+          await _configService.setApiKey(apiKey);
+        }
+
+        final customApiAddress = aiConfig['customApiAddress'] as String?;
+        if (customApiAddress != null && customApiAddress.isNotEmpty) {
+          await _configService.setCustomApiAddress(customApiAddress);
+        }
+        final customApiKey = aiConfig['customApiKey'] as String?;
+        if (customApiKey != null && customApiKey.isNotEmpty) {
+          await _configService.setCustomApiKey(customApiKey);
+        }
+        final customTextModel = aiConfig['customTextModel'] as String?;
+        if (customTextModel != null && customTextModel.isNotEmpty) {
+          await _configService.setCustomTextModel(customTextModel);
+        }
+        final customVisionModel = aiConfig['customVisionModel'] as String?;
+        if (customVisionModel != null && customVisionModel.isNotEmpty) {
+          await _configService.setCustomVisionModel(customVisionModel);
+        }
+      }
+
       // 通知首页刷新数据（不依赖当前页面 mounted 状态）
       await HomePage.onDataChanged?.call();
 
@@ -173,6 +208,8 @@ class _BackupImportPageState extends State<BackupImportPage> {
                       const SizedBox(height: 24),
                       // 开始导入按钮
                       _buildImportButton(context),
+                      // 补偿 AppBar 收缩高度差，防止弹回
+                      const SizedBox(height: 54),
                     ],
                   ),
                 ),

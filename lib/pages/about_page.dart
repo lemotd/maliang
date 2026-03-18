@@ -95,20 +95,19 @@ class _AboutPageState extends State<AboutPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                '当前版本更新日志',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.onSurface(isDark),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
+                              _buildLogItem(isDark, '新增', '设置页支持自定义使用其他模型'),
+                              const SizedBox(height: 10),
+                              _buildLogItem(isDark, '新增', '备份数据支持备份 AI 模型配置文件'),
+                              const SizedBox(height: 10),
+                              _buildLogItem(isDark, '新增', '首页列表新增删除动画'),
+                              const SizedBox(height: 10),
                               _buildLogItem(
                                 isDark,
                                 '新增',
-                                '左右滑动 tab 到边界，增加触感反馈',
+                                '左右滑动首页 tab 到边界，增加触感反馈',
                               ),
+                              const SizedBox(height: 10),
+                              _buildLogItem(isDark, '新增', '关于我们页面改版'),
                               const SizedBox(height: 10),
                               _buildLogItem(
                                 isDark,
@@ -191,6 +190,8 @@ class _AboutPageState extends State<AboutPage> {
                         ),
                       ),
                       const SizedBox(height: 40),
+                      // 补偿 AppBar 收缩高度差，防止弹回
+                      const SizedBox(height: 54),
                     ],
                   ),
                 ),

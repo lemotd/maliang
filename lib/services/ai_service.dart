@@ -19,9 +19,10 @@ class AiService {
   final ConfigService _configService = ConfigService();
 
   Future<String?> chat(String message, {String? systemPrompt}) async {
-    final apiAddress = await _configService.getApiAddress();
-    final apiKey = await _configService.getApiKey();
-    final isUsingDefault = await _configService.isUsingDefaultApiKey();
+    final apiAddress = await _configService.getActiveApiAddress();
+    final apiKey = await _configService.getActiveApiKey();
+    final isUsingDefault = await _configService.isUsingDefaultActiveKey();
+    final textModel = await _configService.getActiveTextModel();
 
     if (apiKey.isEmpty) {
       throw Exception('API密钥未配置，请在设置中填写API密钥');
@@ -43,7 +44,7 @@ class AiService {
         'Authorization': 'Bearer $apiKey',
       },
       body: jsonEncode({
-        'model': 'glm-4-flashx',
+        'model': textModel,
         'messages': messages,
         'temperature': 0.7,
         'max_tokens': 2048,
@@ -70,9 +71,10 @@ class AiService {
 
   /// 流式 chat，通过 onToken 回调逐步返回生成的文字
   Stream<String> chatStream(String message, {String? systemPrompt}) async* {
-    final apiAddress = await _configService.getApiAddress();
-    final apiKey = await _configService.getApiKey();
-    final isUsingDefault = await _configService.isUsingDefaultApiKey();
+    final apiAddress = await _configService.getActiveApiAddress();
+    final apiKey = await _configService.getActiveApiKey();
+    final isUsingDefault = await _configService.isUsingDefaultActiveKey();
+    final textModel = await _configService.getActiveTextModel();
 
     if (apiKey.isEmpty) {
       throw Exception('API密钥未配置，请在设置中填写API密钥');
@@ -91,7 +93,7 @@ class AiService {
       'Authorization': 'Bearer $apiKey',
     });
     request.body = jsonEncode({
-      'model': 'glm-4-flashx',
+      'model': textModel,
       'messages': messages,
       'temperature': 0.7,
       'max_tokens': 2048,
@@ -146,9 +148,10 @@ class AiService {
   }
 
   Future<String?> analyzeImage(String imagePath) async {
-    final apiAddress = await _configService.getApiAddress();
-    final apiKey = await _configService.getApiKey();
-    final isUsingDefault = await _configService.isUsingDefaultApiKey();
+    final apiAddress = await _configService.getActiveApiAddress();
+    final apiKey = await _configService.getActiveApiKey();
+    final isUsingDefault = await _configService.isUsingDefaultActiveKey();
+    final visionModel = await _configService.getActiveVisionModel();
 
     debugPrint('API地址: $apiAddress');
     debugPrint('API密钥长度: ${apiKey.length}');
@@ -223,7 +226,7 @@ class AiService {
             'Authorization': 'Bearer $apiKey',
           },
           body: jsonEncode({
-            'model': 'glm-4v-flash',
+            'model': visionModel,
             'messages': [
               {'role': 'system', 'content': systemPrompt},
               {

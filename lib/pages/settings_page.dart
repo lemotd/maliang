@@ -63,7 +63,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       _buildSettingsItem(
                         context,
                         title: '备份与恢复',
-                        subtitle: '导入、导出记忆数据',
+                        subtitle: '导出、导入记忆和配置数据',
                         icon: CupertinoIcons.arrow_2_circlepath,
                         onTap: () async {
                           final result = await Navigator.push(
@@ -91,6 +91,8 @@ class _SettingsPageState extends State<SettingsPage> {
                           );
                         },
                       ),
+                      // 补偿 AppBar 收缩高度差，防止弹回
+                      const SizedBox(height: 54),
                     ],
                   ),
                 ),

@@ -607,10 +607,11 @@ class _BillSummaryPageState extends State<BillSummaryPage>
                                   ];
                                 }),
                               ],
-                              // 底部留白（含安全区）
+                              // 底部留白（含安全区 + 补偿 AppBar 收缩高度差）
                               SliverToBoxAdapter(
                                 child: SizedBox(
                                   height:
+                                      54 +
                                       16 +
                                       MediaQuery.of(context).padding.bottom,
                                 ),

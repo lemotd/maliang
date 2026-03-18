@@ -265,6 +265,8 @@ $clothesSummary
                               ),
                             ),
                           ),
+                        // 补偿 AppBar 收缩高度差，防止弹回
+                        const SliverToBoxAdapter(child: SizedBox(height: 54)),
                       ],
                     ),
                   ),

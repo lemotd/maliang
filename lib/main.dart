@@ -145,6 +145,7 @@ class _HomePageState extends State<HomePage>
 
   int _loadingCount = 0;
   final Set<String> _newlyAddedIds = {};
+  final Set<String> _deletingIds = {};
   bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
@@ -568,8 +569,16 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _deleteMemory(MemoryItem memory) async {
-    // 先从本地列表移除，避免整页闪烁
+    // 先标记为删除中，触发收缩动画
+    setState(() => _deletingIds.add(memory.id));
+
+    // 等待动画完成
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // 从本地列表移除
+    if (!mounted) return;
     setState(() {
+      _deletingIds.remove(memory.id);
       _memories.removeWhere((m) => m.id == memory.id);
     });
 
@@ -743,7 +752,9 @@ class _HomePageState extends State<HomePage>
               if (memoryIndex >= filteredMemories.length) return null;
               final memory = filteredMemories[memoryIndex];
               final isNew = _newlyAddedIds.contains(memory.id);
-              return AnimatedBuilder(
+              final isDeleting = _deletingIds.contains(memory.id);
+
+              Widget item = AnimatedBuilder(
                 animation: _tabSwitchController,
                 builder: (context, child) {
                   return Opacity(
@@ -764,6 +775,12 @@ class _HomePageState extends State<HomePage>
                   onDelete: () => _deleteMemory(memory),
                   onToggleComplete: () => _toggleComplete(memory),
                 ),
+              );
+
+              return _DeletingWrapper(
+                key: ValueKey('mem_${memory.id}'),
+                isDeleting: isDeleting,
+                child: item,
               );
             }, childCount: _loadingCount + filteredMemories.length),
           ),
@@ -1300,6 +1317,95 @@ class _ToastWidgetState extends State<_ToastWidget>
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 删除动画包装器：淡出 + 向左滑出 + 高度收缩
+class _DeletingWrapper extends StatefulWidget {
+  final bool isDeleting;
+  final Widget child;
+
+  const _DeletingWrapper({
+    super.key,
+    required this.isDeleting,
+    required this.child,
+  });
+
+  @override
+  State<_DeletingWrapper> createState() => _DeletingWrapperState();
+}
+
+class _DeletingWrapperState extends State<_DeletingWrapper>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnim;
+  late Animation<Offset> _slideAnim;
+  late Animation<double> _sizeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _fadeAnim = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+      ),
+    );
+    _slideAnim = Tween<Offset>(begin: Offset.zero, end: const Offset(-0.08, 0))
+        .animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+          ),
+        );
+    _sizeAnim = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
+      ),
+    );
+    if (widget.isDeleting) _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DeletingWrapper old) {
+    super.didUpdateWidget(old);
+    if (widget.isDeleting && !old.isDeleting) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return FadeTransition(
+          opacity: _fadeAnim,
+          child: SlideTransition(
+            position: _slideAnim,
+            child: ClipRect(
+              child: Align(
+                alignment: Alignment.topCenter,
+                heightFactor: _sizeAnim.value,
+                child: child,
+              ),
+            ),
+          ),
+        );
+      },
+      child: widget.child,
     );
   }
 }
