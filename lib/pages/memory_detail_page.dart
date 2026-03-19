@@ -9,6 +9,7 @@ import '../models/memory_item.dart';
 import '../models/bill_category.dart';
 import '../services/memory_service.dart';
 import '../services/ai_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/glass_button.dart';
 import '../utils/scroll_edge_haptic.dart';
@@ -1051,6 +1052,9 @@ class _SizePickerSheetState extends State<_SizePickerSheet> {
 class MemoryDetailPage extends StatefulWidget {
   final MemoryItem memory;
 
+  /// 正在后台重新识别的记忆 ID 集合
+  static final ValueNotifier<Set<String>> reanalyzingIds = ValueNotifier({});
+
   const MemoryDetailPage({super.key, required this.memory});
 
   @override
@@ -1072,6 +1076,9 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   bool _isTextSelecting = false;
   double _imageDisplayHeight = 0;
   double _requiredOffset = 1.0;
+  double _maxDragOffset = 1.0; // 限制后的最大下滑 offset
+  bool _imageNeedsScroll = false; // 图片在最大下滑时仍无法完整显示
+  final ScrollController _imageScrollController = ScrollController();
   bool _eventPressed = false;
   bool _isReanalyzing = false;
   final GlobalKey _moreButtonKey = GlobalKey();
@@ -1083,6 +1090,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
   // 服务
   final _aiService = AiService();
   final _memoryService = MemoryService();
+  final _notificationService = NotificationService();
 
   // 服饰编辑状态
   bool _isEditingClothing = false;
@@ -1151,6 +1159,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     _controller.dispose();
     _editController.dispose();
     _scrollController.dispose();
+    _imageScrollController.dispose();
     _selectionFocusNode.dispose();
     _clothingNameCtrl.dispose();
     _clothingTypeCtrl.dispose();
@@ -1187,6 +1196,19 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     // 如果滑动距离很小，可能是文本选择操作
     if (!_isDragging && !_isTextSelecting) {
       if (deltaY.abs() > 10) {
+        // 吸顶状态下，内容区可以自由滚动
+        if (_offset < 0.1) {
+          final scrollPos = _scrollController.hasClients
+              ? _scrollController.position.pixels
+              : 0.0;
+          if (deltaY < 0) {
+            // 向上滑动：让 SingleChildScrollView 处理
+            return;
+          } else if (scrollPos > 0.5) {
+            // 向下滑动但内容还没滚到顶：让 SingleChildScrollView 处理
+            return;
+          }
+        }
         _isDragging = true;
         // 开始滑动时清除文本选择
         _selectionFocusNode.unfocus();
@@ -1195,6 +1217,16 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
 
     if (!_isDragging) return;
 
+    // 吸顶状态下，如果内容还没滚到顶，不拦截
+    if (_offset < 0.1 && _scrollController.hasClients) {
+      final scrollPos = _scrollController.position.pixels;
+      if (scrollPos > 0.5 && deltaY > 0) {
+        // 内容还没滚到顶，用户向下滑，交还给 ScrollView
+        _isDragging = false;
+        return;
+      }
+    }
+
     // 向上滑动 deltaY < 0，offset 减少
     // 向下滑动 deltaY > 0，offset 增加
     final deltaOffset = deltaY / imageAreaHeight;
@@ -1202,8 +1234,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
 
     // 三段式拖动范围：
     // 最小：0.0（上滑吸附）
-    // 最大：_requiredOffset（下滑吸附，如果图片被遮挡）
-    final maxOffset = _requiredOffset > 1.0 ? _requiredOffset : 1.0;
+    // 最大：_maxDragOffset（下滑吸附，限制后的最大偏移）
+    final maxOffset = _maxDragOffset > 1.0 ? _maxDragOffset : 1.0;
 
     // 超出反馈效果：当超出范围时，使用阻尼效果
     if (newOffset < 0) {
@@ -1233,10 +1265,10 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     // 三段式吸附逻辑：根据当前位置和滑动方向决定吸附位置
     // offset = 0.0: 上滑吸附（展开）
     // offset = 1.0: 默认态
-    // offset = _requiredOffset: 下滑吸附（显示完整图片）
+    // offset = _maxDragOffset: 下滑吸附（显示完整图片，限制后）
 
     final deltaOffset = _offset - _startOffset;
-    final maxOffset = _requiredOffset > 1.0 ? _requiredOffset : 1.0;
+    final maxOffset = _maxDragOffset > 1.0 ? _maxDragOffset : 1.0;
 
     // 如果超出范围，先回弹到边界
     if (_offset < 0) {
@@ -1244,8 +1276,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       return;
     }
     if (_offset > maxOffset) {
-      if (_requiredOffset > 1.0) {
-        _animateToOffset(_requiredOffset, haptic: false);
+      if (_maxDragOffset > 1.0) {
+        _animateToOffset(_maxDragOffset, haptic: false);
       } else {
         _animateToDefault(haptic: false);
       }
@@ -1274,9 +1306,9 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       if (isInExpandedPhase) {
         // 从展开位置下滑，回到默认态（阶段切换）
         _animateToDefault(haptic: true);
-      } else if (isInDefaultPhase && _requiredOffset > 1.0) {
+      } else if (isInDefaultPhase && _maxDragOffset > 1.0) {
         // 从默认态下滑，图片被遮挡，吸附到显示完整图片的位置（阶段切换）
-        _animateToOffset(_requiredOffset, haptic: true);
+        _animateToOffset(_maxDragOffset, haptic: true);
       } else {
         // 图片没有被遮挡或已经在下滑吸附位置，回到默认态（无阶段切换）
         _animateToDefault(haptic: false);
@@ -1285,8 +1317,8 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       // 没有滑动，根据当前位置吸附
       if (_offset < 0.5) {
         _animateToExpanded(haptic: false);
-      } else if (_offset > _requiredOffset - 0.1 && _requiredOffset > 1.0) {
-        _animateToOffset(_requiredOffset, haptic: false);
+      } else if (_offset > _maxDragOffset - 0.1 && _maxDragOffset > 1.0) {
+        _animateToOffset(_maxDragOffset, haptic: false);
       } else {
         _animateToDefault(haptic: false);
       }
@@ -1316,6 +1348,16 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     final start = _offset;
     final end = 0.0;
 
+    // 如果图片有滚动偏移，同步动画回顶部
+    if (_imageScrollController.hasClients &&
+        _imageScrollController.offset > 0) {
+      _imageScrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOut,
+      );
+    }
+
     final animation = Tween<double>(begin: start, end: end).animate(
       CurvedAnimation(parent: _controller, curve: const _MildBounceCurve()),
     );
@@ -1329,10 +1371,20 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     _controller.forward(from: 0);
   }
 
-  void _animateToDefault({bool haptic = true}) {
+  TickerFuture _animateToDefault({bool haptic = true}) {
     if (haptic) HapticFeedback.lightImpact();
     final start = _offset;
     final end = 1.0;
+
+    // 如果图片有滚动偏移，同步动画回顶部
+    if (_imageScrollController.hasClients &&
+        _imageScrollController.offset > 0) {
+      _imageScrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOut,
+      );
+    }
 
     final animation = Tween<double>(begin: start, end: end).animate(
       CurvedAnimation(parent: _controller, curve: const _MildBounceCurve()),
@@ -1344,7 +1396,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       });
     });
 
-    _controller.forward(from: 0);
+    return _controller.forward(from: 0);
   }
 
   @override
@@ -1365,12 +1417,44 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     final imageAreaHeight = screenHeight * 0.3;
     final appBarHeight = 56.0 + safeAreaTop;
 
+    // 稳定计算图片显示高度（始终基于 base imageAreaHeight）
+    if (_imageSize != null && _memory.imagePath != null) {
+      final paneW = screenWidth > 600 ? screenWidth * 2 / 3 : screenWidth;
+      final maxImgW = paneW * 0.7;
+      final minImgW = paneW * 0.5;
+      const vMargin = 16.0;
+      final availH = imageAreaHeight - vMargin * 2;
+      final ar = _imageSize!.width / _imageSize!.height;
+      var w = maxImgW;
+      var h = w / ar;
+      if (h > availH) {
+        h = availH;
+        w = h * ar;
+      }
+      if (w > maxImgW) {
+        w = maxImgW;
+        h = w / ar;
+      } else if (w < minImgW) {
+        w = minImgW;
+        h = w / ar;
+      }
+      _imageDisplayHeight = h + vMargin * 2;
+    }
+
     // 计算显示完整图片所需的offset
     if (_imageDisplayHeight > 0 && _imageDisplayHeight > imageAreaHeight) {
       _requiredOffset = _imageDisplayHeight / imageAreaHeight;
     } else {
       _requiredOffset = 1.0;
     }
+
+    // 限制最大下滑距离：内容区至少占屏幕 20% 高度
+    final maxAllowedOffset =
+        (screenHeight * 0.8 - appBarHeight) / imageAreaHeight;
+    _maxDragOffset = _requiredOffset > maxAllowedOffset
+        ? maxAllowedOffset
+        : _requiredOffset;
+    _imageNeedsScroll = _requiredOffset > maxAllowedOffset;
 
     final contentTop = appBarHeight + imageAreaHeight * _offset;
     final borderRadius = 20.0 * _offset;
@@ -1400,16 +1484,43 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
                 top: appBarHeight - imageSlideUp,
                 left: 0,
                 right: 0,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Opacity(
-                    opacity: imageOpacity,
-                    child: _buildImageArea(
-                      screenWidth,
-                      imageAreaHeight,
-                      isDark,
-                    ),
-                  ),
+                child: Opacity(
+                  opacity: imageOpacity,
+                  child: _imageNeedsScroll
+                      ? ShaderMask(
+                          shaderCallback: (Rect bounds) {
+                            return const LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.white,
+                                Colors.white,
+                              ],
+                              stops: [0.0, 0.08, 1.0],
+                            ).createShader(bounds);
+                          },
+                          blendMode: BlendMode.dstIn,
+                          child: SizedBox(
+                            height: contentTop - (appBarHeight - imageSlideUp),
+                            child: ScrollEdgeHaptic(
+                              child: SingleChildScrollView(
+                                controller: _imageScrollController,
+                                physics: _offset >= _maxDragOffset - 0.05
+                                    ? const BouncingScrollPhysics(
+                                        parent: AlwaysScrollableScrollPhysics(),
+                                      )
+                                    : const NeverScrollableScrollPhysics(),
+                                child: _buildImageArea(
+                                  screenWidth,
+                                  imageAreaHeight * _offset,
+                                  isDark,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      : _buildImageArea(screenWidth, imageAreaHeight, isDark),
                 ),
               ),
             // 内容区域
@@ -2047,8 +2158,7 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
       displayHeight = availableHeight;
     }
 
-    // 更新图片显示高度
-    _imageDisplayHeight = displayHeight + verticalMargin * 2;
+    // 图片显示高度已在 build() 中稳定计算
 
     final clippedImage = ClipSmoothRect(
       radius: smoothRadius(16),
@@ -2082,7 +2192,10 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     );
 
     return Center(
-      child: _Pressable(onTap: () => _openImageViewer(), child: imageWidget),
+      child: _Pressable(
+        onTap: _isReanalyzing ? () {} : () => _openImageViewer(),
+        child: imageWidget,
+      ),
     );
   }
 
@@ -2401,41 +2514,66 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
 
   Future<void> _reanalyzeWithAI() async {
     if (_memory.imagePath == null) return;
+
+    // 先动画回到默认位置，等动画完成后再启动识别
+    if ((_offset - 1.0).abs() > 0.01) {
+      await _animateToDefault(haptic: false);
+    }
+
+    if (!mounted) return;
     setState(() => _isReanalyzing = true);
 
+    final memoryId = _memory.id;
+    final imagePath = _memory.imagePath!;
+    final thumbnailPath = _memory.thumbnailPath;
+    final originalCategory = _memory.category;
+    final createdAt = _memory.createdAt;
+
+    // 标记为正在重新识别（全局）
+    MemoryDetailPage.reanalyzingIds.value = {
+      ...MemoryDetailPage.reanalyzingIds.value,
+      memoryId,
+    };
+
+    // 显示处理中通知（上岛）
+    await _notificationService.showProcessingNotification();
+
     try {
-      final result = await _aiService.analyzeImage(_memory.imagePath!);
+      final result = await _aiService.analyzeImage(imagePath);
       if (result == null) {
+        await _notificationService.cancelProcessingNotification();
         if (mounted) {
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text('AI 分析失败，请重试')));
+          setState(() => _isReanalyzing = false);
         }
-        setState(() => _isReanalyzing = false);
+        _removeReanalyzingId(memoryId);
         return;
       }
 
       final results = _aiService.parseMultipleResults(
         result,
-        _memory.imagePath!,
-        _memory.thumbnailPath,
+        imagePath,
+        thumbnailPath,
       );
 
-      // 优先取与当前记忆同分类的结果，否则取第一条
       final newMemory = results.isEmpty
           ? null
           : results.firstWhere(
-              (m) => m.category == _memory.category,
+              (m) => m.category == originalCategory,
               orElse: () => results.first,
             );
 
       if (newMemory != null) {
-        // 保留原始 id 和创建时间
-        final updated = newMemory.copyWith(
-          id: _memory.id,
-          createdAt: _memory.createdAt,
-        );
+        final updated = newMemory.copyWith(id: memoryId, createdAt: createdAt);
         await _memoryService.updateMemory(updated);
+
+        // 取消处理中通知，显示识别结果通知
+        await _notificationService.cancelProcessingNotification();
+        await _notificationService.showLiveUpdateNotification(updated);
+
+        _removeReanalyzingId(memoryId);
         HomePage.onDataChanged?.call();
         if (mounted) {
           setState(() {
@@ -2447,14 +2585,17 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
           _startStreamAnimation();
         }
       } else {
+        await _notificationService.cancelProcessingNotification();
         if (mounted) {
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text('AI 分析失败，请重试')));
           setState(() => _isReanalyzing = false);
         }
+        _removeReanalyzingId(memoryId);
       }
     } catch (e) {
+      await _notificationService.cancelProcessingNotification();
       debugPrint('AI 重新分析失败: $e');
       if (mounted) {
         ScaffoldMessenger.of(
@@ -2462,7 +2603,14 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
         ).showSnackBar(SnackBar(content: Text('分析失败: $e')));
         setState(() => _isReanalyzing = false);
       }
+      _removeReanalyzingId(memoryId);
     }
+  }
+
+  static void _removeReanalyzingId(String id) {
+    final ids = {...MemoryDetailPage.reanalyzingIds.value};
+    ids.remove(id);
+    MemoryDetailPage.reanalyzingIds.value = ids;
   }
 
   void _startStreamAnimation() {

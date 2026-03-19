@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
@@ -147,6 +148,19 @@ class AiService {
     }
   }
 
+  /// 在独立 isolate 中压缩图片并编码为 base64，避免阻塞 UI 线程
+  static String _compressAndEncodeImage(Uint8List bytes) {
+    Uint8List imageBytes = bytes;
+    if (bytes.length > 500 * 1024) {
+      final image = img.decodeImage(bytes);
+      if (image != null) {
+        final quality = (500 * 1024 / bytes.length * 100).round().clamp(20, 85);
+        imageBytes = Uint8List.fromList(img.encodeJpg(image, quality: quality));
+      }
+    }
+    return base64Encode(imageBytes);
+  }
+
   Future<String?> analyzeImage(String imagePath) async {
     final apiAddress = await _configService.getActiveApiAddress();
     final apiKey = await _configService.getActiveApiKey();
@@ -167,19 +181,9 @@ class AiService {
 
     final bytes = await file.readAsBytes();
 
-    // 如果图片大于 500KB，进行压缩
-    var imageBytes = bytes;
-    if (bytes.length > 500 * 1024) {
-      final image = img.decodeImage(bytes);
-      if (image != null) {
-        final quality = (500 * 1024 / bytes.length * 100).round().clamp(20, 85);
-        imageBytes = img.encodeJpg(image, quality: quality);
-        debugPrint('图片压缩: ${bytes.length} -> ${imageBytes.length} bytes');
-      }
-    }
-
-    final base64Image = base64Encode(imageBytes);
-    debugPrint('最终图片大小: ${imageBytes.length} bytes');
+    // 在独立 isolate 中压缩 + base64 编码，避免阻塞 UI
+    final base64Image = await compute(_compressAndEncodeImage, bytes);
+    debugPrint('最终图片大小: ${base64Image.length} chars (base64)');
 
     final systemPrompt =
         '''你是一个智能助手，专门分析用户分享的图片内容。
@@ -198,7 +202,7 @@ class AiService {
 如果图片中包含多个同类型的信息（如多个取件码、多笔账单），也要为每一个分别生成独立的记录。
 
 每条记录的字段规则：
-- 标题要精简：取餐码用"店铺+取餐码"如"肯德基 A001"，取件码的title字段必须且只能填取件码数字本身如"12-3-4567"（绝对不要填商品名、快递公司名或其他任何非码值内容），账单用金额带符号如"-¥35.00"，服饰用名称，随手记用一句话概括
+- 标题要精简：取餐码的title字段必须且只能填取餐码本身如"A001"（绝对不要填店铺名或其他任何非码值内容），取件码的title字段必须且只能填取件码数字本身如"12-3-4567"（绝对不要填商品名、快递公司名或其他任何非码值内容），账单用金额带符号如"-¥35.00"，服饰用名称，随手记用一句话概括
 - 特别强调：当图片中有多个取件码时，每条取件码记录的title必须是对应的取件码数字（如"12-3-4567"），不是商品名称
 - 所有类型都必须填summary
 - 取餐码/取件码/随手记必须填infoSections
@@ -465,6 +469,75 @@ class AiService {
         return null;
       }
 
+      // 二次校验：如果 AI 分类为服饰，但内容实际是食物相关，降级为随手记
+      if (category == MemoryCategory.clothing) {
+        final fullText = '$title ${json['summary'] ?? ''}'.toLowerCase();
+        const foodKeywords = [
+          '蛋糕',
+          '面包',
+          '甜品',
+          '甜点',
+          '奶茶',
+          '咖啡',
+          '饮料',
+          '果汁',
+          '冰淇淋',
+          '巧克力',
+          '饼干',
+          '糖果',
+          '零食',
+          '小吃',
+          '烧烤',
+          '火锅',
+          '寿司',
+          '拉面',
+          '披萨',
+          '汉堡',
+          '三明治',
+          '沙拉',
+          '牛排',
+          '炸鸡',
+          '奶油',
+          '芝士',
+          '抹茶',
+          '草莓',
+          '水果',
+          '美食',
+          '食物',
+          '餐厅',
+          '外卖',
+          '堂食',
+          '菜单',
+          '菜品',
+          '料理',
+          '烘焙',
+          '甜食',
+          '糕点',
+          '饭',
+          '粥',
+          '面',
+          '汤',
+          '菜',
+          '肉',
+          '鱼',
+          '虾',
+          '蟹',
+          '奶酪',
+          '酸奶',
+          '布丁',
+          '马卡龙',
+          '提拉米苏',
+          '慕斯',
+        ];
+        for (final keyword in foodKeywords) {
+          if (fullText.contains(keyword)) {
+            category = MemoryCategory.note;
+            debugPrint('二次校验：服饰分类但包含食物关键词"$keyword"，降级为随手记');
+            break;
+          }
+        }
+      }
+
       // 二次校验：如果 AI 分类为随手记，但内容中包含账单关键词或有 amount 字段，强制改为账单
       // 注意：账单校验优先于服饰校验
       if (category == MemoryCategory.note) {
@@ -624,14 +697,35 @@ class AiService {
         }
         debugPrint('取件码最终标题: $title');
       }
-      // 标题后处理：取餐码类型强制使用"店铺+取餐码"
+      // 标题后处理：取餐码类型强制使用取餐码本身
       if (category == MemoryCategory.pickupCode) {
-        final shop =
-            getNonEmptyString(json, 'shopName') ??
-            getNonEmptyString(json, 'merchantName');
         final code = _extractCodeFromJson(json, 'pickupCode', ['取餐码', '取餐号']);
         if (code != null) {
-          title = shop != null ? '$shop $code' : code;
+          title = code;
+        } else {
+          // 无法提取到有效取餐码，降级为随手记
+          debugPrint('取餐码分类但无法提取码值，降级为随手记');
+          category = MemoryCategory.note;
+        }
+      }
+
+      // 校验：取件码类型如果最终标题不含数字，降级为随手记
+      if (category == MemoryCategory.packageCode) {
+        if (!RegExp(r'\d').hasMatch(title)) {
+          debugPrint('取件码分类但标题不含数字，降级为随手记');
+          category = MemoryCategory.note;
+        }
+      }
+
+      // 标题兜底：如果标题为空，使用摘要或默认值
+      if (title.trim().isEmpty) {
+        final summary = getNonEmptyString(json, 'summary');
+        if (summary != null && summary.length <= 30) {
+          title = summary;
+        } else if (summary != null) {
+          title = '${summary.substring(0, 27)}...';
+        } else {
+          title = '随手记';
         }
       }
 
@@ -768,7 +862,7 @@ class AiService {
   }
 
   Future<bool> hasApiKey() async {
-    final apiKey = await _configService.getApiKey();
+    final apiKey = await _configService.getActiveApiKey();
     return apiKey.isNotEmpty;
   }
 }

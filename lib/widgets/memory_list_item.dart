@@ -7,6 +7,7 @@ class MemoryListItem extends StatelessWidget {
   final MemoryItem? memory;
   final bool isLoading;
   final bool isNew;
+  final bool isReanalyzing;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
   final VoidCallback? onToggleComplete;
@@ -17,6 +18,7 @@ class MemoryListItem extends StatelessWidget {
     this.memory,
     this.isLoading = false,
     this.isNew = false,
+    this.isReanalyzing = false,
     this.onTap,
     this.onDelete,
     this.onToggleComplete,
@@ -25,7 +27,7 @@ class MemoryListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
+    if (isLoading || isReanalyzing) {
       return const SkeletonListItem();
     }
 

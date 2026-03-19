@@ -25,6 +25,7 @@ class _AboutPageState extends State<AboutPage> {
     return Scaffold(
       backgroundColor: AppColors.surfaceLow(isDark),
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             _buildAppBar(context, isCollapsed),
@@ -68,7 +69,7 @@ class _AboutPageState extends State<AboutPage> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'V1.0.1',
+                              'V1.0.2',
                               style: TextStyle(
                                 fontSize: 16,
 

@@ -42,18 +42,21 @@ class _AIGlowBorderState extends State<AIGlowBorder>
   Widget build(BuildContext context) {
     final borderRadius = widget.borderRadius ?? BorderRadius.circular(20);
 
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return CustomPaint(
-          painter: _GlowBorderPainter(
-            animationValue: _controller.value,
-            borderRadius: borderRadius,
-            intensity: widget.intensity,
-          ),
-          child: widget.child,
-        );
-      },
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return CustomPaint(
+            painter: _GlowBorderPainter(
+              animationValue: _controller.value,
+              borderRadius: borderRadius,
+              intensity: widget.intensity,
+            ),
+            child: child,
+          );
+        },
+        child: widget.child,
+      ),
     );
   }
 }
@@ -87,18 +90,14 @@ class _GlowBorderPainter extends CustomPainter {
 
     final clampedIntensity = intensity.clamp(0.0, 1.0);
 
-    // 弥散模糊半径: 10 ~ 40
-    final blurRadius = 10.0 + clampedIntensity * 30.0;
-    // 外层透明度: 0.25 ~ 0.85
+    // blur 半径控制在 8 ~ 24，避免花屏
+    final blurRadius = 8.0 + clampedIntensity * 16.0;
     final outerOpacity = 0.25 + clampedIntensity * 0.60;
-    // 边框粗细: 1.5 ~ 3.5
     final strokeWidth = 1.5 + clampedIntensity * 2.0;
-    // 外层扩展粗细: 6 ~ 16
     final outerStroke = 6.0 + clampedIntensity * 10.0;
-    // 内层透明度: 0.5 ~ 1.0
     final innerOpacity = 0.5 + clampedIntensity * 0.5;
 
-    // 第一层：大范围弥散光晕（最外层柔光）
+    // 第一层：大范围弥散光晕
     final diffusePaint = Paint()
       ..shader = SweepGradient(
         center: Alignment.center,
@@ -110,7 +109,7 @@ class _GlowBorderPainter extends CustomPainter {
       ).createShader(rect)
       ..strokeWidth = outerStroke + 8.0
       ..style = PaintingStyle.stroke
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurRadius * 2.0);
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurRadius * 1.5);
 
     canvas.drawRRect(rrect, diffusePaint);
 
@@ -128,23 +127,7 @@ class _GlowBorderPainter extends CustomPainter {
 
     canvas.drawRRect(rrect, outerPaint);
 
-    // 第三层：近距离柔光
-    final nearPaint = Paint()
-      ..shader = SweepGradient(
-        center: Alignment.center,
-        colors: colors
-            .map((c) => c.withValues(alpha: outerOpacity * 0.8))
-            .toList(),
-        stops: const [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
-        transform: GradientRotation(startAngle),
-      ).createShader(rect)
-      ..strokeWidth = outerStroke * 0.6
-      ..style = PaintingStyle.stroke
-      ..maskFilter = MaskFilter.blur(BlurStyle.outer, blurRadius * 0.5);
-
-    canvas.drawRRect(rrect, nearPaint);
-
-    // 第四层：柔和边框线（轻微弥散）
+    // 第三层：清晰边框线（轻微弥散）
     final innerPaint = Paint()
       ..shader = SweepGradient(
         center: Alignment.center,

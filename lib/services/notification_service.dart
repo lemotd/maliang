@@ -19,6 +19,7 @@ class NotificationService {
 
   bool _initialized = false;
   Future<void>? _initFuture;
+  bool _channelReady = false;
   MemoryActionCallback? onCompleteMemory;
   MemoryActionCallback? onOpenDetail;
   void Function(String path)? onTileImage;
@@ -30,16 +31,25 @@ class NotificationService {
     return _initFuture;
   }
 
+  /// 立即注册 MethodChannel handler（不等待插件初始化）
+  void _ensureChannelReady() {
+    if (_channelReady) return;
+    _channelReady = true;
+    _channel.setMethodCallHandler(_handleMethodCall);
+    debugPrint('MethodChannel handler 已注册');
+  }
+
   Future<void> _doInitialize() async {
-    // 初始化本地通知
+    // 先注册 MethodChannel，确保原生回调不丢失
+    _ensureChannelReady();
+
+    // 初始化本地通知插件（仅用于权限请求）
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
     );
     const initSettings = InitializationSettings(android: androidSettings);
-
     await _notifications.initialize(initSettings);
 
-    _channel.setMethodCallHandler(_handleMethodCall);
     _initialized = true;
     debugPrint('通知服务初始化完成');
   }
@@ -76,7 +86,7 @@ class NotificationService {
   static const int _processingNotificationId = 99999;
 
   Future<void> showProcessingNotification() async {
-    if (!_initialized) await initialize();
+    _ensureChannelReady();
 
     try {
       await _channel.invokeMethod('showProcessingNotification', {
@@ -100,7 +110,7 @@ class NotificationService {
   }
 
   Future<void> showLiveUpdateNotification(MemoryItem memory) async {
-    if (!_initialized) await initialize();
+    _ensureChannelReady();
 
     try {
       String detailText;
@@ -188,6 +198,16 @@ class NotificationService {
     } catch (e) {
       debugPrint('取消所有通知失败: $e');
     }
+  }
+
+  bool _permissionRequested = false;
+
+  /// 确保通知权限已请求（幂等，只请求一次）
+  Future<void> ensurePermission() async {
+    if (_permissionRequested) return;
+    _permissionRequested = true;
+    if (!_initialized) await initialize();
+    await requestNotificationPermission();
   }
 
   Future<bool> requestNotificationPermission() async {

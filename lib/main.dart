@@ -11,6 +11,8 @@ import 'dart:io';
 import 'widgets/main_app_bar.dart';
 import 'pages/memory_detail_page.dart';
 import 'widgets/memory_list_item.dart';
+import 'widgets/skeleton_list_item.dart';
+import 'widgets/ai_glow_border.dart';
 import 'widgets/collection_section.dart';
 import 'widgets/responsive_layout.dart';
 import 'pages/settings_page.dart';
@@ -162,6 +164,7 @@ class _HomePageState extends State<HomePage>
     super.initState();
     HomePage.onDataChanged = _loadMemories;
     WidgetsBinding.instance.addObserver(this);
+    MemoryDetailPage.reanalyzingIds.addListener(_onReanalyzingChanged);
     _tabSwitchController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 120),
@@ -217,10 +220,15 @@ class _HomePageState extends State<HomePage>
   @override
   void dispose() {
     HomePage.onDataChanged = null;
+    MemoryDetailPage.reanalyzingIds.removeListener(_onReanalyzingChanged);
     WidgetsBinding.instance.removeObserver(this);
     _tabSwitchController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onReanalyzingChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _initNotificationService() async {
@@ -255,8 +263,8 @@ class _HomePageState extends State<HomePage>
       _processImage(path);
     };
 
-    // 权限请求放在最后，不阻塞回调注册
-    _notificationService.requestNotificationPermission();
+    // 权限请求不阻塞，首次上传图片时会通过 ensurePermission 确保权限
+    _notificationService.ensurePermission();
   }
 
   void _handleOpenDetailRequest(int? memoryIdHash) {
@@ -443,6 +451,9 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _processImage(String sharedPath) async {
+    // 确保通知权限已获取（冷启动首次上传时可能还没请求过权限）
+    await _notificationService.ensurePermission();
+
     if (mounted) {
       setState(() {
         _loadingCount++;
@@ -661,9 +672,62 @@ class _HomePageState extends State<HomePage>
       backgroundColor: AppColors.surfaceLow(isDark),
       body: Stack(
         children: [
+          // 底层：列表内容（顶部留出顶栏空间）
           Column(
             children: [
-              MainAppBar(
+              // 占位：和 MainAppBar 同高（不可见）
+              Opacity(
+                opacity: 0,
+                child: IgnorePointer(
+                  child: MainAppBar(scrollOffset: _scrollOffset),
+                ),
+              ),
+              Expanded(child: _buildBody()),
+            ],
+          ),
+          // 中间层：光效覆盖层（在列表之上，顶栏之下）
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ValueListenableBuilder<List<SkeletonGlowInfo>>(
+                valueListenable: SkeletonListItem.activeGlows,
+                builder: (context, glows, _) {
+                  if (glows.isEmpty) return const SizedBox.shrink();
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: glows.map((info) {
+                      return CompositedTransformFollower(
+                        link: info.link,
+                        showWhenUnlinked: false,
+                        child: ClipPath(
+                          clipper: _HollowCardClipper(
+                            cardSize: info.size,
+                            borderRadius: 20,
+                          ),
+                          child: SizedBox(
+                            width: info.size.width,
+                            height: info.size.height,
+                            child: AIGlowBorder(
+                              borderRadius: smoothRadius(20),
+                              intensity: 0.3,
+                              child: const SizedBox.expand(),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ),
+          ),
+          // 上层：顶栏（遮住光效）
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            child: Container(
+              color: AppColors.surfaceLow(isDark),
+              child: MainAppBar(
                 scrollOffset: _scrollOffset,
                 onSettingsTap: () {
                   final page = const SettingsPage();
@@ -677,8 +741,7 @@ class _HomePageState extends State<HomePage>
                   }
                 },
               ),
-              Expanded(child: _buildBody()),
-            ],
+            ),
           ),
           Positioned(
             left: 0,
@@ -795,6 +858,9 @@ class _HomePageState extends State<HomePage>
                 child: MemoryListItem(
                   memory: memory,
                   isNew: isNew,
+                  isReanalyzing: MemoryDetailPage.reanalyzingIds.value.contains(
+                    memory.id,
+                  ),
                   onAnimationComplete: () {
                     _newlyAddedIds.remove(memory.id);
                   },
@@ -1346,6 +1412,32 @@ class _ToastWidgetState extends State<_ToastWidget>
       ),
     );
   }
+}
+
+/// 挖空卡片内部区域，只保留外围光效弥散
+class _HollowCardClipper extends CustomClipper<Path> {
+  final Size cardSize;
+  final double borderRadius;
+
+  _HollowCardClipper({required this.cardSize, required this.borderRadius});
+
+  @override
+  Path getClip(Size size) {
+    final outer = Path()
+      ..addRect(Rect.fromLTWH(-100, -100, size.width + 200, size.height + 200));
+    final inner = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(0, 0, size.width, size.height),
+          Radius.circular(borderRadius),
+        ),
+      );
+    return Path.combine(PathOperation.difference, outer, inner);
+  }
+
+  @override
+  bool shouldReclip(covariant _HollowCardClipper oldClipper) =>
+      cardSize != oldClipper.cardSize;
 }
 
 /// 删除动画包装器：淡出 + 向左滑出 + 高度收缩
