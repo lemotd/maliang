@@ -147,7 +147,7 @@ class _HomePageState extends State<HomePage>
 
   int _loadingCount = 0;
   final Set<String> _newlyAddedIds = {};
-  final Set<String> _deletingIds = {};
+  final Map<String, double> _deletingOffsets = {};
   bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
@@ -608,9 +608,9 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  Future<void> _deleteMemory(MemoryItem memory) async {
-    // 先标记为删除中，触发收缩动画
-    setState(() => _deletingIds.add(memory.id));
+  Future<void> _deleteMemory(MemoryItem memory, double dragOffset) async {
+    // 先标记为删除中，保存当前拖拽偏移量，触发动画
+    setState(() => _deletingOffsets[memory.id] = dragOffset);
 
     // 等待动画完成
     await Future.delayed(const Duration(milliseconds: 300));
@@ -618,7 +618,7 @@ class _HomePageState extends State<HomePage>
     // 从本地列表移除
     if (!mounted) return;
     setState(() {
-      _deletingIds.remove(memory.id);
+      _deletingOffsets.remove(memory.id);
       _memories.removeWhere((m) => m.id == memory.id);
     });
 
@@ -858,7 +858,7 @@ class _HomePageState extends State<HomePage>
               if (memoryIndex >= filteredMemories.length) return null;
               final memory = filteredMemories[memoryIndex];
               final isNew = _newlyAddedIds.contains(memory.id);
-              final isDeleting = _deletingIds.contains(memory.id);
+              final isDeleting = _deletingOffsets.containsKey(memory.id);
 
               Widget item = AnimatedBuilder(
                 animation: _tabSwitchController,
@@ -881,7 +881,7 @@ class _HomePageState extends State<HomePage>
                     _newlyAddedIds.remove(memory.id);
                   },
                   onTap: () => _showMemoryDetail(memory),
-                  onDelete: () => _deleteMemory(memory),
+                  onDelete: (offset) => _deleteMemory(memory, offset),
                   onToggleComplete: () => _toggleComplete(memory),
                 ),
               );
@@ -889,6 +889,7 @@ class _HomePageState extends State<HomePage>
               return _DeletingWrapper(
                 key: ValueKey('mem_${memory.id}'),
                 isDeleting: isDeleting,
+                initialDragOffset: _deletingOffsets[memory.id] ?? 0,
                 child: item,
               );
             }, childCount: _loadingCount + filteredMemories.length),
@@ -1156,7 +1157,7 @@ class _HomePageState extends State<HomePage>
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  _deleteMemory(memory);
+                  _deleteMemory(memory, 0);
                 },
               ),
               ListTile(
@@ -1471,14 +1472,16 @@ class _GlowTopClipper extends CustomClipper<Rect> {
       top != oldClipper.top;
 }
 
-/// 删除动画包装器：淡出 + 向左滑出 + 高度收缩
+/// 删除动画包装器：向左位移 + 缩小 + 高度收缩
 class _DeletingWrapper extends StatefulWidget {
   final bool isDeleting;
+  final double initialDragOffset;
   final Widget child;
 
   const _DeletingWrapper({
     super.key,
     required this.isDeleting,
+    this.initialDragOffset = 0,
     required this.child,
   });
 
@@ -1489,8 +1492,8 @@ class _DeletingWrapper extends StatefulWidget {
 class _DeletingWrapperState extends State<_DeletingWrapper>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late Animation<double> _slideAnim;
   late Animation<double> _fadeAnim;
-  late Animation<Offset> _slideAnim;
   late Animation<double> _sizeAnim;
 
   @override
@@ -1500,32 +1503,50 @@ class _DeletingWrapperState extends State<_DeletingWrapper>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+    _initAnimations(widget.initialDragOffset);
+    if (widget.isDeleting) _controller.forward();
+  }
+
+  void _initAnimations(double dragOffset) {
+    final screenWidth =
+        WidgetsBinding
+            .instance
+            .platformDispatcher
+            .views
+            .first
+            .physicalSize
+            .width /
+        WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
+    // 将像素偏移转换为 SlideTransition 使用的比例值
+    // dragOffset 是负值（向左滑），转换为比例：dragOffset / screenWidth
+    final beginSlide = dragOffset / screenWidth;
+    // 从当前位置继续向左滑出
+    _slideAnim = Tween<double>(begin: beginSlide, end: -1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+      ),
+    );
     _fadeAnim = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
       ),
     );
-    _slideAnim = Tween<Offset>(begin: Offset.zero, end: const Offset(-0.08, 0))
-        .animate(
-          CurvedAnimation(
-            parent: _controller,
-            curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-          ),
-        );
+    // 高度收缩填补空隙
     _sizeAnim = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.3, 1.0, curve: Curves.easeInOut),
+        curve: const Interval(0.4, 1.0, curve: Curves.easeInOut),
       ),
     );
-    if (widget.isDeleting) _controller.forward();
   }
 
   @override
   void didUpdateWidget(covariant _DeletingWrapper old) {
     super.didUpdateWidget(old);
     if (widget.isDeleting && !old.isDeleting) {
+      _initAnimations(widget.initialDragOffset);
       _controller.forward();
     }
   }
@@ -1541,16 +1562,15 @@ class _DeletingWrapperState extends State<_DeletingWrapper>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        // 仅在删除动画进行中时裁切，避免裁切光效
         if (_controller.isDismissed) return child!;
-        return FadeTransition(
-          opacity: _fadeAnim,
-          child: SlideTransition(
-            position: _slideAnim,
-            child: ClipRect(
-              child: Align(
-                alignment: Alignment.topCenter,
-                heightFactor: _sizeAnim.value,
+        return ClipRect(
+          child: Align(
+            alignment: Alignment.topCenter,
+            heightFactor: _sizeAnim.value,
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: SlideTransition(
+                position: AlwaysStoppedAnimation(Offset(_slideAnim.value, 0)),
                 child: child,
               ),
             ),

@@ -192,13 +192,19 @@ class AiService {
 
 分类类型（按以下顺序逐一检查，每种类型独立判断，可同时命中多个）：
 
-1. 取餐码：包含明确的取餐码/取餐号/排队号等数字编码，如"A001"、"12号"。仅有餐厅菜单、食物图片不算。
+1. 取餐码：包含明确的取餐码/取茶码/取餐号/排队号等数字编码，如"A001"、"12号"。仅有餐厅菜单、食物图片不算。【注意】日期时间（如"2024-03-20"、"14:30"、"3月20日"）不是取餐码；截图中显示的聊天时间、通知时间、日历日期等都不是取餐码。取餐码通常出现在点餐/排队场景中，有明确的"取餐码"、"排队号"等标签。如果图片只是普通截图（聊天记录、通知、文章、社交媒体等）且包含日期时间，应归类为随手记而非取餐码。
 2. 取件码：包含明确的快递取件码/取件号，如"12-3-4567"。
-3. 账单：包含金额和交易/支付信息（支付截图、转账、小票、发票、外卖订单、购物订单、缴费等）。
+3. 账单：包含金额和交易/支付信息（支付截图、转账、小票、发票、外卖订单、购物订单、缴费等）。注意：取餐码/取件码中的数字编号不是金额，不要将其识别为账单。
 4. 服饰：服饰实物照片、服饰商品图、电商服饰详情页。社交媒体截图中有人穿衣服不算。
 5. 随手记：以上都不是时使用。
 
-例如：一张外卖订单截图同时包含取餐码和支付金额，应生成两条记录：一条取餐码、一条账单。
+【特别注意】当图片同时包含取餐码和金额时：
+- 取餐码（如"A001"、"12号"）必须归类为取餐码，不能归类为账单
+- 只有明确的支付金额（带¥符号或"元"字的数字）才归类为账单
+- 取餐码的title只填码值本身，账单的amount只填实际支付金额
+- 不要把取餐码的数字当作金额
+
+例如：一张外卖订单截图同时包含取餐码"A032"和支付金额"¥35.00"，应生成两条记录：一条取餐码（title为"A032"）、一条账单（amount为"35.00"）。绝对不要把取餐码"A032"当作账单。
 如果图片中包含多个同类型的信息（如多个取件码、多笔账单），也要为每一个分别生成独立的记录。
 
 每条记录的字段规则：
@@ -446,6 +452,7 @@ class AiService {
       MemoryCategory category;
       switch (categoryStr) {
         case '取餐码':
+        case '取茶码':
           category = MemoryCategory.pickupCode;
           break;
         case '取件码':
@@ -467,6 +474,92 @@ class AiService {
         if (value == null) return null;
         if (value is String && value.trim().isNotEmpty) return value.trim();
         return null;
+      }
+
+      // 二次校验：取餐码的 title 不应该是日期时间格式
+      // 带日期时间的截图（聊天记录、通知等）容易被误识别为取餐码
+      if (category == MemoryCategory.pickupCode) {
+        final codeTitle = title.trim();
+        // 检测常见日期时间格式：
+        // "2024-03-20", "03-20", "3月20日", "14:30", "2024/03/20", "03/20"
+        // "2024.03.20", "周一", "星期一", "上午", "下午"
+        final looksLikeDateTime = RegExp(
+          r'^\d{2,4}[\-/\.]\d{1,2}[\-/\.]\d{1,2}$|' // 2024-03-20, 03/20/2024
+          r'^\d{1,2}[\-/\.]\d{1,2}$|' // 03-20, 3/20
+          r'^\d{1,2}月\d{1,2}日?$|' // 3月20日, 3月20
+          r'^\d{1,2}:\d{2}(:\d{2})?$|' // 14:30, 14:30:00
+          r'^\d{2,4}年\d{1,2}月\d{1,2}日?$|' // 2024年3月20日
+          r'^(周[一二三四五六日天]|星期[一二三四五六日天])$|' // 周一, 星期一
+          r'^(上午|下午|凌晨|早上|晚上)\d{1,2}:\d{2}$', // 上午10:30
+        ).hasMatch(codeTitle);
+        if (looksLikeDateTime) {
+          category = MemoryCategory.note;
+          debugPrint('二次校验：取餐码标题"$codeTitle"看起来像日期时间，降级为随手记');
+        }
+        // 检测 title 和 summary 中是否完全没有取餐相关上下文
+        // 如果 summary 中没有任何取餐/点餐/排队相关词汇，大概率是误识别
+        if (category == MemoryCategory.pickupCode) {
+          final summaryText = (json['summary'] as String? ?? '').toLowerCase();
+          final titleText = title.toLowerCase();
+          final combinedText = '$titleText $summaryText';
+          const pickupContextKeywords = [
+            '取餐',
+            '取茶',
+            '排队',
+            '叫号',
+            '点餐',
+            '下单',
+            '外卖',
+            '堂食',
+            '餐厅',
+            '奶茶',
+            '咖啡',
+            '饮品',
+            '门店',
+            '柜台',
+            '窗口',
+            '等候',
+            '备餐',
+          ];
+          final hasPickupContext = pickupContextKeywords.any(
+            (kw) => combinedText.contains(kw),
+          );
+          if (!hasPickupContext) {
+            // 再检查 infoSections 中是否有取餐相关信息
+            final sectionsText = jsonEncode(
+              json['infoSections'] ?? [],
+            ).toLowerCase();
+            final hasPickupInSections = pickupContextKeywords.any(
+              (kw) => sectionsText.contains(kw),
+            );
+            if (!hasPickupInSections) {
+              category = MemoryCategory.note;
+              debugPrint('二次校验：取餐码分类但无任何取餐上下文，降级为随手记');
+            }
+          }
+        }
+      }
+
+      // 二次校验：账单的 amount 必须像真实金额（含数字和可选的货币符号/小数点）
+      // 如果 amount 看起来像取餐码/取件码（如 "A032"、"12号"），清除 amount
+      if (category == MemoryCategory.bill) {
+        final rawAmount = getNonEmptyString(json, 'amount');
+        if (rawAmount != null) {
+          // 去掉货币符号和空格后，应该是纯数字或带小数点的数字
+          final cleaned = rawAmount.replaceAll(RegExp(r'[¥￥$€£\s,，+\-]'), '');
+          final looksLikeMoney = RegExp(r'^\d+\.?\d*$').hasMatch(cleaned);
+          if (!looksLikeMoney) {
+            debugPrint('二次校验：amount "$rawAmount" 不像金额，清除');
+            json['amount'] = null;
+            // 如果清除 amount 后没有其他账单特征，降级为随手记
+            if (getNonEmptyString(json, 'billCategory') == null &&
+                getNonEmptyString(json, 'paymentMethod') == null &&
+                getNonEmptyString(json, 'merchantName') == null) {
+              category = MemoryCategory.note;
+              debugPrint('二次校验：无账单特征字段，降级为随手记');
+            }
+          }
+        }
       }
 
       // 二次校验：如果 AI 分类为服饰，但内容实际是食物相关，降级为随手记
@@ -572,6 +665,25 @@ class AiService {
             if (fullText.contains(keyword)) {
               category = MemoryCategory.bill;
               debugPrint('二次校验命中账单关键词: $keyword，强制改为账单分类');
+              break;
+            }
+          }
+        }
+      }
+
+      // 二次校验：如果 AI 分类为随手记，但内容中包含取餐码/取茶码关键词或有 pickupCode 字段，强制改为取餐码
+      if (category == MemoryCategory.note) {
+        final hasPickupCode = getNonEmptyString(json, 'pickupCode') != null;
+        if (hasPickupCode) {
+          category = MemoryCategory.pickupCode;
+          debugPrint('二次校验：检测到pickupCode字段，强制改为取餐码分类');
+        } else {
+          final fullText = '$title ${json['summary'] ?? ''}'.toLowerCase();
+          const pickupKeywords = ['取餐码', '取茶码', '取餐号', '排队号', '叫号'];
+          for (final keyword in pickupKeywords) {
+            if (fullText.contains(keyword)) {
+              category = MemoryCategory.pickupCode;
+              debugPrint('二次校验命中取餐码关键词: $keyword，强制改为取餐码分类');
               break;
             }
           }
@@ -699,14 +811,19 @@ class AiService {
       }
       // 标题后处理：取餐码类型强制使用取餐码本身
       if (category == MemoryCategory.pickupCode) {
-        final code = _extractCodeFromJson(json, 'pickupCode', ['取餐码', '取餐号']);
+        final code = _extractCodeFromJson(json, 'pickupCode', [
+          '取餐码',
+          '取餐号',
+          '取茶码',
+          '取茶号',
+          '编号',
+          '号码',
+          '码',
+        ]);
         if (code != null) {
           title = code;
-        } else {
-          // 无法提取到有效取餐码，降级为随手记
-          debugPrint('取餐码分类但无法提取码值，降级为随手记');
-          category = MemoryCategory.note;
         }
+        // 不降级：即使无法从字段中提取码值，title 本身可能就是码值（AI prompt 要求 title 填码值）
       }
 
       // 校验：取件码类型如果最终标题不含数字，降级为随手记

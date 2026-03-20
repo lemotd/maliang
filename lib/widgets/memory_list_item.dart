@@ -9,7 +9,7 @@ class MemoryListItem extends StatelessWidget {
   final bool isNew;
   final bool isReanalyzing;
   final VoidCallback? onTap;
-  final VoidCallback? onDelete;
+  final void Function(double dragOffset)? onDelete;
   final VoidCallback? onToggleComplete;
   final VoidCallback? onAnimationComplete;
 

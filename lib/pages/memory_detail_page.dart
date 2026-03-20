@@ -2527,7 +2527,6 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
     final imagePath = _memory.imagePath!;
     final thumbnailPath = _memory.thumbnailPath;
     final originalCategory = _memory.category;
-    final createdAt = _memory.createdAt;
 
     // 标记为正在重新识别（全局）
     MemoryDetailPage.reanalyzingIds.value = {
@@ -2566,7 +2565,10 @@ class _MemoryDetailPageState extends State<MemoryDetailPage>
             );
 
       if (newMemory != null) {
-        final updated = newMemory.copyWith(id: memoryId, createdAt: createdAt);
+        final updated = newMemory.copyWith(
+          id: memoryId,
+          createdAt: DateTime.now(),
+        );
         await _memoryService.updateMemory(updated);
 
         // 取消处理中通知，显示识别结果通知

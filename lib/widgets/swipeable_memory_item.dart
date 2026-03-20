@@ -11,7 +11,7 @@ class SwipeableMemoryItem extends StatefulWidget {
   final MemoryItem memory;
   final bool isNew;
   final VoidCallback? onTap;
-  final VoidCallback? onDelete;
+  final void Function(double dragOffset)? onDelete;
   final VoidCallback? onToggleComplete;
   final VoidCallback? onAnimationComplete;
 
@@ -156,10 +156,13 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
       HapticFeedback.lightImpact();
       if (_dragExtent > 0) {
         widget.onToggleComplete?.call();
+        _animateReset();
       } else {
-        widget.onDelete?.call();
+        final offset = _dragExtent;
+        // 立即归零，由 _DeletingWrapper 从 offset 位置接管动画
+        setState(() => _dragExtent = 0);
+        widget.onDelete?.call(offset);
       }
-      _animateReset();
     } else if (absDrag > _stage1Threshold) {
       _animateToHoldPosition();
       SwipeableMemoryItem._openedState = this;
@@ -233,8 +236,10 @@ class _SwipeableMemoryItemState extends State<SwipeableMemoryItem>
     if (_isActionExecuting) return;
     _isActionExecuting = true;
     HapticFeedback.lightImpact();
-    widget.onDelete?.call();
-    _animateReset();
+    final offset = _dragExtent;
+    // 立即归零，由 _DeletingWrapper 从 offset 位置接管动画
+    setState(() => _dragExtent = 0);
+    widget.onDelete?.call(offset);
   }
 
   String _formatTime(DateTime time) {
