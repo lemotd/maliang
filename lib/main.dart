@@ -152,6 +152,7 @@ class _HomePageState extends State<HomePage>
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
   MemoryCategory? _selectedCategory; // null = 全部
+  final ValueNotifier<double> _glowClipTop = ValueNotifier<double>(0);
   late AnimationController _tabSwitchController;
   late Animation<double> _tabFade;
   late Animation<double> _tabScale;
@@ -224,6 +225,7 @@ class _HomePageState extends State<HomePage>
     WidgetsBinding.instance.removeObserver(this);
     _tabSwitchController.dispose();
     _scrollController.dispose();
+    _glowClipTop.dispose();
     super.dispose();
   }
 
@@ -688,33 +690,46 @@ class _HomePageState extends State<HomePage>
           // 中间层：光效覆盖层（在列表之上，顶栏之下）
           Positioned.fill(
             child: IgnorePointer(
-              child: ValueListenableBuilder<List<SkeletonGlowInfo>>(
-                valueListenable: SkeletonListItem.activeGlows,
-                builder: (context, glows, _) {
-                  if (glows.isEmpty) return const SizedBox.shrink();
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: glows.map((info) {
-                      return CompositedTransformFollower(
-                        link: info.link,
-                        showWhenUnlinked: false,
-                        child: ClipPath(
-                          clipper: _HollowCardClipper(
-                            cardSize: info.size,
-                            borderRadius: 20,
-                          ),
-                          child: SizedBox(
-                            width: info.size.width,
-                            height: info.size.height,
-                            child: AIGlowBorder(
-                              borderRadius: smoothRadius(20),
-                              intensity: 0.3,
-                              child: const SizedBox.expand(),
+              child: ValueListenableBuilder<double>(
+                valueListenable: _glowClipTop,
+                builder: (context, clipTop, child) {
+                  return ValueListenableBuilder<List<SkeletonGlowInfo>>(
+                    valueListenable: SkeletonListItem.activeGlows,
+                    builder: (context, glows, _) {
+                      if (glows.isEmpty) return const SizedBox.shrink();
+                      Widget glowStack = Stack(
+                        clipBehavior: Clip.none,
+                        children: glows.map((info) {
+                          return CompositedTransformFollower(
+                            link: info.link,
+                            showWhenUnlinked: false,
+                            child: ClipPath(
+                              clipper: _HollowCardClipper(
+                                cardSize: info.size,
+                                borderRadius: 20,
+                              ),
+                              child: SizedBox(
+                                width: info.size.width,
+                                height: info.size.height,
+                                child: AIGlowBorder(
+                                  borderRadius: smoothRadius(20),
+                                  intensity: 0.3,
+                                  child: const SizedBox.expand(),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        }).toList(),
                       );
-                    }).toList(),
+                      // 当 tab 吸顶时，裁切光效使其不超过 tab 底部
+                      if (clipTop > 0) {
+                        glowStack = ClipRect(
+                          clipper: _GlowTopClipper(top: clipTop),
+                          child: glowStack,
+                        );
+                      }
+                      return glowStack;
+                    },
                   );
                 },
               ),
@@ -823,6 +838,7 @@ class _HomePageState extends State<HomePage>
             pinned: true,
             delegate: _StickyTabBarDelegate(
               isDark: isDark,
+              glowClipTop: _glowClipTop,
               child: _CategoryTabBar(
                 selectedCategory: _selectedCategory,
                 memories: _memories,
@@ -1440,6 +1456,21 @@ class _HollowCardClipper extends CustomClipper<Path> {
       cardSize != oldClipper.cardSize;
 }
 
+/// 裁切光效顶部，使光效不超过吸顶 tab 底部
+class _GlowTopClipper extends CustomClipper<Rect> {
+  final double top;
+  _GlowTopClipper({required this.top});
+
+  @override
+  Rect getClip(Size size) {
+    return Rect.fromLTRB(0, top, size.width, size.height);
+  }
+
+  @override
+  bool shouldReclip(covariant _GlowTopClipper oldClipper) =>
+      top != oldClipper.top;
+}
+
 /// 删除动画包装器：淡出 + 向左滑出 + 高度收缩
 class _DeletingWrapper extends StatefulWidget {
   final bool isDeleting;
@@ -1510,6 +1541,8 @@ class _DeletingWrapperState extends State<_DeletingWrapper>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
+        // 仅在删除动画进行中时裁切，避免裁切光效
+        if (_controller.isDismissed) return child!;
         return FadeTransition(
           opacity: _fadeAnim,
           child: SlideTransition(
@@ -1609,12 +1642,68 @@ class _CategoryCapsuleState extends State<_CategoryCapsule> {
   }
 }
 
+/// 用于测量吸顶 Tab 栏底部位置，通知光效裁切
+class _StickyTabBarLayout extends StatefulWidget {
+  final bool isPinned;
+  final ValueNotifier<double>? glowClipTop;
+  final Widget child;
+
+  const _StickyTabBarLayout({
+    required this.isPinned,
+    this.glowClipTop,
+    required this.child,
+  });
+
+  @override
+  State<_StickyTabBarLayout> createState() => _StickyTabBarLayoutState();
+}
+
+class _StickyTabBarLayoutState extends State<_StickyTabBarLayout> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+  }
+
+  @override
+  void didUpdateWidget(covariant _StickyTabBarLayout old) {
+    super.didUpdateWidget(old);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+  }
+
+  void _measure() {
+    if (!mounted || widget.glowClipTop == null) return;
+    if (widget.isPinned) {
+      final box = context.findRenderObject() as RenderBox?;
+      if (box != null && box.hasSize) {
+        final pos = box.localToGlobal(Offset.zero);
+        final bottomY = pos.dy + box.size.height;
+        if ((widget.glowClipTop!.value - bottomY).abs() > 1) {
+          widget.glowClipTop!.value = bottomY;
+        }
+      }
+    } else {
+      if (widget.glowClipTop!.value != 0) {
+        widget.glowClipTop!.value = 0;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 /// 吸顶 Tab 栏 delegate
 class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
   final bool isDark;
+  final ValueNotifier<double>? glowClipTop;
 
-  _StickyTabBarDelegate({required this.child, required this.isDark});
+  _StickyTabBarDelegate({
+    required this.child,
+    required this.isDark,
+    this.glowClipTop,
+  });
 
   @override
   double get minExtent => 48; // 32 tab + 8 top padding + 8 bottom padding
@@ -1628,45 +1717,52 @@ class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) {
     final bgColor = AppColors.surfaceLow(isDark);
+    final isPinned = shrinkOffset > 0;
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // 背景：上方不透明，底部渐变淡出，让光效自然过渡
-        Positioned.fill(
-          child: Column(
-            children: [
-              Expanded(child: Container(color: bgColor)),
-              Container(
-                height: 8,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [bgColor, bgColor.withValues(alpha: 0)],
+    return _StickyTabBarLayout(
+      isPinned: isPinned,
+      glowClipTop: glowClipTop,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // 背景：上方不透明，底部渐变淡出，让光效自然过渡
+          Positioned.fill(
+            child: Column(
+              children: [
+                Expanded(child: Container(color: bgColor)),
+                Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [bgColor, bgColor.withValues(alpha: 0)],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        // tab 内容
-        Positioned.fill(
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-              Expanded(child: child),
-              const SizedBox(height: 8),
-            ],
+          // tab 内容
+          Positioned.fill(
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                Expanded(child: child),
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   @override
   bool shouldRebuild(covariant _StickyTabBarDelegate oldDelegate) {
-    return oldDelegate.child != child || oldDelegate.isDark != isDark;
+    return oldDelegate.child != child ||
+        oldDelegate.isDark != isDark ||
+        oldDelegate.glowClipTop != glowClipTop;
   }
 }
 
