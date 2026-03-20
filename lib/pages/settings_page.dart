@@ -80,7 +80,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       _buildSettingsItem(
                         context,
                         title: '关于软件',
-                        subtitle: 'V1.0.3',
+                        subtitle: 'V1.0.3-demo',
                         icon: CupertinoIcons.info,
                         onTap: () {
                           Navigator.push(

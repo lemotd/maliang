@@ -108,7 +108,7 @@ class _AiModelSettingsPageState extends State<AiModelSettingsPage> {
     final customVisionModel = await _configService.getCustomVisionModel();
     setState(() {
       _apiAddressController.text = apiAddress;
-      if (apiKey.isNotEmpty) _apiKeyController.text = apiKey;
+      _apiKeyController.text = apiKey;
       _tabIndex = modelType == 'custom' ? 1 : 0;
       _customApiAddressController.text = customApiAddress;
       if (customApiKey.isNotEmpty) _customApiKeyController.text = customApiKey;

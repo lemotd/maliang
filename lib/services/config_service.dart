@@ -32,7 +32,7 @@ class ConfigService {
 
   Future<String> getApiKey() async {
     final prefs = await _getPrefs();
-    return prefs.getString(_keyApiKey) ?? '';
+    return prefs.getString(_keyApiKey) ?? defaultApiKey;
   }
 
   Future<void> setApiKey(String apiKey) async {
@@ -48,7 +48,7 @@ class ConfigService {
   Future<bool> isUsingDefaultApiKey() async {
     final prefs = await _getPrefs();
     final key = prefs.getString(_keyApiKey) ?? '';
-    return key.isEmpty;
+    return key.isEmpty || key == defaultApiKey;
   }
 
   Future<void> clearConfig() async {

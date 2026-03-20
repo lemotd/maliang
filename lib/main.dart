@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'dart:convert';
 
 import 'widgets/main_app_bar.dart';
 import 'pages/memory_detail_page.dart';
@@ -149,6 +150,7 @@ class _HomePageState extends State<HomePage>
   final Set<String> _newlyAddedIds = {};
   final Map<String, double> _deletingOffsets = {};
   bool _isLoading = false;
+  bool _isImportingDemo = false;
   final ScrollController _scrollController = ScrollController();
   double _scrollOffset = 0;
   MemoryCategory? _selectedCategory; // null = 全部
@@ -293,6 +295,78 @@ class _HomePageState extends State<HomePage>
     setState(() {
       _scrollOffset = _scrollController.offset;
     });
+  }
+
+  Future<void> _importDemoData() async {
+    if (_isImportingDemo) return;
+    setState(() => _isImportingDemo = true);
+    try {
+      final jsonStr = await rootBundle.loadString(
+        'assets/maliang_demo_data_26032001.maliang',
+      );
+      final data = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final memoriesJson = data['memories'] as List<dynamic>;
+      final docDir = await getApplicationDocumentsDirectory();
+
+      // 覆盖：先清除现有数据
+      final existing = await _memoryService.getAllMemories();
+      for (final m in existing) {
+        await _memoryService.deleteMemory(m.id);
+      }
+
+      for (var i = 0; i < memoriesJson.length; i++) {
+        final json = memoriesJson[i] as Map<String, dynamic>;
+        String? imagePath = json['imagePath'] as String?;
+        String? thumbnailPath = json['thumbnailPath'] as String?;
+
+        if (json['imageData'] != null) {
+          final bytes = base64Decode(json['imageData'] as String);
+          final fileName =
+              'img_demo_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+          final file = File('${docDir.path}/$fileName');
+          await file.writeAsBytes(bytes);
+          imagePath = file.path;
+          if (json['thumbnailData'] == null) thumbnailPath = file.path;
+        }
+        if (json['thumbnailData'] != null) {
+          final bytes = base64Decode(json['thumbnailData'] as String);
+          final fileName =
+              'thumb_demo_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+          final file = File('${docDir.path}/$fileName');
+          await file.writeAsBytes(bytes);
+          thumbnailPath = file.path;
+        }
+
+        json['imagePath'] = imagePath;
+        json['thumbnailPath'] = thumbnailPath;
+        await _memoryService.addMemory(MemoryItem.fromJson(json));
+      }
+
+      await _loadMemories();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('导入成功，共 ${memoriesJson.length} 条记忆'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: smoothRadius(10)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('导入失败：$e'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: smoothRadius(10)),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isImportingDemo = false);
+    }
   }
 
   Future<void> _loadMemories() async {
@@ -808,6 +882,11 @@ class _HomePageState extends State<HomePage>
                   fontSize: 14,
                   color: AppColors.onSurfaceOctonary(isDark),
                 ),
+              ),
+              const SizedBox(height: 16),
+              _DemoImportButton(
+                isLoading: _isImportingDemo,
+                onTap: _importDemoData,
               ),
             ],
           ),
@@ -1455,6 +1534,69 @@ class _HollowCardClipper extends CustomClipper<Path> {
   @override
   bool shouldReclip(covariant _HollowCardClipper oldClipper) =>
       cardSize != oldClipper.cardSize;
+}
+
+/// 导入 demo 数据按钮（带按压反馈动画）
+class _DemoImportButton extends StatefulWidget {
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  const _DemoImportButton({required this.isLoading, required this.onTap});
+
+  @override
+  State<_DemoImportButton> createState() => _DemoImportButtonState();
+}
+
+class _DemoImportButtonState extends State<_DemoImportButton> {
+  bool _isPressed = false;
+
+  void _handleTap() async {
+    if (widget.isLoading) return;
+    setState(() => _isPressed = true);
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (mounted) setState(() => _isPressed = false);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {},
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: _handleTap,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.92 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.primary(isDark).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(100),
+          ),
+          child: widget.isLoading
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary(isDark),
+                  ),
+                )
+              : Text(
+                  '导入 demo 数据体验',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.primary(isDark),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
 }
 
 /// 裁切光效顶部，使光效不超过吸顶 tab 底部

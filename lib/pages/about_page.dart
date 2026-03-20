@@ -69,7 +69,7 @@ class _AboutPageState extends State<AboutPage> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'V1.0.3',
+                              'V1.0.3-demo',
                               style: TextStyle(
                                 fontSize: 16,
 
