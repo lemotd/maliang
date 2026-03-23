@@ -6,6 +6,7 @@ import '../utils/scroll_edge_haptic.dart';
 import '../utils/smooth_radius.dart';
 import 'ai_model_settings_page.dart';
 import 'backup_settings_page.dart';
+import 'mcp_settings_page.dart';
 import 'about_page.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -46,20 +47,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       parent: AlwaysScrollableScrollPhysics(),
                     ),
                     children: [
-                      _buildSettingsItem(
-                        context,
-                        title: 'AI 大模型设置',
-                        subtitle: '配置 API 地址或模型',
-                        icon: CupertinoIcons.cube,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            CupertinoPageRoute(
-                              builder: (context) => const AiModelSettingsPage(),
-                            ),
-                          );
-                        },
-                      ),
+                      _buildAiGroupCard(context),
                       _buildSettingsItem(
                         context,
                         title: '备份与恢复',
@@ -187,6 +175,108 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Widget _buildAiGroupCard(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return _PressableGroupCard(
+      children: [
+        _buildGroupRow(
+          context,
+          title: 'AI 大模型设置',
+          subtitle: '配置 API 地址或模型',
+          icon: CupertinoIcons.cube,
+          onTap: () {
+            Navigator.push(
+              context,
+              CupertinoPageRoute(
+                builder: (context) => const AiModelSettingsPage(),
+              ),
+            );
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Divider(
+            height: 0.6,
+            thickness: 0.6,
+            color: isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA),
+          ),
+        ),
+        _buildGroupRow(
+          context,
+          title: 'MCP 配置',
+          subtitle: '让其他 AI 可读写软件内数据',
+          icon: CupertinoIcons.link,
+          onTap: () {
+            Navigator.push(
+              context,
+              CupertinoPageRoute(builder: (context) => const McpSettingsPage()),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGroupRow(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return _PressableGroupRow(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: AppColors.primary(isDark).withValues(alpha: 0.1),
+                borderRadius: smoothRadius(10),
+              ),
+              child: Icon(icon, size: 20, color: AppColors.primary(isDark)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.onSurface(isDark),
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.onSurfaceQuaternary(isDark),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              CupertinoIcons.chevron_right,
+              size: 16,
+              color: AppColors.onSurfaceQuaternary(isDark),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSettingsItem(
     BuildContext context, {
     required String title,
@@ -247,6 +337,65 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PressableGroupCard extends StatelessWidget {
+  final List<Widget> children;
+
+  const _PressableGroupCard({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        borderRadius: smoothRadius(20),
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: children),
+    );
+  }
+}
+
+class _PressableGroupRow extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _PressableGroupRow({required this.child, required this.onTap});
+
+  @override
+  State<_PressableGroupRow> createState() => _PressableGroupRowState();
+}
+
+class _PressableGroupRowState extends State<_PressableGroupRow> {
+  bool _isPressed = false;
+
+  void _handleTap() async {
+    setState(() => _isPressed = true);
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (mounted) setState(() => _isPressed = false);
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {},
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: _handleTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        child: widget.child,
       ),
     );
   }

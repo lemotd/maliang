@@ -1,0 +1,16 @@
+[project]
+name = "maliang-mcp-server"
+version = "0.1.0"
+description = "马良神记 MCP Server - 智能记忆管理接口"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]>=1.0.0",
+    "uvicorn>=0.30.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+maliang-mcp = "maliang_mcp_server:mcp.run"
