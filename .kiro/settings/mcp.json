@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "TalkToFigma": {
+      "command": "bunx",
+      "args": [
+        "cursor-talk-to-figma-mcp@latest"
+      ],
+      "autoApprove": [
+        "get_document_info",
+        "join_channel",
+        "create_frame",
+        "set_corner_radius",
+        "create_text",
+        "set_fill_color",
+        "set_focus",
+        "export_node_as_image"
+      ]
+    },
+    "maliang-notes": {
+      "command": "uv",
+      "args": ["run", "--directory", "mcp_server", "--python", "3.12", "python", "maliang_mcp_server.py"],
+      "env": {
+        "MALIANG_DATA_FILE": "demo_data.maliang",
+        "MCP_TRANSPORT": "stdio"
+      },
+      "autoApprove": [
+        "list_memories",
+        "get_memory",
+        "search_memories",
+        "query_bills",
+        "get_bill_summary"
+      ]
+    }
+  }
+}
