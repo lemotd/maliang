@@ -16,6 +16,7 @@ import 'widgets/ai_glow_border.dart';
 import 'widgets/collection_section.dart';
 import 'widgets/responsive_layout.dart';
 import 'pages/settings_page.dart';
+import 'pages/ai_model_settings_page.dart';
 import 'models/memory_item.dart';
 import 'services/memory_service.dart';
 import 'services/ai_service.dart';
@@ -398,7 +399,7 @@ class _HomePageState extends State<HomePage>
             behavior: SnackBarBehavior.floating,
           ),
         );
-        final page = const SettingsPage();
+        final page = const AiModelSettingsPage();
         if (!pushToDetailPane(context, page)) {
           Navigator.push(
             context,
@@ -434,7 +435,7 @@ class _HomePageState extends State<HomePage>
             behavior: SnackBarBehavior.floating,
           ),
         );
-        final page = const SettingsPage();
+        final page = const AiModelSettingsPage();
         if (!pushToDetailPane(context, page)) {
           Navigator.push(
             context,
@@ -509,7 +510,7 @@ class _HomePageState extends State<HomePage>
     } on ApiKeyInvalidException catch (e) {
       debugPrint('API密钥无效: $e');
       if (mounted) {
-        final page = const SettingsPage();
+        final page = const AiModelSettingsPage();
         if (!pushToDetailPane(context, page)) {
           Navigator.push(
             context,
